@@ -9,8 +9,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { FolderOpen, LogOut, User, Zap, Menu, X } from 'lucide-react';
+import { FolderOpen, LogOut, User, Menu, X } from 'lucide-react';
 import { useState } from 'react';
+import logo from '@/assets/logo.png';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -38,13 +39,12 @@ export function AppLayout({ children }: AppLayoutProps) {
         <div className="content-container">
           <div className="flex h-16 items-center justify-between">
             {/* Logo */}
-            <Link to="/projects" className="flex items-center gap-2 group">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-primary shadow-md group-hover:shadow-lg transition-shadow">
-                <Zap className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <span className="font-display text-xl font-bold text-foreground hidden sm:block">
-                Optienergia
-              </span>
+            <Link to="/projects" className="flex items-center group">
+              <img 
+                src={logo} 
+                alt="Optienergia" 
+                className="h-10 sm:h-12 w-auto transition-transform group-hover:scale-105"
+              />
             </Link>
 
             {/* Desktop Navigation */}
