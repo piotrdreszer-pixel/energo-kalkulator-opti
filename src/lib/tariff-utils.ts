@@ -1,23 +1,23 @@
-// Tariff codes and their zone mappings
+// Tariff codes and their zone mappings - NO descriptive zone hints in labels
 export const TARIFF_CODES = [
   // C-tariffs (below 40kW)
-  { code: 'C11', label: 'C11 - jedna strefa', zones: 1, maxPower: 40 },
-  { code: 'C12a', label: 'C12a - dwie strefy (dzień/noc)', zones: 2, maxPower: 40 },
-  { code: 'C12b', label: 'C12b - dwie strefy (szczyt/poza)', zones: 2, maxPower: 40 },
-  { code: 'C13', label: 'C13 - trzy strefy', zones: 3, maxPower: 40 },
+  { code: 'C11', zones: 1, maxPower: 40 },
+  { code: 'C12a', zones: 2, maxPower: 40 },
+  { code: 'C12b', zones: 2, maxPower: 40 },
+  { code: 'C13', zones: 3, maxPower: 40 },
   // B-tariffs (below 40kW)
-  { code: 'B11', label: 'B11 - jedna strefa', zones: 1, maxPower: 40 },
-  { code: 'B12', label: 'B12 - dwie strefy', zones: 2, maxPower: 40 },
-  { code: 'B13', label: 'B13 - trzy strefy', zones: 3, maxPower: 40 },
+  { code: 'B11', zones: 1, maxPower: 40 },
+  { code: 'B12', zones: 2, maxPower: 40 },
+  { code: 'B13', zones: 3, maxPower: 40 },
   // C-tariffs (above 40kW)
-  { code: 'C21', label: 'C21 - jedna strefa (>40kW)', zones: 1, minPower: 40 },
-  { code: 'C22a', label: 'C22a - dwie strefy (>40kW)', zones: 2, minPower: 40 },
-  { code: 'C22b', label: 'C22b - dwie strefy (>40kW)', zones: 2, minPower: 40 },
-  { code: 'C23', label: 'C23 - trzy strefy (>40kW)', zones: 3, minPower: 40 },
+  { code: 'C21', zones: 1, minPower: 40 },
+  { code: 'C22a', zones: 2, minPower: 40 },
+  { code: 'C22b', zones: 2, minPower: 40 },
+  { code: 'C23', zones: 3, minPower: 40 },
   // B-tariffs (above 40kW)
-  { code: 'B21', label: 'B21 - jedna strefa (>40kW)', zones: 1, minPower: 40 },
-  { code: 'B22', label: 'B22 - dwie strefy (>40kW)', zones: 2, minPower: 40 },
-  { code: 'B23', label: 'B23 - trzy strefy (>40kW)', zones: 3, minPower: 40 },
+  { code: 'B21', zones: 1, minPower: 40 },
+  { code: 'B22', zones: 2, minPower: 40 },
+  { code: 'B23', zones: 3, minPower: 40 },
 ] as const;
 
 export type TariffCode = typeof TARIFF_CODES[number]['code'];
@@ -74,4 +74,35 @@ export const ZONE_LABELS = {
 
 export function getZoneLabels(zonesCount: number): readonly string[] {
   return ZONE_LABELS[zonesCount as keyof typeof ZONE_LABELS] || ZONE_LABELS[1];
+}
+
+// Month labels in Polish
+export const MONTH_LABELS = [
+  'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
+  'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'
+] as const;
+
+// Calculate period length in months
+export function calculatePeriodMonths(periodFrom: string | null, periodTo: string | null): number {
+  if (!periodFrom || !periodTo) return 12; // Default to 12 months
+  
+  const from = new Date(periodFrom);
+  const to = new Date(periodTo);
+  
+  const yearDiff = to.getFullYear() - from.getFullYear();
+  const monthDiff = to.getMonth() - from.getMonth();
+  const dayDiff = to.getDate() - from.getDate();
+  
+  // Calculate total months including partial months
+  let totalMonths = yearDiff * 12 + monthDiff;
+  
+  // Add 1 because period includes both start and end month
+  totalMonths += 1;
+  
+  // Adjust for partial months if end day is before start day
+  if (dayDiff < 0) {
+    totalMonths -= 1;
+  }
+  
+  return Math.max(1, totalMonths);
 }
