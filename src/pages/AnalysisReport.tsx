@@ -3,12 +3,13 @@ import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Printer, Loader2, Zap } from 'lucide-react';
+import { ArrowLeft, Printer, Loader2 } from 'lucide-react';
 import type { EnergyAnalysis, ClientProject } from '@/types/database';
 import { calculateEnergyCosts, formatCurrency, formatPercent, formatNumber } from '@/lib/calculation-utils';
 import { getZoneLabels } from '@/lib/tariff-utils';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
+import logo from '@/assets/logo.png';
 
 export default function AnalysisReport() {
   const { projectId, analysisId } = useParams<{ projectId: string; analysisId: string }>();
@@ -93,16 +94,15 @@ export default function AnalysisReport() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8 pb-6 border-b-2 border-primary/20">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-r from-primary to-accent shadow-lg print:shadow-none">
-              <Zap className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-display font-bold text-foreground">Optienergia</h1>
-              <p className="text-sm text-muted-foreground">Raport analizy oszczędności energii</p>
-            </div>
+            <img 
+              src={logo} 
+              alt="Optienergia" 
+              className="h-12 w-auto"
+            />
           </div>
           <div className="text-right text-sm text-muted-foreground">
-            <p>Data raportu: {format(new Date(), 'd MMMM yyyy', { locale: pl })}</p>
+            <p>Raport analizy oszczędności energii</p>
+            <p className="font-medium">{format(new Date(), 'd MMMM yyyy', { locale: pl })}</p>
           </div>
         </div>
 
@@ -300,8 +300,11 @@ export default function AnalysisReport() {
 
         {/* Footer */}
         <footer className="mt-12 pt-6 border-t text-center text-sm text-muted-foreground">
-          <p>Raport wygenerowany przez Optienergia • {format(new Date(), 'd MMMM yyyy, HH:mm', { locale: pl })}</p>
-          <p className="mt-1">Niniejszy dokument ma charakter informacyjny i nie stanowi oferty handlowej.</p>
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <img src={logo} alt="Optienergia" className="h-6 w-auto" />
+            <span>• {format(new Date(), 'd MMMM yyyy, HH:mm', { locale: pl })}</span>
+          </div>
+          <p>Niniejszy dokument ma charakter informacyjny i nie stanowi oferty handlowej.</p>
         </footer>
       </div>
     </div>
