@@ -65,8 +65,6 @@ export default function AnalysisReport() {
   const results = calculateEnergyCosts(analysis);
   const zonesCountBefore = analysis.zones_count_before || 1;
   const zonesCountAfter = analysis.zones_count_after || 1;
-  const zoneLabelsBefore = getZoneLabels(zonesCountBefore);
-  const zoneLabelsAfter = getZoneLabels(zonesCountAfter);
 
   const handlePrint = () => {
     window.print();
@@ -74,7 +72,7 @@ export default function AnalysisReport() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Print controls - hidden when printing */}
+      {/* Print controls */}
       <div className="no-print sticky top-0 z-50 border-b bg-card/95 backdrop-blur">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <Button variant="ghost" size="sm" asChild>
@@ -141,32 +139,32 @@ export default function AnalysisReport() {
               <p className="text-sm text-muted-foreground">Okres analizy</p>
               <p className="font-medium">
                 {analysis.period_from && analysis.period_to
-                  ? `${format(new Date(analysis.period_from), 'd.MM.yyyy')} - ${format(new Date(analysis.period_to), 'd.MM.yyyy')}`
+                  ? `${format(new Date(analysis.period_from), 'd.MM.yyyy')} - ${format(new Date(analysis.period_to), 'd.MM.yyyy')} (${results.periodMonths} mies.)`
                   : 'Nie określono'}
               </p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Taryfa PRZED</p>
-              <p className="font-medium">{analysis.tariff_code_before} ({zonesCountBefore} stref{zonesCountBefore === 1 ? 'a' : zonesCountBefore < 5 ? 'y' : ''})</p>
+              <p className="font-medium">{analysis.tariff_code_before}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Taryfa PO</p>
-              <p className="font-medium">{analysis.tariff_code_after} ({zonesCountAfter} stref{zonesCountAfter === 1 ? 'a' : zonesCountAfter < 5 ? 'y' : ''})</p>
+              <p className="font-medium">{analysis.tariff_code_after}</p>
             </div>
           </div>
         </section>
 
         {/* Cost Comparison Table */}
         <section className="mb-8 print-avoid-break">
-          <h2 className="text-lg font-display font-semibold mb-4 text-primary">Porównanie kosztów rocznych</h2>
+          <h2 className="text-lg font-display font-semibold mb-4 text-primary">Porównanie kosztów za okres analizy</h2>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="bg-muted/50">
                   <th className="border border-border px-4 py-3 text-left font-semibold">Składnik kosztu</th>
-                  <th className="border border-border px-4 py-3 text-right font-semibold">PRZED [zł/rok]</th>
-                  <th className="border border-border px-4 py-3 text-right font-semibold">PO [zł/rok]</th>
-                  <th className="border border-border px-4 py-3 text-right font-semibold">Różnica [zł/rok]</th>
+                  <th className="border border-border px-4 py-3 text-right font-semibold">PRZED [zł]</th>
+                  <th className="border border-border px-4 py-3 text-right font-semibold">PO [zł]</th>
+                  <th className="border border-border px-4 py-3 text-right font-semibold">Różnica [zł]</th>
                 </tr>
               </thead>
               <tbody>
@@ -187,26 +185,21 @@ export default function AnalysisReport() {
                   </td>
                 </tr>
                 <tr className="bg-muted/20">
-                  <td className="border border-border px-4 py-2 pl-8 text-muted-foreground">w tym: opłata za moc umowną</td>
-                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">
-                    {formatCurrency(Number(analysis.contracted_power_before_kw) * Number(analysis.contracted_power_charge_rate_before))}
+                  <td className="border border-border px-4 py-2 pl-8 text-muted-foreground">
+                    w tym: opłata za moc umowną ({results.periodMonths} mies.)
                   </td>
+                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">{formatCurrency(results.contractedPowerChargeBefore)}</td>
+                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">{formatCurrency(results.contractedPowerChargeAfter)}</td>
                   <td className="border border-border px-4 py-2 text-right text-muted-foreground">
-                    {formatCurrency(Number(analysis.contracted_power_after_kw) * Number(analysis.contracted_power_charge_rate_after))}
-                  </td>
-                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">
-                    {formatCurrency(
-                      (Number(analysis.contracted_power_before_kw) * Number(analysis.contracted_power_charge_rate_before)) -
-                      (Number(analysis.contracted_power_after_kw) * Number(analysis.contracted_power_charge_rate_after))
-                    )}
+                    {formatCurrency(results.contractedPowerChargeBefore - results.contractedPowerChargeAfter)}
                   </td>
                 </tr>
                 <tr className="bg-muted/20">
                   <td className="border border-border px-4 py-2 pl-8 text-muted-foreground">w tym: energia bierna</td>
-                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">{formatCurrency(Number(analysis.reactive_energy_cost_before))}</td>
-                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">{formatCurrency(Number(analysis.reactive_energy_cost_after))}</td>
+                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">{formatCurrency(results.reactiveEnergyCostBefore)}</td>
+                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">{formatCurrency(results.reactiveEnergyCostAfter)}</td>
                   <td className="border border-border px-4 py-2 text-right text-muted-foreground">
-                    {formatCurrency(Number(analysis.reactive_energy_cost_before) - Number(analysis.reactive_energy_cost_after))}
+                    {formatCurrency(results.reactiveEnergyCostBefore - results.reactiveEnergyCostAfter)}
                   </td>
                 </tr>
                 <tr className="bg-muted/20">
@@ -253,12 +246,12 @@ export default function AnalysisReport() {
             <div>
               <h3 className="font-medium mb-2 text-muted-foreground">Moc umowna</h3>
               <div className="space-y-1 text-sm">
-                <p>PRZED: <span className="font-medium">{formatNumber(Number(analysis.contracted_power_before_kw))} kW</span></p>
-                <p>PO: <span className="font-medium">{formatNumber(Number(analysis.contracted_power_after_kw))} kW</span></p>
+                <p>PRZED: <span className="font-medium">{formatNumber(Number(analysis.contracted_power_before_kw))} kW × {formatNumber(Number(analysis.contracted_power_charge_rate_before))} zł/kW/mies.</span></p>
+                <p>PO: <span className="font-medium">{formatNumber(Number(analysis.contracted_power_after_kw))} kW × {formatNumber(Number(analysis.contracted_power_charge_rate_after))} zł/kW/mies.</span></p>
               </div>
             </div>
             <div>
-              <h3 className="font-medium mb-2 text-muted-foreground">Zużycie energii [MWh/rok]</h3>
+              <h3 className="font-medium mb-2 text-muted-foreground">Zużycie energii [MWh]</h3>
               <div className="space-y-1 text-sm">
                 <p>Strefa 1: <span className="font-medium">{formatNumber(Number(analysis.consumption_zone1_mwh), 4)} MWh</span></p>
                 {(zonesCountBefore >= 2 || zonesCountAfter >= 2) && (
@@ -280,19 +273,19 @@ export default function AnalysisReport() {
               <div className="p-4 bg-background rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Koszt PRZED</p>
                 <p className="text-xl font-bold">{formatCurrency(results.totalCostBefore)}</p>
-                <p className="text-xs text-muted-foreground">rocznie</p>
+                <p className="text-xs text-muted-foreground">za okres</p>
               </div>
               <div className="p-4 bg-background rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Koszt PO</p>
                 <p className="text-xl font-bold">{formatCurrency(results.totalCostAfter)}</p>
-                <p className="text-xs text-muted-foreground">rocznie</p>
+                <p className="text-xs text-muted-foreground">za okres</p>
               </div>
               <div className="p-4 bg-background rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Oszczędność</p>
                 <p className={`text-xl font-bold ${results.savingsValue > 0 ? 'text-success' : 'text-destructive'}`}>
                   {formatCurrency(results.savingsValue)}
                 </p>
-                <p className="text-xs text-muted-foreground">rocznie</p>
+                <p className="text-xs text-muted-foreground">za okres</p>
               </div>
               <div className="p-4 bg-background rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Oszczędność</p>

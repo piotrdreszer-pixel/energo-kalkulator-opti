@@ -77,8 +77,34 @@ export type Database = {
           name: string
           period_from: string | null
           period_to: string | null
+          reactive_energy_after_month_1: number | null
+          reactive_energy_after_month_10: number | null
+          reactive_energy_after_month_11: number | null
+          reactive_energy_after_month_12: number | null
+          reactive_energy_after_month_2: number | null
+          reactive_energy_after_month_3: number | null
+          reactive_energy_after_month_4: number | null
+          reactive_energy_after_month_5: number | null
+          reactive_energy_after_month_6: number | null
+          reactive_energy_after_month_7: number | null
+          reactive_energy_after_month_8: number | null
+          reactive_energy_after_month_9: number | null
+          reactive_energy_before_month_1: number | null
+          reactive_energy_before_month_10: number | null
+          reactive_energy_before_month_11: number | null
+          reactive_energy_before_month_12: number | null
+          reactive_energy_before_month_2: number | null
+          reactive_energy_before_month_3: number | null
+          reactive_energy_before_month_4: number | null
+          reactive_energy_before_month_5: number | null
+          reactive_energy_before_month_6: number | null
+          reactive_energy_before_month_7: number | null
+          reactive_energy_before_month_8: number | null
+          reactive_energy_before_month_9: number | null
           reactive_energy_cost_after: number | null
           reactive_energy_cost_before: number | null
+          reactive_monthly_mode_after: boolean
+          reactive_monthly_mode_before: boolean
           tariff_code_after: string
           tariff_code_before: string
           updated_at: string
@@ -117,8 +143,34 @@ export type Database = {
           name?: string
           period_from?: string | null
           period_to?: string | null
+          reactive_energy_after_month_1?: number | null
+          reactive_energy_after_month_10?: number | null
+          reactive_energy_after_month_11?: number | null
+          reactive_energy_after_month_12?: number | null
+          reactive_energy_after_month_2?: number | null
+          reactive_energy_after_month_3?: number | null
+          reactive_energy_after_month_4?: number | null
+          reactive_energy_after_month_5?: number | null
+          reactive_energy_after_month_6?: number | null
+          reactive_energy_after_month_7?: number | null
+          reactive_energy_after_month_8?: number | null
+          reactive_energy_after_month_9?: number | null
+          reactive_energy_before_month_1?: number | null
+          reactive_energy_before_month_10?: number | null
+          reactive_energy_before_month_11?: number | null
+          reactive_energy_before_month_12?: number | null
+          reactive_energy_before_month_2?: number | null
+          reactive_energy_before_month_3?: number | null
+          reactive_energy_before_month_4?: number | null
+          reactive_energy_before_month_5?: number | null
+          reactive_energy_before_month_6?: number | null
+          reactive_energy_before_month_7?: number | null
+          reactive_energy_before_month_8?: number | null
+          reactive_energy_before_month_9?: number | null
           reactive_energy_cost_after?: number | null
           reactive_energy_cost_before?: number | null
+          reactive_monthly_mode_after?: boolean
+          reactive_monthly_mode_before?: boolean
           tariff_code_after?: string
           tariff_code_before?: string
           updated_at?: string
@@ -157,8 +209,34 @@ export type Database = {
           name?: string
           period_from?: string | null
           period_to?: string | null
+          reactive_energy_after_month_1?: number | null
+          reactive_energy_after_month_10?: number | null
+          reactive_energy_after_month_11?: number | null
+          reactive_energy_after_month_12?: number | null
+          reactive_energy_after_month_2?: number | null
+          reactive_energy_after_month_3?: number | null
+          reactive_energy_after_month_4?: number | null
+          reactive_energy_after_month_5?: number | null
+          reactive_energy_after_month_6?: number | null
+          reactive_energy_after_month_7?: number | null
+          reactive_energy_after_month_8?: number | null
+          reactive_energy_after_month_9?: number | null
+          reactive_energy_before_month_1?: number | null
+          reactive_energy_before_month_10?: number | null
+          reactive_energy_before_month_11?: number | null
+          reactive_energy_before_month_12?: number | null
+          reactive_energy_before_month_2?: number | null
+          reactive_energy_before_month_3?: number | null
+          reactive_energy_before_month_4?: number | null
+          reactive_energy_before_month_5?: number | null
+          reactive_energy_before_month_6?: number | null
+          reactive_energy_before_month_7?: number | null
+          reactive_energy_before_month_8?: number | null
+          reactive_energy_before_month_9?: number | null
           reactive_energy_cost_after?: number | null
           reactive_energy_cost_before?: number | null
+          reactive_monthly_mode_after?: boolean
+          reactive_monthly_mode_before?: boolean
           tariff_code_after?: string
           tariff_code_before?: string
           updated_at?: string

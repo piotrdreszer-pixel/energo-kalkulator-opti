@@ -50,7 +50,22 @@ export interface EnergyAnalysis {
   variable_distribution_before_zone3_rate: number;
   reactive_energy_cost_before: number;
   capacity_charge_before: number;
-  contracted_power_charge_rate_before: number;
+  contracted_power_charge_rate_before: number; // Monthly rate [zł/kW/miesiąc]
+  
+  // Reactive energy monthly mode BEFORE
+  reactive_monthly_mode_before: boolean;
+  reactive_energy_before_month_1: number;
+  reactive_energy_before_month_2: number;
+  reactive_energy_before_month_3: number;
+  reactive_energy_before_month_4: number;
+  reactive_energy_before_month_5: number;
+  reactive_energy_before_month_6: number;
+  reactive_energy_before_month_7: number;
+  reactive_energy_before_month_8: number;
+  reactive_energy_before_month_9: number;
+  reactive_energy_before_month_10: number;
+  reactive_energy_before_month_11: number;
+  reactive_energy_before_month_12: number;
   
   // Distribution AFTER
   fixed_distribution_after_total: number;
@@ -59,7 +74,22 @@ export interface EnergyAnalysis {
   variable_distribution_after_zone3_rate: number;
   reactive_energy_cost_after: number;
   capacity_charge_after: number;
-  contracted_power_charge_rate_after: number;
+  contracted_power_charge_rate_after: number; // Monthly rate [zł/kW/miesiąc]
+  
+  // Reactive energy monthly mode AFTER
+  reactive_monthly_mode_after: boolean;
+  reactive_energy_after_month_1: number;
+  reactive_energy_after_month_2: number;
+  reactive_energy_after_month_3: number;
+  reactive_energy_after_month_4: number;
+  reactive_energy_after_month_5: number;
+  reactive_energy_after_month_6: number;
+  reactive_energy_after_month_7: number;
+  reactive_energy_after_month_8: number;
+  reactive_energy_after_month_9: number;
+  reactive_energy_after_month_10: number;
+  reactive_energy_after_month_11: number;
+  reactive_energy_after_month_12: number;
   
   // Active energy BEFORE
   active_energy_price_before_zone1: number;

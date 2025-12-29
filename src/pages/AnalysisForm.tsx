@@ -25,8 +25,9 @@ import {
   Printer,
 } from 'lucide-react';
 import type { EnergyAnalysis, ClientProject } from '@/types/database';
-import { TARIFF_CODES, getZonesCount, getZoneLabels, validateContractedPower } from '@/lib/tariff-utils';
-import { calculateEnergyCosts, formatCurrency, formatPercent } from '@/lib/calculation-utils';
+import { TARIFF_CODES, getZonesCount, getZoneLabels, validateContractedPower, calculatePeriodMonths } from '@/lib/tariff-utils';
+import { calculateEnergyCosts, formatCurrency, formatPercent, formatNumber } from '@/lib/calculation-utils';
+import { ReactiveEnergyInput } from '@/components/analysis/ReactiveEnergyInput';
 
 export default function AnalysisForm() {
   const { projectId, analysisId } = useParams<{ projectId: string; analysisId: string }>();
@@ -49,6 +50,19 @@ export default function AnalysisForm() {
     reactive_energy_cost_before: 0,
     capacity_charge_before: 0,
     contracted_power_charge_rate_before: 0,
+    reactive_monthly_mode_before: false,
+    reactive_energy_before_month_1: 0,
+    reactive_energy_before_month_2: 0,
+    reactive_energy_before_month_3: 0,
+    reactive_energy_before_month_4: 0,
+    reactive_energy_before_month_5: 0,
+    reactive_energy_before_month_6: 0,
+    reactive_energy_before_month_7: 0,
+    reactive_energy_before_month_8: 0,
+    reactive_energy_before_month_9: 0,
+    reactive_energy_before_month_10: 0,
+    reactive_energy_before_month_11: 0,
+    reactive_energy_before_month_12: 0,
     fixed_distribution_after_total: 0,
     variable_distribution_after_zone1_rate: 0,
     variable_distribution_after_zone2_rate: 0,
@@ -56,6 +70,19 @@ export default function AnalysisForm() {
     reactive_energy_cost_after: 0,
     capacity_charge_after: 0,
     contracted_power_charge_rate_after: 0,
+    reactive_monthly_mode_after: false,
+    reactive_energy_after_month_1: 0,
+    reactive_energy_after_month_2: 0,
+    reactive_energy_after_month_3: 0,
+    reactive_energy_after_month_4: 0,
+    reactive_energy_after_month_5: 0,
+    reactive_energy_after_month_6: 0,
+    reactive_energy_after_month_7: 0,
+    reactive_energy_after_month_8: 0,
+    reactive_energy_after_month_9: 0,
+    reactive_energy_after_month_10: 0,
+    reactive_energy_after_month_11: 0,
+    reactive_energy_after_month_12: 0,
     active_energy_price_before_zone1: 0,
     active_energy_price_before_zone2: 0,
     active_energy_price_before_zone3: 0,
@@ -159,7 +186,7 @@ export default function AnalysisForm() {
     }
   };
 
-  const handleInputChange = (field: keyof EnergyAnalysis, value: string | number) => {
+  const handleInputChange = (field: keyof EnergyAnalysis, value: string | number | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -176,6 +203,7 @@ export default function AnalysisForm() {
   const zonesCountAfter = formData.zones_count_after || 1;
   const zoneLabelsBefore = getZoneLabels(zonesCountBefore);
   const zoneLabelsAfter = getZoneLabels(zonesCountAfter);
+  const periodMonths = calculatePeriodMonths(formData.period_from || null, formData.period_to || null);
 
   if (isLoading) {
     return (
@@ -229,8 +257,8 @@ export default function AnalysisForm() {
             <CardHeader>
               <CardTitle className="text-lg font-display">Dane ogólne</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="space-y-2">
+            <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="space-y-2 lg:col-span-2">
                 <Label>Nazwa analizy</Label>
                 <Input
                   value={formData.name || ''}
@@ -253,13 +281,20 @@ export default function AnalysisForm() {
                   onChange={(e) => handleInputChange('period_to', e.target.value)}
                 />
               </div>
+              {formData.period_from && formData.period_to && (
+                <div className="lg:col-span-4 p-3 bg-muted/50 rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    Okres analizy: <span className="font-medium text-foreground">{periodMonths} {periodMonths === 1 ? 'miesiąc' : periodMonths < 5 ? 'miesiące' : 'miesięcy'}</span>
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
           {/* Tariff and Zones */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg font-display">Taryfa i strefy</CardTitle>
+              <CardTitle className="text-lg font-display">Taryfa</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-6 sm:grid-cols-2">
               <div className="space-y-4">
@@ -275,11 +310,10 @@ export default function AnalysisForm() {
                     </SelectTrigger>
                     <SelectContent>
                       {TARIFF_CODES.map((t) => (
-                        <SelectItem key={t.code} value={t.code}>{t.label}</SelectItem>
+                        <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-sm text-muted-foreground">Liczba stref: {zonesCountBefore}</p>
                 </div>
               </div>
               <div className="space-y-4">
@@ -295,11 +329,10 @@ export default function AnalysisForm() {
                     </SelectTrigger>
                     <SelectContent>
                       {TARIFF_CODES.map((t) => (
-                        <SelectItem key={t.code} value={t.code}>{t.label}</SelectItem>
+                        <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-sm text-muted-foreground">Liczba stref: {zonesCountAfter}</p>
                 </div>
               </div>
             </CardContent>
@@ -310,7 +343,7 @@ export default function AnalysisForm() {
             <CardHeader>
               <CardTitle className="text-lg font-display">Moc umowna</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-6 sm:grid-cols-2">
+            <CardContent className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               <div className="space-y-2">
                 <Label>Moc umowna PRZED [kW]</Label>
                 <Input
@@ -327,6 +360,15 @@ export default function AnalysisForm() {
                 )}
               </div>
               <div className="space-y-2">
+                <Label>Stawka miesięczna PRZED [zł/kW/mies.]</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={formData.contracted_power_charge_rate_before || ''}
+                  onChange={(e) => handleInputChange('contracted_power_charge_rate_before', parseFloat(e.target.value) || 0)}
+                />
+              </div>
+              <div className="space-y-2">
                 <Label>Moc umowna PO [kW]</Label>
                 <Input
                   type="number"
@@ -341,6 +383,23 @@ export default function AnalysisForm() {
                   </p>
                 )}
               </div>
+              <div className="space-y-2">
+                <Label>Stawka miesięczna PO [zł/kW/mies.]</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={formData.contracted_power_charge_rate_after || ''}
+                  onChange={(e) => handleInputChange('contracted_power_charge_rate_after', parseFloat(e.target.value) || 0)}
+                />
+              </div>
+              <div className="lg:col-span-4 p-3 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  Opłata za moc umowną za okres ({periodMonths} mies.): {' '}
+                  <span className="font-medium text-foreground">
+                    PRZED: {formatCurrency(results.contractedPowerChargeBefore)} → PO: {formatCurrency(results.contractedPowerChargeAfter)}
+                  </span>
+                </p>
+              </div>
             </CardContent>
           </Card>
 
@@ -349,72 +408,65 @@ export default function AnalysisForm() {
             <CardHeader>
               <CardTitle className="text-lg font-display">Dystrybucja – przed zmianami</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="space-y-2">
-                <Label>Suma stałych opłat [zł/rok]</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.fixed_distribution_before_total || ''}
-                  onChange={(e) => handleInputChange('fixed_distribution_before_total', parseFloat(e.target.value) || 0)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Stawka zmienna {zoneLabelsBefore[0]} [zł/kWh]</Label>
-                <Input
-                  type="number"
-                  step="0.000001"
-                  value={formData.variable_distribution_before_zone1_rate || ''}
-                  onChange={(e) => handleInputChange('variable_distribution_before_zone1_rate', parseFloat(e.target.value) || 0)}
-                />
-              </div>
-              {zonesCountBefore >= 2 && (
+            <CardContent className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
-                  <Label>Stawka zmienna {zoneLabelsBefore[1]} [zł/kWh]</Label>
+                  <Label>Suma stałych opłat za okres [zł]</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={formData.fixed_distribution_before_total || ''}
+                    onChange={(e) => handleInputChange('fixed_distribution_before_total', parseFloat(e.target.value) || 0)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Stawka zmienna {zoneLabelsBefore[0]} [zł/kWh]</Label>
                   <Input
                     type="number"
                     step="0.000001"
-                    value={formData.variable_distribution_before_zone2_rate || ''}
-                    onChange={(e) => handleInputChange('variable_distribution_before_zone2_rate', parseFloat(e.target.value) || 0)}
+                    value={formData.variable_distribution_before_zone1_rate || ''}
+                    onChange={(e) => handleInputChange('variable_distribution_before_zone1_rate', parseFloat(e.target.value) || 0)}
                   />
                 </div>
-              )}
-              {zonesCountBefore >= 3 && (
+                {zonesCountBefore >= 2 && (
+                  <div className="space-y-2">
+                    <Label>Stawka zmienna {zoneLabelsBefore[1]} [zł/kWh]</Label>
+                    <Input
+                      type="number"
+                      step="0.000001"
+                      value={formData.variable_distribution_before_zone2_rate || ''}
+                      onChange={(e) => handleInputChange('variable_distribution_before_zone2_rate', parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
+                )}
+                {zonesCountBefore >= 3 && (
+                  <div className="space-y-2">
+                    <Label>Stawka zmienna {zoneLabelsBefore[2]} [zł/kWh]</Label>
+                    <Input
+                      type="number"
+                      step="0.000001"
+                      value={formData.variable_distribution_before_zone3_rate || ''}
+                      onChange={(e) => handleInputChange('variable_distribution_before_zone3_rate', parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
+                )}
                 <div className="space-y-2">
-                  <Label>Stawka zmienna {zoneLabelsBefore[2]} [zł/kWh]</Label>
+                  <Label>Opłata mocowa za okres [zł]</Label>
                   <Input
                     type="number"
-                    step="0.000001"
-                    value={formData.variable_distribution_before_zone3_rate || ''}
-                    onChange={(e) => handleInputChange('variable_distribution_before_zone3_rate', parseFloat(e.target.value) || 0)}
+                    step="0.01"
+                    value={formData.capacity_charge_before || ''}
+                    onChange={(e) => handleInputChange('capacity_charge_before', parseFloat(e.target.value) || 0)}
                   />
                 </div>
-              )}
-              <div className="space-y-2">
-                <Label>Koszt energii biernej [zł/rok]</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.reactive_energy_cost_before || ''}
-                  onChange={(e) => handleInputChange('reactive_energy_cost_before', parseFloat(e.target.value) || 0)}
-                />
               </div>
-              <div className="space-y-2">
-                <Label>Opłata mocowa [zł/rok]</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.capacity_charge_before || ''}
-                  onChange={(e) => handleInputChange('capacity_charge_before', parseFloat(e.target.value) || 0)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Stawka za moc umowną [zł/kW/rok]</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.contracted_power_charge_rate_before || ''}
-                  onChange={(e) => handleInputChange('contracted_power_charge_rate_before', parseFloat(e.target.value) || 0)}
+              
+              {/* Reactive Energy Before */}
+              <div className="pt-4 border-t">
+                <ReactiveEnergyInput
+                  prefix="before"
+                  formData={formData}
+                  onInputChange={handleInputChange}
                 />
               </div>
             </CardContent>
@@ -425,72 +477,65 @@ export default function AnalysisForm() {
             <CardHeader>
               <CardTitle className="text-lg font-display">Dystrybucja – po zmianach</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="space-y-2">
-                <Label>Suma stałych opłat [zł/rok]</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.fixed_distribution_after_total || ''}
-                  onChange={(e) => handleInputChange('fixed_distribution_after_total', parseFloat(e.target.value) || 0)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Stawka zmienna {zoneLabelsAfter[0]} [zł/kWh]</Label>
-                <Input
-                  type="number"
-                  step="0.000001"
-                  value={formData.variable_distribution_after_zone1_rate || ''}
-                  onChange={(e) => handleInputChange('variable_distribution_after_zone1_rate', parseFloat(e.target.value) || 0)}
-                />
-              </div>
-              {zonesCountAfter >= 2 && (
+            <CardContent className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
-                  <Label>Stawka zmienna {zoneLabelsAfter[1]} [zł/kWh]</Label>
+                  <Label>Suma stałych opłat za okres [zł]</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={formData.fixed_distribution_after_total || ''}
+                    onChange={(e) => handleInputChange('fixed_distribution_after_total', parseFloat(e.target.value) || 0)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Stawka zmienna {zoneLabelsAfter[0]} [zł/kWh]</Label>
                   <Input
                     type="number"
                     step="0.000001"
-                    value={formData.variable_distribution_after_zone2_rate || ''}
-                    onChange={(e) => handleInputChange('variable_distribution_after_zone2_rate', parseFloat(e.target.value) || 0)}
+                    value={formData.variable_distribution_after_zone1_rate || ''}
+                    onChange={(e) => handleInputChange('variable_distribution_after_zone1_rate', parseFloat(e.target.value) || 0)}
                   />
                 </div>
-              )}
-              {zonesCountAfter >= 3 && (
+                {zonesCountAfter >= 2 && (
+                  <div className="space-y-2">
+                    <Label>Stawka zmienna {zoneLabelsAfter[1]} [zł/kWh]</Label>
+                    <Input
+                      type="number"
+                      step="0.000001"
+                      value={formData.variable_distribution_after_zone2_rate || ''}
+                      onChange={(e) => handleInputChange('variable_distribution_after_zone2_rate', parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
+                )}
+                {zonesCountAfter >= 3 && (
+                  <div className="space-y-2">
+                    <Label>Stawka zmienna {zoneLabelsAfter[2]} [zł/kWh]</Label>
+                    <Input
+                      type="number"
+                      step="0.000001"
+                      value={formData.variable_distribution_after_zone3_rate || ''}
+                      onChange={(e) => handleInputChange('variable_distribution_after_zone3_rate', parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
+                )}
                 <div className="space-y-2">
-                  <Label>Stawka zmienna {zoneLabelsAfter[2]} [zł/kWh]</Label>
+                  <Label>Opłata mocowa za okres [zł]</Label>
                   <Input
                     type="number"
-                    step="0.000001"
-                    value={formData.variable_distribution_after_zone3_rate || ''}
-                    onChange={(e) => handleInputChange('variable_distribution_after_zone3_rate', parseFloat(e.target.value) || 0)}
+                    step="0.01"
+                    value={formData.capacity_charge_after || ''}
+                    onChange={(e) => handleInputChange('capacity_charge_after', parseFloat(e.target.value) || 0)}
                   />
                 </div>
-              )}
-              <div className="space-y-2">
-                <Label>Koszt energii biernej [zł/rok]</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.reactive_energy_cost_after || ''}
-                  onChange={(e) => handleInputChange('reactive_energy_cost_after', parseFloat(e.target.value) || 0)}
-                />
               </div>
-              <div className="space-y-2">
-                <Label>Opłata mocowa [zł/rok]</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.capacity_charge_after || ''}
-                  onChange={(e) => handleInputChange('capacity_charge_after', parseFloat(e.target.value) || 0)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Stawka za moc umowną [zł/kW/rok]</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.contracted_power_charge_rate_after || ''}
-                  onChange={(e) => handleInputChange('contracted_power_charge_rate_after', parseFloat(e.target.value) || 0)}
+              
+              {/* Reactive Energy After */}
+              <div className="pt-4 border-t">
+                <ReactiveEnergyInput
+                  prefix="after"
+                  formData={formData}
+                  onInputChange={handleInputChange}
                 />
               </div>
             </CardContent>
@@ -499,7 +544,7 @@ export default function AnalysisForm() {
           {/* Energy Consumption */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg font-display">Zużycie energii [MWh/rok]</CardTitle>
+              <CardTitle className="text-lg font-display">Zużycie energii [MWh]</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-2">
@@ -619,7 +664,7 @@ export default function AnalysisForm() {
           {/* Handling Fee */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg font-display">Opłata handlowa [zł/rok]</CardTitle>
+              <CardTitle className="text-lg font-display">Opłata handlowa za okres [zł]</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -660,19 +705,19 @@ export default function AnalysisForm() {
                 <div className="text-center p-4 rounded-lg bg-background">
                   <p className="text-sm text-muted-foreground mb-1">Łączny koszt PRZED</p>
                   <p className="text-2xl font-bold">{formatCurrency(results.totalCostBefore)}</p>
-                  <p className="text-xs text-muted-foreground">rocznie</p>
+                  <p className="text-xs text-muted-foreground">za okres ({periodMonths} mies.)</p>
                 </div>
                 <div className="text-center p-4 rounded-lg bg-background">
                   <p className="text-sm text-muted-foreground mb-1">Łączny koszt PO</p>
                   <p className="text-2xl font-bold">{formatCurrency(results.totalCostAfter)}</p>
-                  <p className="text-xs text-muted-foreground">rocznie</p>
+                  <p className="text-xs text-muted-foreground">za okres ({periodMonths} mies.)</p>
                 </div>
                 <div className="text-center p-4 rounded-lg bg-background">
                   <p className="text-sm text-muted-foreground mb-1">Oszczędność</p>
                   <p className={`text-2xl font-bold ${results.savingsValue > 0 ? 'text-success' : results.savingsValue < 0 ? 'text-destructive' : ''}`}>
                     {formatCurrency(results.savingsValue)}
                   </p>
-                  <p className="text-xs text-muted-foreground">rocznie</p>
+                  <p className="text-xs text-muted-foreground">za okres ({periodMonths} mies.)</p>
                 </div>
                 <div className="text-center p-4 rounded-lg bg-background">
                   <p className="text-sm text-muted-foreground mb-1">Oszczędność</p>
@@ -695,6 +740,27 @@ export default function AnalysisForm() {
                 <div className="p-3 rounded-lg bg-background">
                   <p className="text-muted-foreground">Opłata handlowa</p>
                   <p className="font-medium">{formatCurrency(results.handlingFeeBefore)} → {formatCurrency(results.handlingFeeAfter)}</p>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-2 text-sm">
+                <div className="p-3 rounded-lg bg-background">
+                  <p className="text-muted-foreground">Opłata za moc umowną</p>
+                  <p className="font-medium">
+                    {formatCurrency(results.contractedPowerChargeBefore)} → {formatCurrency(results.contractedPowerChargeAfter)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    (stawka mies.: {formatNumber(Number(formData.contracted_power_charge_rate_before))} → {formatNumber(Number(formData.contracted_power_charge_rate_after))} zł/kW)
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-background">
+                  <p className="text-muted-foreground">Energia bierna</p>
+                  <p className="font-medium">
+                    {formatCurrency(results.reactiveEnergyCostBefore)} → {formatCurrency(results.reactiveEnergyCostAfter)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    ({formData.reactive_monthly_mode_before ? 'suma miesięcy' : 'wartość całkowita'} → {formData.reactive_monthly_mode_after ? 'suma miesięcy' : 'wartość całkowita'})
+                  </p>
                 </div>
               </div>
             </CardContent>
