@@ -1,0 +1,316 @@
+import React from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft, Printer, Loader2, Zap } from 'lucide-react';
+import type { EnergyAnalysis, ClientProject } from '@/types/database';
+import { calculateEnergyCosts, formatCurrency, formatPercent, formatNumber } from '@/lib/calculation-utils';
+import { getZoneLabels } from '@/lib/tariff-utils';
+import { format } from 'date-fns';
+import { pl } from 'date-fns/locale';
+
+export default function AnalysisReport() {
+  const { projectId, analysisId } = useParams<{ projectId: string; analysisId: string }>();
+
+  const { data: project } = useQuery({
+    queryKey: ['project', projectId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('client_projects')
+        .select('*')
+        .eq('id', projectId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as ClientProject | null;
+    },
+    enabled: !!projectId,
+  });
+
+  const { data: analysis, isLoading } = useQuery({
+    queryKey: ['analysis', analysisId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('energy_analyses')
+        .select('*')
+        .eq('id', analysisId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as EnergyAnalysis | null;
+    },
+    enabled: !!analysisId,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!analysis || !project) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground mb-4">Nie znaleziono analizy</p>
+          <Button asChild>
+            <Link to={`/projects/${projectId}`}>Wróć do projektu</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const results = calculateEnergyCosts(analysis);
+  const zonesCountBefore = analysis.zones_count_before || 1;
+  const zonesCountAfter = analysis.zones_count_after || 1;
+  const zoneLabelsBefore = getZoneLabels(zonesCountBefore);
+  const zoneLabelsAfter = getZoneLabels(zonesCountAfter);
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Print controls - hidden when printing */}
+      <div className="no-print sticky top-0 z-50 border-b bg-card/95 backdrop-blur">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+          <Button variant="ghost" size="sm" asChild>
+            <Link to={`/projects/${projectId}/analysis/${analysisId}`}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Wróć do edycji
+            </Link>
+          </Button>
+          <Button onClick={handlePrint}>
+            <Printer className="h-4 w-4 mr-2" />
+            Drukuj / Zapisz PDF
+          </Button>
+        </div>
+      </div>
+
+      {/* Report Content */}
+      <div className="max-w-4xl mx-auto px-8 py-8 print:py-4 print:px-4">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8 pb-6 border-b-2 border-primary/20">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-r from-primary to-accent shadow-lg print:shadow-none">
+              <Zap className="h-6 w-6 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-display font-bold text-foreground">Optienergia</h1>
+              <p className="text-sm text-muted-foreground">Raport analizy oszczędności energii</p>
+            </div>
+          </div>
+          <div className="text-right text-sm text-muted-foreground">
+            <p>Data raportu: {format(new Date(), 'd MMMM yyyy', { locale: pl })}</p>
+          </div>
+        </div>
+
+        {/* Client Info */}
+        <section className="mb-8 print-avoid-break">
+          <h2 className="text-lg font-display font-semibold mb-4 text-primary">Dane klienta</h2>
+          <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg">
+            <div>
+              <p className="text-sm text-muted-foreground">Nazwa klienta</p>
+              <p className="font-medium">{project.client_name}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">NIP</p>
+              <p className="font-medium">{project.client_nip}</p>
+            </div>
+            {project.client_address && (
+              <div className="col-span-2">
+                <p className="text-sm text-muted-foreground">Adres</p>
+                <p className="font-medium">{project.client_address}</p>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Analysis Info */}
+        <section className="mb-8 print-avoid-break">
+          <h2 className="text-lg font-display font-semibold mb-4 text-primary">Informacje o analizie</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-lg">
+            <div>
+              <p className="text-sm text-muted-foreground">Nazwa analizy</p>
+              <p className="font-medium">{analysis.name}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Okres analizy</p>
+              <p className="font-medium">
+                {analysis.period_from && analysis.period_to
+                  ? `${format(new Date(analysis.period_from), 'd.MM.yyyy')} - ${format(new Date(analysis.period_to), 'd.MM.yyyy')}`
+                  : 'Nie określono'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Taryfa PRZED</p>
+              <p className="font-medium">{analysis.tariff_code_before} ({zonesCountBefore} stref{zonesCountBefore === 1 ? 'a' : zonesCountBefore < 5 ? 'y' : ''})</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Taryfa PO</p>
+              <p className="font-medium">{analysis.tariff_code_after} ({zonesCountAfter} stref{zonesCountAfter === 1 ? 'a' : zonesCountAfter < 5 ? 'y' : ''})</p>
+            </div>
+          </div>
+        </section>
+
+        {/* Cost Comparison Table */}
+        <section className="mb-8 print-avoid-break">
+          <h2 className="text-lg font-display font-semibold mb-4 text-primary">Porównanie kosztów rocznych</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-muted/50">
+                  <th className="border border-border px-4 py-3 text-left font-semibold">Składnik kosztu</th>
+                  <th className="border border-border px-4 py-3 text-right font-semibold">PRZED [zł/rok]</th>
+                  <th className="border border-border px-4 py-3 text-right font-semibold">PO [zł/rok]</th>
+                  <th className="border border-border px-4 py-3 text-right font-semibold">Różnica [zł/rok]</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border border-border px-4 py-2 font-medium">Dystrybucja</td>
+                  <td className="border border-border px-4 py-2 text-right">{formatCurrency(results.distributionCostBefore)}</td>
+                  <td className="border border-border px-4 py-2 text-right">{formatCurrency(results.distributionCostAfter)}</td>
+                  <td className={`border border-border px-4 py-2 text-right font-medium ${results.distributionCostBefore - results.distributionCostAfter > 0 ? 'text-success' : 'text-destructive'}`}>
+                    {formatCurrency(results.distributionCostBefore - results.distributionCostAfter)}
+                  </td>
+                </tr>
+                <tr className="bg-muted/20">
+                  <td className="border border-border px-4 py-2 pl-8 text-muted-foreground">w tym: stałe opłaty</td>
+                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">{formatCurrency(Number(analysis.fixed_distribution_before_total))}</td>
+                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">{formatCurrency(Number(analysis.fixed_distribution_after_total))}</td>
+                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">
+                    {formatCurrency(Number(analysis.fixed_distribution_before_total) - Number(analysis.fixed_distribution_after_total))}
+                  </td>
+                </tr>
+                <tr className="bg-muted/20">
+                  <td className="border border-border px-4 py-2 pl-8 text-muted-foreground">w tym: opłata za moc umowną</td>
+                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">
+                    {formatCurrency(Number(analysis.contracted_power_before_kw) * Number(analysis.contracted_power_charge_rate_before))}
+                  </td>
+                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">
+                    {formatCurrency(Number(analysis.contracted_power_after_kw) * Number(analysis.contracted_power_charge_rate_after))}
+                  </td>
+                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">
+                    {formatCurrency(
+                      (Number(analysis.contracted_power_before_kw) * Number(analysis.contracted_power_charge_rate_before)) -
+                      (Number(analysis.contracted_power_after_kw) * Number(analysis.contracted_power_charge_rate_after))
+                    )}
+                  </td>
+                </tr>
+                <tr className="bg-muted/20">
+                  <td className="border border-border px-4 py-2 pl-8 text-muted-foreground">w tym: energia bierna</td>
+                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">{formatCurrency(Number(analysis.reactive_energy_cost_before))}</td>
+                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">{formatCurrency(Number(analysis.reactive_energy_cost_after))}</td>
+                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">
+                    {formatCurrency(Number(analysis.reactive_energy_cost_before) - Number(analysis.reactive_energy_cost_after))}
+                  </td>
+                </tr>
+                <tr className="bg-muted/20">
+                  <td className="border border-border px-4 py-2 pl-8 text-muted-foreground">w tym: opłata mocowa</td>
+                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">{formatCurrency(Number(analysis.capacity_charge_before))}</td>
+                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">{formatCurrency(Number(analysis.capacity_charge_after))}</td>
+                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">
+                    {formatCurrency(Number(analysis.capacity_charge_before) - Number(analysis.capacity_charge_after))}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-border px-4 py-2 font-medium">Energia czynna</td>
+                  <td className="border border-border px-4 py-2 text-right">{formatCurrency(results.activeEnergyCostBefore)}</td>
+                  <td className="border border-border px-4 py-2 text-right">{formatCurrency(results.activeEnergyCostAfter)}</td>
+                  <td className={`border border-border px-4 py-2 text-right font-medium ${results.activeEnergyCostBefore - results.activeEnergyCostAfter > 0 ? 'text-success' : 'text-destructive'}`}>
+                    {formatCurrency(results.activeEnergyCostBefore - results.activeEnergyCostAfter)}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-border px-4 py-2 font-medium">Opłata handlowa</td>
+                  <td className="border border-border px-4 py-2 text-right">{formatCurrency(results.handlingFeeBefore)}</td>
+                  <td className="border border-border px-4 py-2 text-right">{formatCurrency(results.handlingFeeAfter)}</td>
+                  <td className={`border border-border px-4 py-2 text-right font-medium ${results.handlingFeeBefore - results.handlingFeeAfter > 0 ? 'text-success' : 'text-destructive'}`}>
+                    {formatCurrency(results.handlingFeeBefore - results.handlingFeeAfter)}
+                  </td>
+                </tr>
+                <tr className="bg-primary/10 font-bold">
+                  <td className="border border-border px-4 py-3">RAZEM</td>
+                  <td className="border border-border px-4 py-3 text-right">{formatCurrency(results.totalCostBefore)}</td>
+                  <td className="border border-border px-4 py-3 text-right">{formatCurrency(results.totalCostAfter)}</td>
+                  <td className={`border border-border px-4 py-3 text-right ${results.savingsValue > 0 ? 'text-success' : 'text-destructive'}`}>
+                    {formatCurrency(results.savingsValue)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* Parameters Summary */}
+        <section className="mb-8 print-avoid-break">
+          <h2 className="text-lg font-display font-semibold mb-4 text-primary">Parametry analizy</h2>
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <h3 className="font-medium mb-2 text-muted-foreground">Moc umowna</h3>
+              <div className="space-y-1 text-sm">
+                <p>PRZED: <span className="font-medium">{formatNumber(Number(analysis.contracted_power_before_kw))} kW</span></p>
+                <p>PO: <span className="font-medium">{formatNumber(Number(analysis.contracted_power_after_kw))} kW</span></p>
+              </div>
+            </div>
+            <div>
+              <h3 className="font-medium mb-2 text-muted-foreground">Zużycie energii [MWh/rok]</h3>
+              <div className="space-y-1 text-sm">
+                <p>Strefa 1: <span className="font-medium">{formatNumber(Number(analysis.consumption_zone1_mwh), 4)} MWh</span></p>
+                {(zonesCountBefore >= 2 || zonesCountAfter >= 2) && (
+                  <p>Strefa 2: <span className="font-medium">{formatNumber(Number(analysis.consumption_zone2_mwh), 4)} MWh</span></p>
+                )}
+                {(zonesCountBefore >= 3 || zonesCountAfter >= 3) && (
+                  <p>Strefa 3: <span className="font-medium">{formatNumber(Number(analysis.consumption_zone3_mwh), 4)} MWh</span></p>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Summary Box */}
+        <section className="print-avoid-break">
+          <div className="p-6 bg-gradient-to-r from-primary/10 to-accent/10 rounded-xl border-2 border-primary/20">
+            <h2 className="text-xl font-display font-bold mb-4 text-center">Podsumowanie oszczędności</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+              <div className="p-4 bg-background rounded-lg">
+                <p className="text-sm text-muted-foreground mb-1">Koszt PRZED</p>
+                <p className="text-xl font-bold">{formatCurrency(results.totalCostBefore)}</p>
+                <p className="text-xs text-muted-foreground">rocznie</p>
+              </div>
+              <div className="p-4 bg-background rounded-lg">
+                <p className="text-sm text-muted-foreground mb-1">Koszt PO</p>
+                <p className="text-xl font-bold">{formatCurrency(results.totalCostAfter)}</p>
+                <p className="text-xs text-muted-foreground">rocznie</p>
+              </div>
+              <div className="p-4 bg-background rounded-lg">
+                <p className="text-sm text-muted-foreground mb-1">Oszczędność</p>
+                <p className={`text-xl font-bold ${results.savingsValue > 0 ? 'text-success' : 'text-destructive'}`}>
+                  {formatCurrency(results.savingsValue)}
+                </p>
+                <p className="text-xs text-muted-foreground">rocznie</p>
+              </div>
+              <div className="p-4 bg-background rounded-lg">
+                <p className="text-sm text-muted-foreground mb-1">Oszczędność</p>
+                <p className={`text-xl font-bold ${results.savingsValue > 0 ? 'text-success' : 'text-destructive'}`}>
+                  {formatPercent(results.savingsPercent)}
+                </p>
+                <p className="text-xs text-muted-foreground">procentowo</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Footer */}
+        <footer className="mt-12 pt-6 border-t text-center text-sm text-muted-foreground">
+          <p>Raport wygenerowany przez Optienergia • {format(new Date(), 'd MMMM yyyy, HH:mm', { locale: pl })}</p>
+          <p className="mt-1">Niniejszy dokument ma charakter informacyjny i nie stanowi oferty handlowej.</p>
+        </footer>
+      </div>
+    </div>
+  );
+}

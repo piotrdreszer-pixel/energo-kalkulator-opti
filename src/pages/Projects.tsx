@@ -64,18 +64,12 @@ export default function Projects() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('client_projects')
-        .select(`
-          *,
-          profiles:created_by_user_id (name)
-        `)
+        .select('*')
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
       
-      return (data || []).map(project => ({
-        ...project,
-        creator_name: project.profiles?.name || 'Nieznany',
-      })) as ClientProject[];
+      return (data || []) as ClientProject[];
     },
   });
 
@@ -292,10 +286,6 @@ export default function Projects() {
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <FileText className="h-3 w-3" />
-                      <span>Utworzył: {project.creator_name}</span>
-                    </div>
                   </CardContent>
                 </Card>
               </Link>
