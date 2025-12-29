@@ -7,8 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Zap, Loader2, Mail, Lock, User, CheckCircle, AlertCircle } from 'lucide-react';
+import { Loader2, Mail, Lock, User, CheckCircle, AlertCircle } from 'lucide-react';
 import { z } from 'zod';
+import logo from '@/assets/logo.png';
 
 const loginSchema = z.object({
   email: z.string().email('Nieprawidłowy format adresu e-mail'),
@@ -166,13 +167,8 @@ export default function Auth() {
       <div className="w-full max-w-md space-y-6 animate-slide-up">
         {/* Logo */}
         <div className="text-center">
-          <div className="inline-flex items-center gap-3 mb-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-primary shadow-lg">
-              <Zap className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <span className="font-display text-2xl font-bold text-foreground">
-              Optienergia
-            </span>
+          <div className="flex justify-center mb-4">
+            <img src={logo} alt="Optienergia" className="h-14 w-auto" />
           </div>
           <p className="text-muted-foreground">
             Kalkulator oszczędności energii
