@@ -344,30 +344,25 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen flex">
-      {/* Dynamic two-color gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/90 via-teal-500/80 to-cyan-400/70" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/30 via-transparent to-transparent" />
-      
-      {/* Decorative background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-white/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute top-1/2 -left-40 w-80 h-80 bg-emerald-300/20 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 right-1/3 w-72 h-72 bg-cyan-300/15 rounded-full blur-3xl" />
-        <div className="absolute top-1/4 left-1/3 w-64 h-64 bg-teal-200/10 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
-      </div>
-
-      {/* Left side - Branding & Features (hidden on mobile) */}
-      <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative items-center justify-center p-12">
-        <div className="max-w-lg space-y-8 animate-fade-in">
+      {/* Left side - Dark green gradient with branding */}
+      <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative items-center justify-center p-12 bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-900">
+        {/* Subtle decorative elements */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-96 h-96 bg-emerald-700/30 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 left-0 w-80 h-80 bg-teal-800/40 rounded-full blur-3xl" />
+          <div className="absolute top-1/3 right-1/4 w-64 h-64 bg-emerald-600/20 rounded-full blur-3xl" />
+        </div>
+        
+        <div className="max-w-lg space-y-8 animate-fade-in relative z-10">
           <div className="space-y-4">
-            <img src={logo} alt="Optienergia" className="h-16 w-auto drop-shadow-lg" />
-            <h1 className="text-4xl xl:text-5xl font-display font-bold text-white leading-tight drop-shadow-lg">
+            <img src={logo} alt="Optienergia" className="h-16 w-auto brightness-0 invert drop-shadow-lg" />
+            <h1 className="text-4xl xl:text-5xl font-display font-bold text-white leading-tight">
               Optymalizuj koszty
-              <span className="block text-emerald-100">
+              <span className="block text-emerald-200">
                 energii elektrycznej
               </span>
             </h1>
-            <p className="text-lg text-white/90 leading-relaxed drop-shadow">
+            <p className="text-lg text-gray-200 leading-relaxed">
               Profesjonalne narzędzie do analizy i optymalizacji kosztów energii elektrycznej dla przedsiębiorstw.
             </p>
           </div>
@@ -393,8 +388,8 @@ export default function Auth() {
         </div>
       </div>
 
-      {/* Right side - Auth form */}
-      <div className="w-full lg:w-1/2 xl:w-2/5 flex items-center justify-center p-4 sm:p-8 relative">
+      {/* Right side - Light/white auth form */}
+      <div className="w-full lg:w-1/2 xl:w-2/5 flex items-center justify-center p-4 sm:p-8 bg-gray-50">
         <div className="w-full max-w-md space-y-6 animate-slide-up">
           {/* Mobile logo */}
           <div className="text-center lg:hidden">
@@ -406,22 +401,22 @@ export default function Auth() {
             </p>
           </div>
 
-          <Card className="backdrop-blur-sm bg-card/95 border-border/50 shadow-2xl">
+          <Card className="bg-white border-gray-200 shadow-xl">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <CardHeader className="pb-4 space-y-4">
                 <div className="hidden lg:block text-center">
-                  <CardTitle className="text-2xl font-display">Witaj ponownie</CardTitle>
-                  <CardDescription className="mt-1">
+                  <CardTitle className="text-2xl font-display text-gray-900">Witaj ponownie</CardTitle>
+                  <CardDescription className="mt-1 text-gray-600">
                     {activeTab === 'login' 
                       ? 'Zaloguj się do swojego konta' 
                       : 'Utwórz nowe konto w systemie'}
                   </CardDescription>
                 </div>
-                <TabsList className="grid w-full grid-cols-2 h-12">
-                  <TabsTrigger value="login" className="text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
+                <TabsList className="grid w-full grid-cols-2 h-12 bg-gray-100">
+                  <TabsTrigger value="login" className="text-sm font-medium data-[state=active]:bg-emerald-700 data-[state=active]:text-white transition-all">
                     Logowanie
                   </TabsTrigger>
-                  <TabsTrigger value="register" className="text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
+                  <TabsTrigger value="register" className="text-sm font-medium data-[state=active]:bg-emerald-700 data-[state=active]:text-white transition-all">
                     Rejestracja
                   </TabsTrigger>
                 </TabsList>
@@ -435,19 +430,19 @@ export default function Auth() {
                         Adres e-mail
                       </Label>
                       <div className="relative group">
-                        <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                        <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-emerald-700 transition-colors" />
                         <Input
                           id="login-email"
                           type="email"
                           placeholder="jan.kowalski@optienergia.pl"
                           value={loginEmail}
                           onChange={(e) => setLoginEmail(e.target.value)}
-                          className="pl-11 h-12 bg-background/50 border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                          className="pl-11 h-12 bg-gray-50 border-gray-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 transition-all text-gray-900"
                           required
                         />
                       </div>
                       {formErrors.email && (
-                        <p className="text-sm text-destructive flex items-center gap-1.5 mt-1.5">
+                        <p className="text-sm text-red-600 flex items-center gap-1.5 mt-1.5">
                           <AlertCircle className="h-3.5 w-3.5" />
                           {formErrors.email}
                         </p>
@@ -456,31 +451,31 @@ export default function Auth() {
 
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <Label htmlFor="login-password" className="text-sm font-medium">
+                        <Label htmlFor="login-password" className="text-sm font-medium text-gray-700">
                           Hasło
                         </Label>
                         <button
                           type="button"
                           onClick={() => setResetPasswordMode(true)}
-                          className="text-sm text-primary hover:text-primary/80 font-medium transition-colors"
+                          className="text-sm text-emerald-700 hover:text-emerald-800 font-medium transition-colors"
                         >
                           Nie pamiętasz hasła?
                         </button>
                       </div>
                       <div className="relative group">
-                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-emerald-700 transition-colors" />
                         <Input
                           id="login-password"
                           type="password"
                           placeholder="••••••••"
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
-                          className="pl-11 h-12 bg-background/50 border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                          className="pl-11 h-12 bg-gray-50 border-gray-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 transition-all text-gray-900"
                           required
                         />
                       </div>
                       {formErrors.password && (
-                        <p className="text-sm text-destructive flex items-center gap-1.5 mt-1.5">
+                        <p className="text-sm text-red-600 flex items-center gap-1.5 mt-1.5">
                           <AlertCircle className="h-3.5 w-3.5" />
                           {formErrors.password}
                         </p>
@@ -489,7 +484,7 @@ export default function Auth() {
 
                     <Button 
                       type="submit" 
-                      className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg hover:shadow-xl transition-all duration-300" 
+                      className="w-full h-12 text-base font-semibold bg-emerald-700 hover:bg-emerald-800 text-white shadow-lg hover:shadow-xl transition-all duration-300" 
                       disabled={loading}
                     >
                       {loading ? (
@@ -505,32 +500,32 @@ export default function Auth() {
                 </TabsContent>
 
                 <TabsContent value="register" className="mt-0 space-y-4">
-                  <div className="p-4 rounded-xl bg-gradient-to-r from-secondary/50 to-secondary/30 border border-secondary/50">
-                    <p className="font-medium text-sm text-foreground mb-1">Informacja o rejestracji</p>
-                    <p className="text-sm text-muted-foreground">
-                      Dostępna wyłącznie dla adresów e-mail w domenie <span className="font-medium text-primary">@optienergia.pl</span>
+                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+                    <p className="font-medium text-sm text-gray-800 mb-1">Informacja o rejestracji</p>
+                    <p className="text-sm text-gray-600">
+                      Dostępna wyłącznie dla adresów e-mail w domenie <span className="font-medium text-emerald-700">@optienergia.pl</span>
                     </p>
                   </div>
 
                   <form onSubmit={handleRegister} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="register-name" className="text-sm font-medium">
+                      <Label htmlFor="register-name" className="text-sm font-medium text-gray-700">
                         Imię i nazwisko
                       </Label>
                       <div className="relative group">
-                        <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                        <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-emerald-700 transition-colors" />
                         <Input
                           id="register-name"
                           type="text"
                           placeholder="Jan Kowalski"
                           value={registerName}
                           onChange={(e) => setRegisterName(e.target.value)}
-                          className="pl-11 h-12 bg-background/50 border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                          className="pl-11 h-12 bg-gray-50 border-gray-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 transition-all text-gray-900"
                           required
                         />
                       </div>
                       {formErrors.name && (
-                        <p className="text-sm text-destructive flex items-center gap-1.5 mt-1.5">
+                        <p className="text-sm text-red-600 flex items-center gap-1.5 mt-1.5">
                           <AlertCircle className="h-3.5 w-3.5" />
                           {formErrors.name}
                         </p>
@@ -538,23 +533,23 @@ export default function Auth() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="register-email" className="text-sm font-medium">
+                      <Label htmlFor="register-email" className="text-sm font-medium text-gray-700">
                         Adres e-mail
                       </Label>
                       <div className="relative group">
-                        <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                        <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-emerald-700 transition-colors" />
                         <Input
                           id="register-email"
                           type="email"
                           placeholder="jan.kowalski@optienergia.pl"
                           value={registerEmail}
                           onChange={(e) => setRegisterEmail(e.target.value)}
-                          className="pl-11 h-12 bg-background/50 border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                          className="pl-11 h-12 bg-gray-50 border-gray-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 transition-all text-gray-900"
                           required
                         />
                       </div>
                       {formErrors.email && (
-                        <p className="text-sm text-destructive flex items-center gap-1.5 mt-1.5">
+                        <p className="text-sm text-red-600 flex items-center gap-1.5 mt-1.5">
                           <AlertCircle className="h-3.5 w-3.5" />
                           {formErrors.email}
                         </p>
@@ -563,23 +558,23 @@ export default function Auth() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="register-password" className="text-sm font-medium">
+                        <Label htmlFor="register-password" className="text-sm font-medium text-gray-700">
                           Hasło
                         </Label>
                         <div className="relative group">
-                          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-emerald-700 transition-colors" />
                           <Input
                             id="register-password"
                             type="password"
                             placeholder="Min. 6 znaków"
                             value={registerPassword}
                             onChange={(e) => setRegisterPassword(e.target.value)}
-                            className="pl-11 h-12 bg-background/50 border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                            className="pl-11 h-12 bg-gray-50 border-gray-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 transition-all text-gray-900"
                             required
                           />
                         </div>
                         {formErrors.password && (
-                          <p className="text-sm text-destructive flex items-center gap-1.5 mt-1.5">
+                          <p className="text-sm text-red-600 flex items-center gap-1.5 mt-1.5">
                             <AlertCircle className="h-3.5 w-3.5" />
                             {formErrors.password}
                           </p>
@@ -587,23 +582,23 @@ export default function Auth() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="register-confirm" className="text-sm font-medium">
+                        <Label htmlFor="register-confirm" className="text-sm font-medium text-gray-700">
                           Powtórz hasło
                         </Label>
                         <div className="relative group">
-                          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-emerald-700 transition-colors" />
                           <Input
                             id="register-confirm"
                             type="password"
                             placeholder="Powtórz"
                             value={registerConfirmPassword}
                             onChange={(e) => setRegisterConfirmPassword(e.target.value)}
-                            className="pl-11 h-12 bg-background/50 border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                            className="pl-11 h-12 bg-gray-50 border-gray-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 transition-all text-gray-900"
                             required
                           />
                         </div>
                         {formErrors.confirmPassword && (
-                          <p className="text-sm text-destructive flex items-center gap-1.5 mt-1.5">
+                          <p className="text-sm text-red-600 flex items-center gap-1.5 mt-1.5">
                             <AlertCircle className="h-3.5 w-3.5" />
                             {formErrors.confirmPassword}
                           </p>
@@ -613,7 +608,7 @@ export default function Auth() {
 
                     <Button 
                       type="submit" 
-                      className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg hover:shadow-xl transition-all duration-300" 
+                      className="w-full h-12 text-base font-semibold bg-emerald-700 hover:bg-emerald-800 text-white shadow-lg hover:shadow-xl transition-all duration-300" 
                       disabled={loading}
                     >
                       {loading ? (
