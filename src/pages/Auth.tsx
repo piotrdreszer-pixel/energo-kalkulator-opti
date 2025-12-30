@@ -343,26 +343,31 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-primary/5 via-background to-accent/5">
+    <div className="min-h-screen flex">
+      {/* Dynamic two-color gradient background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/90 via-teal-500/80 to-cyan-400/70" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/30 via-transparent to-transparent" />
+      
       {/* Decorative background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary/8 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute top-1/2 -left-40 w-80 h-80 bg-accent/8 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 right-1/3 w-72 h-72 bg-success/5 rounded-full blur-3xl" />
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-white/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-1/2 -left-40 w-80 h-80 bg-emerald-300/20 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 right-1/3 w-72 h-72 bg-cyan-300/15 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 left-1/3 w-64 h-64 bg-teal-200/10 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
       </div>
 
       {/* Left side - Branding & Features (hidden on mobile) */}
       <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative items-center justify-center p-12">
         <div className="max-w-lg space-y-8 animate-fade-in">
           <div className="space-y-4">
-            <img src={logo} alt="Optienergia" className="h-16 w-auto" />
-            <h1 className="text-4xl xl:text-5xl font-display font-bold text-foreground leading-tight">
+            <img src={logo} alt="Optienergia" className="h-16 w-auto drop-shadow-lg" />
+            <h1 className="text-4xl xl:text-5xl font-display font-bold text-white leading-tight drop-shadow-lg">
               Optymalizuj koszty
-              <span className="block bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              <span className="block text-emerald-100">
                 energii elektrycznej
               </span>
             </h1>
-            <p className="text-lg text-muted-foreground leading-relaxed">
+            <p className="text-lg text-white/90 leading-relaxed drop-shadow">
               Profesjonalne narzędzie do analizy i optymalizacji kosztów energii elektrycznej dla przedsiębiorstw.
             </p>
           </div>
@@ -639,13 +644,13 @@ export default function Auth() {
 // Feature card component
 function FeatureCard({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
   return (
-    <div className="flex items-start gap-4 p-4 rounded-xl bg-card/50 border border-border/50 backdrop-blur-sm hover:bg-card/80 hover:border-primary/20 transition-all duration-300">
-      <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-accent/10 flex items-center justify-center text-primary">
+    <div className="flex items-start gap-4 p-4 rounded-xl bg-white/10 border border-white/20 backdrop-blur-sm hover:bg-white/20 hover:border-white/30 transition-all duration-300">
+      <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-white">
         {icon}
       </div>
       <div>
-        <h3 className="font-semibold text-foreground">{title}</h3>
-        <p className="text-sm text-muted-foreground mt-0.5">{description}</p>
+        <h3 className="font-semibold text-white">{title}</h3>
+        <p className="text-sm text-white/80 mt-0.5">{description}</p>
       </div>
     </div>
   );
