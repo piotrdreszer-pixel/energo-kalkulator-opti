@@ -9,6 +9,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 // Pages
 import Auth from "./pages/Auth";
 import VerifyEmail from "./pages/VerifyEmail";
+import ResetPassword from "./pages/ResetPassword";
 import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
 import AnalysisForm from "./pages/AnalysisForm";
@@ -28,6 +29,7 @@ const App = () => (
             {/* Auth routes */}
             <Route path="/auth" element={<Auth />} />
             <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
             {/* Protected routes */}
             <Route
