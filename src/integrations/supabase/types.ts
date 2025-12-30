@@ -50,6 +50,30 @@ export type Database = {
         }
         Relationships: []
       }
+      email_verification_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          token: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          token: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          token?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       energy_analyses: {
         Row: {
           active_energy_price_after_zone1: number | null
@@ -268,8 +292,6 @@ export type Database = {
           name: string
           updated_at: string
           user_id: string
-          verification_token: string | null
-          verification_token_expires_at: string | null
         }
         Insert: {
           created_at?: string
@@ -279,8 +301,6 @@ export type Database = {
           name: string
           updated_at?: string
           user_id: string
-          verification_token?: string | null
-          verification_token_expires_at?: string | null
         }
         Update: {
           created_at?: string
@@ -290,8 +310,6 @@ export type Database = {
           name?: string
           updated_at?: string
           user_id?: string
-          verification_token?: string | null
-          verification_token_expires_at?: string | null
         }
         Relationships: []
       }
