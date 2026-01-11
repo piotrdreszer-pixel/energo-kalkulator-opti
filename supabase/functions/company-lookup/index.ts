@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -79,128 +79,15 @@ function saveToCache(nip: string, data: CompanyData): void {
   cache.set(nip, { data, timestamp: Date.now() });
 }
 
-// Provider: CEIDG (for JDG - sole proprietorships)
-async function fetchFromCEIDG(nip: string): Promise<CompanyData | null> {
-  const apiKey = Deno.env.get('CEIDG_API_KEY');
-  
-  try {
-    // CEIDG API v2
-    const url = `https://dane.biznes.gov.pl/api/ceidg/v2/firmy?nip=${nip}`;
-    const headers: Record<string, string> = {
-      'Accept': 'application/json',
-    };
-    
-    if (apiKey) {
-      headers['Authorization'] = `Bearer ${apiKey}`;
-    }
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-    
-    const response = await fetch(url, { 
-      headers,
-      signal: controller.signal 
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      console.log(`CEIDG returned ${response.status}`);
-      return null;
-    }
-    
-    const data = await response.json();
-    
-    if (!data.firmy || data.firmy.length === 0) {
-      console.log('CEIDG: No results found');
-      return null;
-    }
-    
-    const firma = data.firmy[0];
-    const adres = firma.adresDzialalnosci || firma.adresKorespondencyjny || {};
-    
-    console.log('CEIDG: Found company data');
-    
-    return {
-      nip: nip,
-      companyName: firma.nazwa || firma.imie + ' ' + firma.nazwisko,
-      regon: firma.regon || null,
-      krs: null,
-      status: firma.status === 'AKTYWNY' ? 'Aktywny' : firma.status || 'Nieznany',
-      pkdMain: firma.pkdGlowny || null,
-      pkdList: firma.pkdPozostale || [],
-      addressLine: [adres.ulica, adres.budynek, adres.lokal].filter(Boolean).join(' ') || adres.ulica || '',
-      postalCode: adres.kodPocztowy || '',
-      city: adres.miasto || adres.miejscowosc || '',
-      source: "CEIDG"
-    };
-  } catch (error) {
-    console.error('CEIDG error:', error instanceof Error ? error.message : error);
-    return null;
-  }
-}
-
-// Provider: KRS (for companies)
-async function fetchFromKRS(nip: string): Promise<CompanyData | null> {
-  try {
-    // KRS public API
-    const url = `https://api-krs.ms.gov.pl/api/krs/OdsijNip/${nip}`;
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-    
-    const response = await fetch(url, {
-      headers: { 'Accept': 'application/json' },
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      console.log(`KRS returned ${response.status}`);
-      return null;
-    }
-    
-    const data = await response.json();
-    
-    if (!data.odpis) {
-      console.log('KRS: No results found');
-      return null;
-    }
-    
-    const dane = data.odpis.dane;
-    const adres = dane?.siedzibaIAdres?.adres || {};
-    const pkd = dane?.dzialalnosciPKD || [];
-    
-    console.log('KRS: Found company data');
-    
-    return {
-      nip: nip,
-      companyName: dane?.danePodmiotu?.nazwa || '',
-      regon: dane?.danePodmiotu?.regon || null,
-      krs: dane?.danePodmiotu?.krs || null,
-      status: 'Aktywny',
-      pkdMain: pkd[0]?.kodDzial + '.' + pkd[0]?.kodKlasa + '.' + pkd[0]?.kodPodklasa || null,
-      pkdList: pkd.slice(1).map((p: any) => p.kodDzial + '.' + p.kodKlasa + '.' + p.kodPodklasa),
-      addressLine: [adres.ulica, adres.nrDomu, adres.nrLokalu].filter(Boolean).join(' '),
-      postalCode: adres.kodPocztowy || '',
-      city: adres.miejscowosc || '',
-      source: "KRS"
-    };
-  } catch (error) {
-    console.error('KRS error:', error instanceof Error ? error.message : error);
-    return null;
-  }
-}
-
-// Provider: GUS/REGON (fallback)
+// Provider: GUS/MF (Ministry of Finance - most reliable)
 async function fetchFromGUS(nip: string): Promise<CompanyData | null> {
   try {
-    // Using public REGON API proxy
     const url = `https://wl-api.mf.gov.pl/api/search/nip/${nip}?date=${new Date().toISOString().split('T')[0]}`;
     
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    
+    console.log(`GUS: Fetching from ${url}`);
     
     const response = await fetch(url, {
       headers: { 'Accept': 'application/json' },
@@ -215,6 +102,7 @@ async function fetchFromGUS(nip: string): Promise<CompanyData | null> {
     }
     
     const data = await response.json();
+    console.log(`GUS response:`, JSON.stringify(data).substring(0, 500));
     
     if (!data.result?.subject) {
       console.log('GUS: No results found');
@@ -250,6 +138,119 @@ async function fetchFromGUS(nip: string): Promise<CompanyData | null> {
   }
 }
 
+// Provider: CEIDG (for JDG - sole proprietorships)
+async function fetchFromCEIDG(nip: string): Promise<CompanyData | null> {
+  try {
+    // CEIDG API - public endpoint
+    const url = `https://dane.biznes.gov.pl/api/ceidg/v2/firmy?nip=${nip}`;
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    
+    console.log(`CEIDG: Fetching from ${url}`);
+    
+    const response = await fetch(url, { 
+      headers: { 'Accept': 'application/json' },
+      signal: controller.signal 
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      console.log(`CEIDG returned ${response.status}`);
+      return null;
+    }
+    
+    const data = await response.json();
+    console.log(`CEIDG response:`, JSON.stringify(data).substring(0, 500));
+    
+    if (!data.firmy || data.firmy.length === 0) {
+      console.log('CEIDG: No results found');
+      return null;
+    }
+    
+    const firma = data.firmy[0];
+    const adres = firma.adresDzialalnosci || firma.adresKorespondencyjny || {};
+    
+    console.log('CEIDG: Found company data');
+    
+    return {
+      nip: nip,
+      companyName: firma.nazwa || `${firma.imie || ''} ${firma.nazwisko || ''}`.trim(),
+      regon: firma.regon || null,
+      krs: null,
+      status: firma.status === 'AKTYWNY' ? 'Aktywny' : firma.status || 'Nieznany',
+      pkdMain: firma.pkdGlowny || null,
+      pkdList: firma.pkdPozostale || [],
+      addressLine: [adres.ulica, adres.budynek, adres.lokal].filter(Boolean).join(' ') || adres.ulica || '',
+      postalCode: adres.kodPocztowy || '',
+      city: adres.miasto || adres.miejscowosc || '',
+      source: "CEIDG"
+    };
+  } catch (error) {
+    console.error('CEIDG error:', error instanceof Error ? error.message : error);
+    return null;
+  }
+}
+
+// Provider: KRS (for companies)
+async function fetchFromKRS(nip: string): Promise<CompanyData | null> {
+  try {
+    // KRS public API
+    const url = `https://api-krs.ms.gov.pl/api/krs/OdsijNip/${nip}`;
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    
+    console.log(`KRS: Fetching from ${url}`);
+    
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' },
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      console.log(`KRS returned ${response.status}`);
+      return null;
+    }
+    
+    const data = await response.json();
+    console.log(`KRS response:`, JSON.stringify(data).substring(0, 500));
+    
+    if (!data.odpis) {
+      console.log('KRS: No results found');
+      return null;
+    }
+    
+    const dane = data.odpis.dane;
+    const adres = dane?.siedzibaIAdres?.adres || {};
+    const pkd = dane?.dzialalnosciPKD || [];
+    
+    console.log('KRS: Found company data');
+    
+    return {
+      nip: nip,
+      companyName: dane?.danePodmiotu?.nazwa || '',
+      regon: dane?.danePodmiotu?.regon || null,
+      krs: dane?.danePodmiotu?.krs || null,
+      status: 'Aktywny',
+      pkdMain: pkd[0] ? `${pkd[0].kodDzial}.${pkd[0].kodKlasa}.${pkd[0].kodPodklasa}` : null,
+      pkdList: pkd.slice(1).map((p: { kodDzial: string; kodKlasa: string; kodPodklasa: string }) => 
+        `${p.kodDzial}.${p.kodKlasa}.${p.kodPodklasa}`
+      ),
+      addressLine: [adres.ulica, adres.nrDomu, adres.nrLokalu].filter(Boolean).join(' '),
+      postalCode: adres.kodPocztowy || '',
+      city: adres.miejscowosc || '',
+      source: "KRS"
+    };
+  } catch (error) {
+    console.error('KRS error:', error instanceof Error ? error.message : error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -260,6 +261,8 @@ serve(async (req) => {
     const url = new URL(req.url);
     const nip = url.searchParams.get('nip')?.replace(/[\s-]/g, '') || '';
     
+    console.log(`Received request for NIP: "${nip}"`);
+    
     // Get client IP for rate limiting
     const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0] || 
                      req.headers.get('x-real-ip') || 
@@ -267,6 +270,7 @@ serve(async (req) => {
     
     // Validate NIP format
     if (!/^\d{10}$/.test(nip)) {
+      console.log(`Invalid NIP format: "${nip}"`);
       return new Response(
         JSON.stringify({ message: 'INVALID_NIP_FORMAT', details: 'NIP musi składać się z 10 cyfr' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -275,6 +279,7 @@ serve(async (req) => {
     
     // Validate NIP checksum
     if (!validateNIP(nip)) {
+      console.log(`Invalid NIP checksum: "${nip}"`);
       return new Response(
         JSON.stringify({ message: 'INVALID_NIP_CHECKSUM', details: 'Nieprawidłowa suma kontrolna NIP' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -304,20 +309,21 @@ serve(async (req) => {
     // Try providers in order (fallback chain)
     let result: CompanyData | null = null;
     
-    // 1. Try CEIDG first (for JDG)
-    result = await fetchFromCEIDG(nip);
+    // 1. Try GUS/MF first (most reliable, works for all types)
+    result = await fetchFromGUS(nip);
     
-    // 2. Try KRS if CEIDG failed
+    // 2. Try CEIDG if GUS failed
+    if (!result) {
+      result = await fetchFromCEIDG(nip);
+    }
+    
+    // 3. Try KRS as fallback
     if (!result) {
       result = await fetchFromKRS(nip);
     }
     
-    // 3. Try GUS/MF as fallback
     if (!result) {
-      result = await fetchFromGUS(nip);
-    }
-    
-    if (!result) {
+      console.log(`No data found for NIP: ${nip}`);
       return new Response(
         JSON.stringify({ message: 'NOT_FOUND', details: 'Nie znaleziono podmiotu w rejestrach' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -326,6 +332,8 @@ serve(async (req) => {
     
     // Save to cache
     saveToCache(nip, result);
+    
+    console.log(`Successfully found data for NIP: ${nip} from ${result.source}`);
     
     return new Response(
       JSON.stringify(result),
