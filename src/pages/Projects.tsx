@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,11 +27,13 @@ import {
   Calendar,
   Loader2,
   FolderOpen,
-  FileText,
+  Trash2,
 } from 'lucide-react';
 import type { ClientProject, ProjectStatus } from '@/types/database';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
+import { NipLookupField } from '@/components/company/NipLookupField';
+import { CompanyData } from '@/hooks/useCompanyLookup';
 
 const STATUS_LABELS: Record<ProjectStatus, string> = {
   'roboczy': 'Roboczy',
@@ -54,6 +56,10 @@ export default function Projects() {
     client_nip: '',
     client_address: '',
     description: '',
+    regon: '',
+    krs: '',
+    status_company: '',
+    pkd_main: '',
   });
 
   const { user } = useAuth();
@@ -110,7 +116,16 @@ export default function Projects() {
         description: 'Projekt został utworzony.',
       });
 
-      setNewProject({ client_name: '', client_nip: '', client_address: '', description: '' });
+      setNewProject({ 
+        client_name: '', 
+        client_nip: '', 
+        client_address: '', 
+        description: '',
+        regon: '',
+        krs: '',
+        status_company: '',
+        pkd_main: '',
+      });
       setIsCreateDialogOpen(false);
       refetch();
     } catch (error) {
@@ -155,6 +170,43 @@ export default function Projects() {
               </DialogHeader>
 
               <div className="space-y-4 py-4">
+                {/* NIP with auto-lookup */}
+                <NipLookupField
+                  value={newProject.client_nip}
+                  onChange={(value) => setNewProject({ ...newProject, client_nip: value })}
+                  onCompanyFound={(data) => {
+                    const fullAddress = [data.addressLine, data.postalCode, data.city]
+                      .filter(Boolean)
+                      .join(', ');
+                    setNewProject({
+                      ...newProject,
+                      client_nip: data.nip,
+                      client_name: data.companyName,
+                      client_address: fullAddress,
+                      regon: data.regon || '',
+                      krs: data.krs || '',
+                      status_company: data.status,
+                      pkd_main: data.pkdMain || '',
+                    });
+                    toast({
+                      title: 'Dane pobrane',
+                      description: `Źródło: ${data.source}`,
+                    });
+                  }}
+                  onClear={() => {
+                    setNewProject({
+                      client_name: '',
+                      client_nip: '',
+                      client_address: '',
+                      description: '',
+                      regon: '',
+                      krs: '',
+                      status_company: '',
+                      pkd_main: '',
+                    });
+                  }}
+                />
+
                 <div className="space-y-2">
                   <Label htmlFor="client_name">Nazwa klienta *</Label>
                   <Input
@@ -165,15 +217,42 @@ export default function Projects() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="client_nip">NIP *</Label>
-                  <Input
-                    id="client_nip"
-                    placeholder="np. 1234567890"
-                    value={newProject.client_nip}
-                    onChange={(e) => setNewProject({ ...newProject, client_nip: e.target.value })}
-                  />
-                </div>
+                {/* Additional fields from registry */}
+                {(newProject.regon || newProject.krs) && (
+                  <div className="grid grid-cols-2 gap-4">
+                    {newProject.regon && (
+                      <div className="space-y-2">
+                        <Label htmlFor="regon">REGON</Label>
+                        <Input
+                          id="regon"
+                          value={newProject.regon}
+                          onChange={(e) => setNewProject({ ...newProject, regon: e.target.value })}
+                        />
+                      </div>
+                    )}
+                    {newProject.krs && (
+                      <div className="space-y-2">
+                        <Label htmlFor="krs">KRS</Label>
+                        <Input
+                          id="krs"
+                          value={newProject.krs}
+                          onChange={(e) => setNewProject({ ...newProject, krs: e.target.value })}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {newProject.pkd_main && (
+                  <div className="space-y-2">
+                    <Label htmlFor="pkd_main">PKD główne</Label>
+                    <Input
+                      id="pkd_main"
+                      value={newProject.pkd_main}
+                      onChange={(e) => setNewProject({ ...newProject, pkd_main: e.target.value })}
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="client_address">Adres (opcjonalnie)</Label>
@@ -195,6 +274,31 @@ export default function Projects() {
                     rows={3}
                   />
                 </div>
+
+                {/* Clear button */}
+                {(newProject.client_name || newProject.client_address) && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setNewProject({
+                        client_name: '',
+                        client_nip: '',
+                        client_address: '',
+                        description: '',
+                        regon: '',
+                        krs: '',
+                        status_company: '',
+                        pkd_main: '',
+                      });
+                    }}
+                    className="text-muted-foreground"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Wyczyść dane klienta
+                  </Button>
+                )}
               </div>
 
               <DialogFooter>
