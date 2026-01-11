@@ -1,5 +1,4 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 
 export interface CompanyData {
   nip: string;
@@ -55,18 +54,6 @@ export function useCompanyLookup() {
     setError(null);
 
     try {
-      const { data: responseData, error: functionError } = await supabase.functions.invoke(
-        'company-lookup',
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: null,
-        }
-      );
-
-      // Since invoke doesn't support query params well, we need to use fetch directly
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/company-lookup?nip=${cleanNip}`,
         {
