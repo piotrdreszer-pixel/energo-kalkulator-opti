@@ -100,47 +100,49 @@ export function calculateEnergyCosts(analysis: Partial<EnergyAnalysis>): Calcula
   const distributionCostBefore = fixedDistBefore + varDistBefore1 + varDistBefore2 + varDistBefore3 + 
                                   reactiveEnergyCostBefore + capacityBefore + contractedPowerChargeBefore;
 
-  // Distribution AFTER
+  // Distribution AFTER - uses consumption_after_zone*_mwh for mapped consumption
   const fixedDistAfter = Number(analysis.fixed_distribution_after_total) || 0;
+  // Variable distribution rates are in PLN/kWh, consumption is in MWh, so multiply by 1000
   const varDistAfter1 = (Number(analysis.variable_distribution_after_zone1_rate) || 0) * 
-                         (Number(analysis.consumption_zone1_mwh) || 0) * 1000;
+                         (Number(analysis.consumption_after_zone1_mwh) || 0) * 1000;
   const varDistAfter2 = zonesCountAfter >= 2 
     ? (Number(analysis.variable_distribution_after_zone2_rate) || 0) * 
-      (Number(analysis.consumption_zone2_mwh) || 0) * 1000 
+      (Number(analysis.consumption_after_zone2_mwh) || 0) * 1000 
     : 0;
   const varDistAfter3 = zonesCountAfter >= 3 
     ? (Number(analysis.variable_distribution_after_zone3_rate) || 0) * 
-      (Number(analysis.consumption_zone3_mwh) || 0) * 1000 
+      (Number(analysis.consumption_after_zone3_mwh) || 0) * 1000 
     : 0;
   const capacityAfter = Number(analysis.capacity_charge_after) || 0;
 
   const distributionCostAfter = fixedDistAfter + varDistAfter1 + varDistAfter2 + varDistAfter3 + 
                                  reactiveEnergyCostAfter + capacityAfter + contractedPowerChargeAfter;
 
-  // Active energy BEFORE
+  // Active energy BEFORE - rates are in PLN/kWh, consumption in MWh, multiply by 1000
   const activeEnergy1Before = (Number(analysis.active_energy_price_before_zone1) || 0) * 
-                               (Number(analysis.consumption_zone1_mwh) || 0);
+                               (Number(analysis.consumption_zone1_mwh) || 0) * 1000;
   const activeEnergy2Before = zonesCountBefore >= 2 
     ? (Number(analysis.active_energy_price_before_zone2) || 0) * 
-      (Number(analysis.consumption_zone2_mwh) || 0) 
+      (Number(analysis.consumption_zone2_mwh) || 0) * 1000
     : 0;
   const activeEnergy3Before = zonesCountBefore >= 3 
     ? (Number(analysis.active_energy_price_before_zone3) || 0) * 
-      (Number(analysis.consumption_zone3_mwh) || 0) 
+      (Number(analysis.consumption_zone3_mwh) || 0) * 1000
     : 0;
 
   const activeEnergyCostBefore = activeEnergy1Before + activeEnergy2Before + activeEnergy3Before;
 
-  // Active energy AFTER
+  // Active energy AFTER - uses consumption_after_zone*_mwh for mapped consumption
+  // Rates are in PLN/kWh, consumption in MWh, multiply by 1000
   const activeEnergy1After = (Number(analysis.active_energy_price_after_zone1) || 0) * 
-                              (Number(analysis.consumption_zone1_mwh) || 0);
+                              (Number(analysis.consumption_after_zone1_mwh) || 0) * 1000;
   const activeEnergy2After = zonesCountAfter >= 2 
     ? (Number(analysis.active_energy_price_after_zone2) || 0) * 
-      (Number(analysis.consumption_zone2_mwh) || 0) 
+      (Number(analysis.consumption_after_zone2_mwh) || 0) * 1000
     : 0;
   const activeEnergy3After = zonesCountAfter >= 3 
     ? (Number(analysis.active_energy_price_after_zone3) || 0) * 
-      (Number(analysis.consumption_zone3_mwh) || 0) 
+      (Number(analysis.consumption_after_zone3_mwh) || 0) * 1000
     : 0;
 
   const activeEnergyCostAfter = activeEnergy1After + activeEnergy2After + activeEnergy3After;
