@@ -16,6 +16,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -51,6 +61,8 @@ export default function Projects() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<ClientProject | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [newProject, setNewProject] = useState({
     client_name: '',
     client_nip: '',
@@ -136,6 +148,36 @@ export default function Projects() {
       });
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    if (!projectToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('client_projects')
+        .delete()
+        .eq('id', projectToDelete.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Sukces',
+        description: 'Projekt został usunięty.',
+      });
+
+      setProjectToDelete(null);
+      refetch();
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Błąd',
+        description: 'Nie udało się usunąć projektu.',
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -359,8 +401,8 @@ export default function Projects() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filteredProjects?.map((project) => (
-              <Link key={project.id} to={`/projects/${project.id}`}>
-                <Card className="card-interactive h-full">
+              <Card key={project.id} className="card-interactive h-full relative group">
+                <Link to={`/projects/${project.id}`} className="block">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-2">
                       <CardTitle className="text-lg font-display line-clamp-2">
@@ -389,13 +431,53 @@ export default function Projects() {
                         Aktualizacja: {format(new Date(project.updated_at), 'd MMM yyyy', { locale: pl })}
                       </span>
                     </div>
-
                   </CardContent>
-                </Card>
-              </Link>
+                </Link>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setProjectToDelete(project);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </Card>
             ))}
           </div>
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={!!projectToDelete} onOpenChange={(open) => !open && setProjectToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Czy na pewno chcesz usunąć ten projekt?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Projekt <strong>{projectToDelete?.client_name}</strong> zostanie trwale usunięty wraz ze wszystkimi powiązanymi analizami. Tej operacji nie można cofnąć.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Anuluj</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteProject}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Usuwanie...
+                  </>
+                ) : (
+                  'Usuń projekt'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AppLayout>
   );
