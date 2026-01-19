@@ -10,9 +10,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { FolderOpen, LogOut, User, Menu, X, Settings2, Users } from 'lucide-react';
+import { FolderOpen, LogOut, User, Menu, X, Settings2, Users, Lock } from 'lucide-react';
 import { useState } from 'react';
 import logo from '@/assets/logo.png';
+import { ChangePasswordDialog } from '@/components/auth/ChangePasswordDialog';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -93,6 +94,15 @@ export function AppLayout({ children }: AppLayoutProps) {
                     <p className="text-sm font-medium">{profile?.name}</p>
                     <p className="text-xs text-muted-foreground">{profile?.email}</p>
                   </div>
+                  <DropdownMenuSeparator />
+                  <ChangePasswordDialog
+                    trigger={
+                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                        <Lock className="mr-2 h-4 w-4" />
+                        Zmień hasło
+                      </DropdownMenuItem>
+                    }
+                  />
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
                     <LogOut className="mr-2 h-4 w-4" />
