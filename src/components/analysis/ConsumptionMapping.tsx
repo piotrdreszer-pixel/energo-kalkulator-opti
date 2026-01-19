@@ -91,6 +91,17 @@ export const ConsumptionMapping = forwardRef<HTMLDivElement, ConsumptionMappingP
     }
     
     setZoneDistribution(newDistribution);
+    
+    // Immediately apply the new distribution to formData
+    if (totalConsumption > 0) {
+      const zone1 = zonesAfter >= 1 ? totalConsumption * newDistribution[0] / 100 : 0;
+      const zone2 = zonesAfter >= 2 ? totalConsumption * newDistribution[1] / 100 : 0;
+      const zone3 = zonesAfter >= 3 ? totalConsumption * (newDistribution[2] ?? 0) / 100 : 0;
+      
+      onInputChange('consumption_after_zone1_mwh', zone1);
+      onInputChange('consumption_after_zone2_mwh', zone2);
+      onInputChange('consumption_after_zone3_mwh', zone3);
+    }
   };
 
   return (
