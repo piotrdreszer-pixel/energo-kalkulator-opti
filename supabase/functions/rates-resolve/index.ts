@@ -107,12 +107,12 @@ Deno.serve(async (req) => {
     const rateCard = rateCards[0] as RateCard
     console.log(`[rates-resolve] Found rate card: ${rateCard.name} (${rateCard.id})`)
 
-    // Get rate items for the rate card and tariff
+    // Get rate items for the rate card and tariff (case-insensitive matching)
     const { data: rateItems, error: itemsError } = await supabase
       .from('rate_items')
       .select('*')
       .eq('rate_card_id', rateCard.id)
-      .eq('tariff_code', tariffCode)
+      .ilike('tariff_code', tariffCode)
       .or(`season.eq.ALL,season.eq.${season}`)
 
     if (itemsError) {
@@ -140,7 +140,19 @@ Deno.serve(async (req) => {
     const items = rateItems as RateItem[]
     
     const fixedNetworkItem = items.find(i => i.rate_type === 'SIEC_STALA')
-    const variableItems = items.filter(i => i.rate_type === 'SIEC_ZMIENNA').sort((a, b) => (a.zone_number || 0) - (b.zone_number || 0))
+    // Support both SIEC_ZMIENNA and SIEC_ZMIENNA_STREFA* rate types
+    const variableItems = items
+      .filter(i => i.rate_type === 'SIEC_ZMIENNA' || i.rate_type.startsWith('SIEC_ZMIENNA_STREFA'))
+      .map(item => {
+        // Extract zone number from rate_type if not set (e.g., SIEC_ZMIENNA_STREFA1 -> 1)
+        let zoneNum = item.zone_number
+        if (!zoneNum && item.rate_type.startsWith('SIEC_ZMIENNA_STREFA')) {
+          const match = item.rate_type.match(/SIEC_ZMIENNA_STREFA(\d+)/)
+          zoneNum = match ? parseInt(match[1], 10) : 1
+        }
+        return { ...item, zone_number: zoneNum || 1 }
+      })
+      .sort((a, b) => (a.zone_number || 0) - (b.zone_number || 0))
     const qualityFeeItem = items.find(i => i.rate_type === 'OPLATA_JAKOSCIOWA')
     const subscriptionFeeItem = items.find(i => i.rate_type === 'OPLATA_ABONAMENTOWA')
     const capacityFeeItem = items.find(i => i.rate_type === 'OPLATA_MOCOWA')
