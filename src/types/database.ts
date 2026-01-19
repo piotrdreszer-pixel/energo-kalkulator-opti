@@ -5,9 +5,8 @@ export interface Profile {
   user_id: string;
   name: string;
   email: string;
-  email_verified: boolean;
-  verification_token: string | null;
-  verification_token_expires_at: string | null;
+  email_verified: boolean | null;
+  last_activity_at: string | null;
   created_at: string;
   updated_at: string;
 }
