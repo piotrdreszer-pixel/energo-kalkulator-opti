@@ -41,12 +41,14 @@ export const ConsumptionMapping = forwardRef<HTMLDivElement, ConsumptionMappingP
       (Number(formData.consumption_before_zone2_mwh) || 0) +
       (Number(formData.consumption_before_zone3_mwh) || 0);
 
-    // Reset distribution ONLY when zonesAfter actually changes (tariff switch)
+    // Reset distribution when zonesAfter changes OR when length doesn't match (initial load)
     React.useEffect(() => {
-      if (previousZonesAfter !== null && previousZonesAfter !== zonesAfter) {
+      const needsReset = zoneDistribution.length !== zonesAfter || 
+        (previousZonesAfter !== null && previousZonesAfter !== zonesAfter);
+      if (needsReset) {
         setZoneDistribution(getDefaultDistribution(zonesAfter));
       }
-    }, [zonesAfter, previousZonesAfter, setZoneDistribution]);
+    }, [zonesAfter, previousZonesAfter, zoneDistribution.length, setZoneDistribution]);
 
   // Apply auto distribution when toggling or changing distribution
   React.useEffect(() => {
