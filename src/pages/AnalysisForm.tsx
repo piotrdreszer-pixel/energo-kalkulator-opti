@@ -116,6 +116,7 @@ export default function AnalysisForm() {
   const [overriddenBefore, setOverriddenBefore] = useState<Record<string, number>>({});
   const [overriddenAfter, setOverriddenAfter] = useState<Record<string, number>>({});
   const [isAutoConsumptionMode, setIsAutoConsumptionMode] = useState(true);
+  const [zoneDistribution, setZoneDistribution] = useState<number[]>([60, 40]);
 
   const { data: osdOperators } = useOsdOperators();
   const { resolveRates, isLoading: isResolvingRates } = useRatesResolver();
@@ -706,6 +707,8 @@ export default function AnalysisForm() {
                 onInputChange={handleInputChange}
                 isAutoMode={isAutoConsumptionMode}
                 setIsAutoMode={setIsAutoConsumptionMode}
+                zoneDistribution={zoneDistribution}
+                setZoneDistribution={setZoneDistribution}
               />
 
               <RatesInputPanel
