@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAdminRole } from '@/hooks/useAdminRole';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -9,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { FolderOpen, LogOut, User, Menu, X } from 'lucide-react';
+import { FolderOpen, LogOut, User, Menu, X, Settings2 } from 'lucide-react';
 import { useState } from 'react';
 import logo from '@/assets/logo.png';
 
@@ -19,6 +20,7 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const { profile, signOut } = useAuth();
+  const { isAdmin } = useAdminRole();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -30,6 +32,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const navLinks = [
     { href: '/projects', label: 'Projekty', icon: FolderOpen },
+    ...(isAdmin ? [{ href: '/admin/rates', label: 'Stawki OSD', icon: Settings2 }] : []),
   ];
 
   return (
