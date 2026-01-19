@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -213,9 +213,9 @@ export default function AnalysisForm() {
     }
   };
 
-  const handleInputChange = (field: keyof EnergyAnalysis, value: string | number | boolean) => {
+  const handleInputChange = useCallback((field: keyof EnergyAnalysis, value: string | number | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-  };
+  }, []);
 
   const handleFetchRates = async (scenario: 'before' | 'after') => {
     if (!formData.osd_id) {

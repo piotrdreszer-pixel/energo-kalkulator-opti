@@ -48,21 +48,16 @@ export const ConsumptionMapping = forwardRef<HTMLDivElement, ConsumptionMappingP
   // Apply auto distribution when toggling or changing distribution
   React.useEffect(() => {
     if (isAutoMode && totalConsumption > 0) {
-      if (zonesAfter === 1) {
-        onInputChange('consumption_after_zone1_mwh', totalConsumption);
-        onInputChange('consumption_after_zone2_mwh', 0);
-        onInputChange('consumption_after_zone3_mwh', 0);
-      } else if (zonesAfter === 2) {
-        onInputChange('consumption_after_zone1_mwh', totalConsumption * zoneDistribution[0] / 100);
-        onInputChange('consumption_after_zone2_mwh', totalConsumption * zoneDistribution[1] / 100);
-        onInputChange('consumption_after_zone3_mwh', 0);
-      } else {
-        onInputChange('consumption_after_zone1_mwh', totalConsumption * zoneDistribution[0] / 100);
-        onInputChange('consumption_after_zone2_mwh', totalConsumption * zoneDistribution[1] / 100);
-        onInputChange('consumption_after_zone3_mwh', totalConsumption * zoneDistribution[2] / 100);
-      }
+      const zone1 = zonesAfter >= 1 ? totalConsumption * (zoneDistribution[0] ?? 100) / 100 : 0;
+      const zone2 = zonesAfter >= 2 ? totalConsumption * (zoneDistribution[1] ?? 0) / 100 : 0;
+      const zone3 = zonesAfter >= 3 ? totalConsumption * (zoneDistribution[2] ?? 0) / 100 : 0;
+      
+      // Update all zones in sequence
+      onInputChange('consumption_after_zone1_mwh', zone1);
+      onInputChange('consumption_after_zone2_mwh', zone2);
+      onInputChange('consumption_after_zone3_mwh', zone3);
     }
-  }, [isAutoMode, zoneDistribution, totalConsumption, zonesAfter]);
+  }, [isAutoMode, zoneDistribution, totalConsumption, zonesAfter, onInputChange]);
 
   const handleSliderChange = (index: number, value: number[]) => {
     const newValue = value[0];

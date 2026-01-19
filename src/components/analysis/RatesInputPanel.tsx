@@ -230,7 +230,6 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
                       `active_energy_price_${prefix}_zone${index + 1}` as keyof EnergyAnalysis,
                       parseLocaleNumber(e.target.value)
                     )}
-                    disabled={!isManualMode && resolvedRates !== null}
                     className="pr-14 text-sm"
                   />
                   <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
