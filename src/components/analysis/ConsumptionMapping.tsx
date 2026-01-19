@@ -116,20 +116,20 @@ export const ConsumptionMapping = forwardRef<HTMLDivElement, ConsumptionMappingP
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {isAutoMode && totalConsumption > 0 && zonesAfter > 1 && (
+        {isAutoMode && totalConsumption > 0 && zonesAfter > 1 && zoneDistribution.length >= zonesAfter && (
           <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
             <p className="text-sm text-muted-foreground">
               Całkowite zużycie do rozdzielenia: <span className="font-medium text-foreground">{totalConsumption.toFixed(4)} MWh</span>
             </p>
             
-            {zonesAfter === 2 && (
+            {zonesAfter === 2 && zoneLabelsAfter.length >= 2 && (
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span>{zoneLabelsAfter[0]}: {zoneDistribution[0].toFixed(0)}%</span>
-                  <span>{zoneLabelsAfter[1]}: {zoneDistribution[1].toFixed(0)}%</span>
+                  <span>{zoneLabelsAfter[0]}: {(zoneDistribution[0] ?? 0).toFixed(0)}%</span>
+                  <span>{zoneLabelsAfter[1]}: {(zoneDistribution[1] ?? 0).toFixed(0)}%</span>
                 </div>
                 <Slider
-                  value={[zoneDistribution[0]]}
+                  value={[zoneDistribution[0] ?? 60]}
                   onValueChange={(v) => handleSliderChange(0, v)}
                   min={0}
                   max={100}
@@ -138,9 +138,9 @@ export const ConsumptionMapping = forwardRef<HTMLDivElement, ConsumptionMappingP
               </div>
             )}
             
-            {zonesAfter === 3 && (
+            {zonesAfter === 3 && zoneLabelsAfter.length >= 3 && (
               <div className="space-y-3">
-                {zoneLabelsAfter.map((label, index) => (
+                {zoneLabelsAfter.slice(0, 3).map((label, index) => (
                   <div key={index} className="space-y-1">
                     <div className="flex justify-between text-sm">
                       <span>{label}</span>
