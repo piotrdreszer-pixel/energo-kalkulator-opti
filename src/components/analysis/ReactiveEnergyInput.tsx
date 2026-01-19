@@ -20,6 +20,17 @@ export function ReactiveEnergyInput({ prefix, formData, onInputChange }: Reactiv
     return `reactive_energy_${prefix}_month_${month}` as keyof EnergyAnalysis;
   };
   
+  const parseLocaleNumber = (value: string): number => {
+    const normalized = value.replace(',', '.');
+    const parsed = parseFloat(normalized);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  const formatDisplayValue = (value: number | null | undefined): string => {
+    if (value === null || value === undefined || value === 0) return '';
+    return String(value);
+  };
+  
   // Calculate sum of monthly values for display
   const monthlySum = isMonthlyMode 
     ? Array.from({ length: 12 }, (_, i) => Number(formData[getMonthField(i + 1)]) || 0).reduce((a, b) => a + b, 0)
@@ -47,10 +58,10 @@ export function ReactiveEnergyInput({ prefix, formData, onInputChange }: Reactiv
         <div className="space-y-2">
           <Label className="text-sm text-muted-foreground">Łączny koszt za okres analizy [zł]</Label>
           <Input
-            type="number"
-            step="0.01"
-            value={formData[totalField] || ''}
-            onChange={(e) => onInputChange(totalField, parseFloat(e.target.value) || 0)}
+            type="text"
+            inputMode="decimal"
+            value={formatDisplayValue(formData[totalField] as number)}
+            onChange={(e) => onInputChange(totalField, parseLocaleNumber(e.target.value))}
             placeholder="0.00"
           />
         </div>
@@ -64,10 +75,10 @@ export function ReactiveEnergyInput({ prefix, formData, onInputChange }: Reactiv
               <div key={idx} className="space-y-1">
                 <Label className="text-xs text-muted-foreground">{label} [zł]</Label>
                 <Input
-                  type="number"
-                  step="0.01"
-                  value={Number(formData[getMonthField(idx + 1)]) || ''}
-                  onChange={(e) => onInputChange(getMonthField(idx + 1), parseFloat(e.target.value) || 0)}
+                  type="text"
+                  inputMode="decimal"
+                  value={formatDisplayValue(formData[getMonthField(idx + 1)] as number)}
+                  onChange={(e) => onInputChange(getMonthField(idx + 1), parseLocaleNumber(e.target.value))}
                   placeholder="0.00"
                 />
               </div>

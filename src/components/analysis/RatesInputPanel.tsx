@@ -71,11 +71,24 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
     return Object.keys(overriddenFields).includes(field);
   };
 
+  const parseLocaleNumber = (value: string): number => {
+    // Replace comma with dot for parsing
+    const normalized = value.replace(',', '.');
+    const parsed = parseFloat(normalized);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  const formatDisplayValue = (value: number | null | undefined): string => {
+    if (value === null || value === undefined || value === 0) return '';
+    // Keep exact string representation to preserve trailing zeros
+    return String(value);
+  };
+
   const renderInput = (
     label: string, 
     field: keyof EnergyAnalysis, 
     unit: string,
-    step: string = '0.01'
+    _step: string = '0.01'
   ) => (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
@@ -86,10 +99,10 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
       </div>
       <div className="relative">
         <Input
-          type="number"
-          step={step}
-          value={Number(formData[field]) || ''}
-          onChange={(e) => handleInputChange(field, parseFloat(e.target.value) || 0)}
+          type="text"
+          inputMode="decimal"
+          value={formatDisplayValue(formData[field] as number)}
+          onChange={(e) => handleInputChange(field, parseLocaleNumber(e.target.value))}
           disabled={!isManualMode && resolvedRates !== null}
           className="pr-16"
         />
@@ -177,13 +190,13 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
                   )}
                 </div>
                 <div className="relative">
-                <Input
-                    type="number"
-                    step="0.000001"
-                    value={Number(formData[`variable_distribution_${prefix}_zone${index + 1}_rate` as keyof EnergyAnalysis]) || ''}
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    value={formatDisplayValue(formData[`variable_distribution_${prefix}_zone${index + 1}_rate` as keyof EnergyAnalysis] as number)}
                     onChange={(e) => handleInputChange(
                       `variable_distribution_${prefix}_zone${index + 1}_rate` as keyof EnergyAnalysis,
-                      parseFloat(e.target.value) || 0
+                      parseLocaleNumber(e.target.value)
                     )}
                     disabled={!isManualMode && resolvedRates !== null}
                     className="pr-14 text-sm"
@@ -210,12 +223,12 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
                 </div>
                 <div className="relative">
                   <Input
-                    type="number"
-                    step="0.0001"
-                    value={Number(formData[`active_energy_price_${prefix}_zone${index + 1}` as keyof EnergyAnalysis]) || ''}
+                    type="text"
+                    inputMode="decimal"
+                    value={formatDisplayValue(formData[`active_energy_price_${prefix}_zone${index + 1}` as keyof EnergyAnalysis] as number)}
                     onChange={(e) => handleInputChange(
                       `active_energy_price_${prefix}_zone${index + 1}` as keyof EnergyAnalysis,
-                      parseFloat(e.target.value) || 0
+                      parseLocaleNumber(e.target.value)
                     )}
                     disabled={!isManualMode && resolvedRates !== null}
                     className="pr-14 text-sm"
