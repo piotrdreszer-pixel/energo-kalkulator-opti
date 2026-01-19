@@ -209,8 +209,39 @@ export default function AnalysisForm() {
         contracted_power_before_kw: value,
         contracted_power_after_kw: value,
       }));
+      
+      // Validate power for both tariffs
+      const validationBefore = validateContractedPower(formData.tariff_code_before || 'C11', value);
+      const validationAfter = validateContractedPower(formData.tariff_code_after || 'C11', value);
+      
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        if (!validationBefore.valid) {
+          newErrors.contracted_power_before_kw = validationBefore.error!;
+        } else {
+          delete newErrors.contracted_power_before_kw;
+        }
+        if (!validationAfter.valid) {
+          newErrors.contracted_power_after_kw = validationAfter.error!;
+        } else {
+          delete newErrors.contracted_power_after_kw;
+        }
+        return newErrors;
+      });
     } else {
       setFormData(prev => ({ ...prev, contracted_power_before_kw: value }));
+      
+      // Validate power for before tariff only
+      const validation = validateContractedPower(formData.tariff_code_before || 'C11', value);
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        if (!validation.valid) {
+          newErrors.contracted_power_before_kw = validation.error!;
+        } else {
+          delete newErrors.contracted_power_before_kw;
+        }
+        return newErrors;
+      });
     }
   };
 
@@ -292,8 +323,13 @@ export default function AnalysisForm() {
   };
 
   const handleSave = () => {
-    if (Object.keys(validationErrors).length > 0) {
-      toast({ variant: 'destructive', title: 'Błąd walidacji', description: 'Popraw błędy w formularzu.' });
+    const errors = Object.values(validationErrors);
+    if (errors.length > 0) {
+      toast({ 
+        variant: 'destructive', 
+        title: 'Błąd walidacji', 
+        description: errors[0] || 'Popraw błędy w formularzu.' 
+      });
       return;
     }
     saveMutation.mutate();
