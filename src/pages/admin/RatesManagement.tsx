@@ -7,11 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Plus, Pencil, Trash2, FileUp, Save, Upload, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, FileUp, Save, Upload, FileText, CheckCircle2, AlertTriangle, Info } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -52,6 +51,13 @@ interface ExtractedRate {
   season: string;
   description: string | null;
   selected?: boolean;
+  needsReview?: boolean;
+}
+
+interface ParseDiagnostics {
+  tariffsDetected: string[];
+  recordCount: number;
+  parseErrors: string[];
 }
 
 const RATE_TYPES = [
@@ -66,8 +72,9 @@ const RATE_TYPES = [
   { value: 'ENERGIA_BIERNA', label: 'Energia bierna' },
 ];
 
-const TARIFF_CODES = ['C11', 'C12a', 'C12b', 'C21', 'C22a', 'C22b', 'C23', 'B11', 'B21', 'B22', 'B23'];
+const TARIFF_CODES = ['A23', 'B11', 'B21', 'B22', 'B23', 'C11', 'C12a', 'C12b', 'C12w', 'C21', 'C22a', 'C22b', 'C23', 'G11', 'G12', 'G12w'];
 const SEASONS = ['ALL', 'SUMMER', 'WINTER'];
+const UNITS = ['zł/kWh', 'zł/MWh', 'zł/kW/mies', 'zł/mies', 'zł/kvarh'];
 
 export default function RatesManagement() {
   const [operators, setOperators] = useState<OsdOperator[]>([]);
@@ -90,8 +97,11 @@ export default function RatesManagement() {
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const [parsingPdf, setParsingPdf] = useState(false);
   const [extractedRates, setExtractedRates] = useState<ExtractedRate[]>([]);
-  const [importStep, setImportStep] = useState<'upload' | 'review' | 'done'>('upload');
+  const [importStep, setImportStep] = useState<'upload' | 'review' | 'done' | 'manual'>('upload');
   const [uploadedFileName, setUploadedFileName] = useState<string>('');
+  const [parseDiagnostics, setParseDiagnostics] = useState<ParseDiagnostics | null>(null);
+  const [parserUsed, setParserUsed] = useState<string>('');
+  const [editingRateIndex, setEditingRateIndex] = useState<number | null>(null);
 
   // Form state for rate card
   const [rateCardForm, setRateCardForm] = useState({
@@ -387,6 +397,14 @@ export default function RatesManagement() {
         throw new Error('Błąd podczas analizy pliku');
       }
 
+      // Check if manual mapping is required
+      if (parseResult.requiresManualMapping) {
+        setParseDiagnostics(parseResult.diagnostics || null);
+        setImportStep('manual');
+        toast.warning('Parser nie rozpoznał struktury - wymagane ręczne mapowanie');
+        return;
+      }
+
       if (!parseResult.success) {
         throw new Error(parseResult.error || 'Błąd podczas ekstrakcji stawek');
       }
@@ -397,12 +415,19 @@ export default function RatesManagement() {
       }));
 
       setExtractedRates(rates);
+      setParseDiagnostics(parseResult.diagnostics || null);
+      setParserUsed(parseResult.parserUsed || 'generic');
       setImportStep('review');
 
       if (rates.length === 0) {
         toast.warning('Nie znaleziono stawek w dokumencie');
       } else {
-        toast.success(`Wyekstrahowano ${rates.length} stawek`);
+        const reviewCount = rates.filter((r: ExtractedRate) => r.needsReview).length;
+        if (reviewCount > 0) {
+          toast.info(`Wyekstrahowano ${rates.length} stawek (${reviewCount} wymaga weryfikacji)`);
+        } else {
+          toast.success(`Wyekstrahowano ${rates.length} stawek`);
+        }
       }
 
     } catch (error) {
@@ -425,6 +450,16 @@ export default function RatesManagement() {
 
   const toggleAllRates = (selected: boolean) => {
     setExtractedRates(rates => rates.map(r => ({ ...r, selected })));
+  };
+
+  const updateExtractedRate = (index: number, field: keyof ExtractedRate, value: any) => {
+    setExtractedRates(rates =>
+      rates.map((r, i) => {
+        if (i !== index) return r;
+        const updated = { ...r, [field]: value, needsReview: false };
+        return updated;
+      })
+    );
   };
 
   const handleImportSelectedRates = async () => {
@@ -458,6 +493,13 @@ export default function RatesManagement() {
 
       if (error) throw error;
 
+      // Log diagnostics
+      console.log('[RatesManagement] Import completed:', {
+        tariffsImported: [...new Set(selectedRates.map(r => r.tariff_code))],
+        recordCount: selectedRates.length,
+        parserUsed,
+      });
+
       toast.success(`Zaimportowano ${selectedRates.length} stawek`);
       setImportStep('done');
       fetchRateItems(selectedRateCard);
@@ -465,9 +507,7 @@ export default function RatesManagement() {
       // Reset after short delay
       setTimeout(() => {
         setImportDialogOpen(false);
-        setImportStep('upload');
-        setExtractedRates([]);
-        setUploadedFileName('');
+        resetImport();
       }, 1500);
 
     } catch (error) {
@@ -478,10 +518,34 @@ export default function RatesManagement() {
     }
   };
 
+  const addManualRate = () => {
+    setExtractedRates(rates => [
+      ...rates,
+      {
+        tariff_code: 'C11',
+        rate_type: 'SIEC_STALA',
+        value: 0,
+        unit: 'zł/kW/mies',
+        zone_number: null,
+        season: 'ALL',
+        description: null,
+        selected: true,
+        needsReview: true,
+      },
+    ]);
+  };
+
+  const removeExtractedRate = (index: number) => {
+    setExtractedRates(rates => rates.filter((_, i) => i !== index));
+  };
+
   const resetImport = () => {
     setImportStep('upload');
     setExtractedRates([]);
     setUploadedFileName('');
+    setParseDiagnostics(null);
+    setParserUsed('');
+    setEditingRateIndex(null);
   };
 
   const selectedOperatorName = operators.find(o => o.id === selectedOperator)?.name || '';
@@ -682,7 +746,7 @@ export default function RatesManagement() {
                         Import PDF
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-3xl max-h-[80vh]">
+                    <DialogContent className="max-w-4xl max-h-[85vh]">
                       <DialogHeader>
                         <DialogTitle>Import stawek z PDF</DialogTitle>
                         <DialogDescription>
@@ -711,7 +775,7 @@ export default function RatesManagement() {
                                 </p>
                                 {parsingPdf && (
                                   <p className="text-xs text-muted-foreground">
-                                    To może potrwać do 30 sekund
+                                    To może potrwać do 60 sekund
                                   </p>
                                 )}
                               </div>
@@ -722,6 +786,9 @@ export default function RatesManagement() {
                                 <p className="text-sm text-muted-foreground mt-2">
                                   Dokument z taryfą OSD (max 10MB)
                                 </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Obsługiwane formaty: Energa, PGE, TAURON, ENEA, STOEN
+                                </p>
                               </>
                             )}
                           </div>
@@ -729,48 +796,77 @@ export default function RatesManagement() {
                       )}
 
                       {importStep === 'review' && (
-                        <div className="py-4">
-                          <div className="flex items-center justify-between mb-4">
+                        <div className="py-4 space-y-4">
+                          {/* Header with diagnostics */}
+                          <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <FileText className="h-5 w-5 text-primary" />
                               <span className="font-medium">{uploadedFileName}</span>
                               <Badge variant="secondary">
                                 {extractedRates.length} stawek
                               </Badge>
+                              {parserUsed && (
+                                <Badge variant="outline" className="text-xs">
+                                  Parser: {parserUsed}
+                                </Badge>
+                              )}
                             </div>
                             <div className="flex items-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => toggleAllRates(true)}
-                              >
+                              <Button variant="ghost" size="sm" onClick={() => toggleAllRates(true)}>
                                 Zaznacz wszystkie
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => toggleAllRates(false)}
-                              >
+                              <Button variant="ghost" size="sm" onClick={() => toggleAllRates(false)}>
                                 Odznacz wszystkie
                               </Button>
                             </div>
                           </div>
 
+                          {/* Diagnostics info */}
+                          {parseDiagnostics && (
+                            <div className="flex items-start gap-2 p-3 bg-muted rounded-lg text-sm">
+                              <Info className="h-4 w-4 mt-0.5 text-blue-500" />
+                              <div>
+                                <p>Wykryte taryfy: {parseDiagnostics.tariffsDetected.join(', ') || 'brak'}</p>
+                                {parseDiagnostics.parseErrors.length > 0 && (
+                                  <p className="text-amber-600 mt-1">
+                                    Błędy: {parseDiagnostics.parseErrors.length}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Review warning */}
+                          {extractedRates.some(r => r.needsReview) && (
+                            <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950 rounded-lg text-sm text-amber-700 dark:text-amber-300">
+                              <AlertTriangle className="h-4 w-4" />
+                              <span>
+                                {extractedRates.filter(r => r.needsReview).length} stawek wymaga weryfikacji (oznaczone kolorem)
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Editable rates table */}
                           <ScrollArea className="h-[400px] border rounded-lg">
                             <Table>
                               <TableHeader>
                                 <TableRow>
                                   <TableHead className="w-10"></TableHead>
-                                  <TableHead>Taryfa</TableHead>
-                                  <TableHead>Rodzaj stawki</TableHead>
-                                  <TableHead>Wartość</TableHead>
-                                  <TableHead>Jednostka</TableHead>
-                                  <TableHead>Strefa</TableHead>
+                                  <TableHead className="w-24">Taryfa</TableHead>
+                                  <TableHead className="w-20">Sezon</TableHead>
+                                  <TableHead className="w-20">Strefa</TableHead>
+                                  <TableHead>Komponent</TableHead>
+                                  <TableHead className="w-28">Jednostka</TableHead>
+                                  <TableHead className="w-28">Wartość</TableHead>
+                                  <TableHead className="w-16"></TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
                                 {extractedRates.map((rate, index) => (
-                                  <TableRow key={index} className={!rate.selected ? 'opacity-50' : ''}>
+                                  <TableRow 
+                                    key={index} 
+                                    className={`${!rate.selected ? 'opacity-50' : ''} ${rate.needsReview ? 'bg-amber-50 dark:bg-amber-950/30' : ''}`}
+                                  >
                                     <TableCell>
                                       <Checkbox
                                         checked={rate.selected}
@@ -778,17 +874,99 @@ export default function RatesManagement() {
                                       />
                                     </TableCell>
                                     <TableCell>
-                                      <Badge variant="outline">{rate.tariff_code}</Badge>
+                                      <Select
+                                        value={rate.tariff_code}
+                                        onValueChange={(v) => updateExtractedRate(index, 'tariff_code', v)}
+                                      >
+                                        <SelectTrigger className="h-8 text-xs">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {TARIFF_CODES.map((code) => (
+                                            <SelectItem key={code} value={code}>{code}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
                                     </TableCell>
-                                    <TableCell className="text-sm">
-                                      {RATE_TYPES.find(r => r.value === rate.rate_type)?.label || rate.rate_type}
+                                    <TableCell>
+                                      <Select
+                                        value={rate.season}
+                                        onValueChange={(v) => updateExtractedRate(index, 'season', v)}
+                                      >
+                                        <SelectTrigger className="h-8 text-xs">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {SEASONS.map((s) => (
+                                            <SelectItem key={s} value={s}>
+                                              {s === 'ALL' ? 'Cały rok' : s === 'SUMMER' ? 'Lato' : 'Zima'}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
                                     </TableCell>
-                                    <TableCell className="font-mono text-sm">
-                                      {rate.value.toFixed(6)}
+                                    <TableCell>
+                                      <Input
+                                        type="number"
+                                        value={rate.zone_number || ''}
+                                        onChange={(e) => updateExtractedRate(index, 'zone_number', e.target.value ? parseInt(e.target.value) : null)}
+                                        placeholder="-"
+                                        className="h-8 w-16 text-xs"
+                                      />
                                     </TableCell>
-                                    <TableCell className="text-sm">{rate.unit}</TableCell>
-                                    <TableCell className="text-sm">
-                                      {rate.zone_number || '-'}
+                                    <TableCell>
+                                      <Select
+                                        value={rate.rate_type}
+                                        onValueChange={(v) => updateExtractedRate(index, 'rate_type', v)}
+                                      >
+                                        <SelectTrigger className="h-8 text-xs">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {RATE_TYPES.map((rt) => (
+                                            <SelectItem key={rt.value} value={rt.value}>{rt.label}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Select
+                                        value={rate.unit}
+                                        onValueChange={(v) => updateExtractedRate(index, 'unit', v)}
+                                      >
+                                        <SelectTrigger className="h-8 text-xs">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {UNITS.map((u) => (
+                                            <SelectItem key={u} value={u}>{u}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Input
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={rate.value.toString()}
+                                        onChange={(e) => {
+                                          const val = parseFloat(e.target.value.replace(',', '.'));
+                                          if (!isNaN(val)) {
+                                            updateExtractedRate(index, 'value', val);
+                                          }
+                                        }}
+                                        className="h-8 text-xs font-mono"
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 text-destructive"
+                                        onClick={() => removeExtractedRate(index)}
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
                                     </TableCell>
                                   </TableRow>
                                 ))}
@@ -796,7 +974,14 @@ export default function RatesManagement() {
                             </Table>
                           </ScrollArea>
 
-                          <DialogFooter className="mt-4">
+                          <div className="flex items-center justify-between">
+                            <Button variant="outline" size="sm" onClick={addManualRate}>
+                              <Plus className="h-4 w-4 mr-1" />
+                              Dodaj ręcznie
+                            </Button>
+                          </div>
+
+                          <DialogFooter>
                             <Button variant="outline" onClick={resetImport}>
                               Anuluj
                             </Button>
@@ -806,6 +991,166 @@ export default function RatesManagement() {
                             >
                               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                               Importuj {extractedRates.filter(r => r.selected).length} stawek
+                            </Button>
+                          </DialogFooter>
+                        </div>
+                      )}
+
+                      {importStep === 'manual' && (
+                        <div className="py-4 space-y-4">
+                          <div className="flex items-center gap-2 p-4 bg-amber-50 dark:bg-amber-950 rounded-lg">
+                            <AlertTriangle className="h-5 w-5 text-amber-500" />
+                            <div>
+                              <p className="font-medium">Parser nie rozpoznał struktury dokumentu</p>
+                              <p className="text-sm text-muted-foreground">
+                                Możesz ręcznie dodać stawki poniżej lub spróbować z innym plikiem.
+                              </p>
+                            </div>
+                          </div>
+
+                          {parseDiagnostics?.parseErrors && parseDiagnostics.parseErrors.length > 0 && (
+                            <div className="p-3 bg-muted rounded-lg text-sm">
+                              <p className="font-medium mb-1">Błędy parsowania:</p>
+                              <ul className="list-disc list-inside text-xs text-muted-foreground">
+                                {parseDiagnostics.parseErrors.slice(0, 5).map((err, i) => (
+                                  <li key={i}>{err}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          <ScrollArea className="h-[300px] border rounded-lg">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="w-24">Taryfa</TableHead>
+                                  <TableHead className="w-20">Sezon</TableHead>
+                                  <TableHead className="w-20">Strefa</TableHead>
+                                  <TableHead>Komponent</TableHead>
+                                  <TableHead className="w-28">Jednostka</TableHead>
+                                  <TableHead className="w-28">Wartość</TableHead>
+                                  <TableHead className="w-16"></TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {extractedRates.map((rate, index) => (
+                                  <TableRow key={index}>
+                                    <TableCell>
+                                      <Select
+                                        value={rate.tariff_code}
+                                        onValueChange={(v) => updateExtractedRate(index, 'tariff_code', v)}
+                                      >
+                                        <SelectTrigger className="h-8 text-xs">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {TARIFF_CODES.map((code) => (
+                                            <SelectItem key={code} value={code}>{code}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Select
+                                        value={rate.season}
+                                        onValueChange={(v) => updateExtractedRate(index, 'season', v)}
+                                      >
+                                        <SelectTrigger className="h-8 text-xs">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {SEASONS.map((s) => (
+                                            <SelectItem key={s} value={s}>
+                                              {s === 'ALL' ? 'Cały rok' : s === 'SUMMER' ? 'Lato' : 'Zima'}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Input
+                                        type="number"
+                                        value={rate.zone_number || ''}
+                                        onChange={(e) => updateExtractedRate(index, 'zone_number', e.target.value ? parseInt(e.target.value) : null)}
+                                        placeholder="-"
+                                        className="h-8 w-16 text-xs"
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <Select
+                                        value={rate.rate_type}
+                                        onValueChange={(v) => updateExtractedRate(index, 'rate_type', v)}
+                                      >
+                                        <SelectTrigger className="h-8 text-xs">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {RATE_TYPES.map((rt) => (
+                                            <SelectItem key={rt.value} value={rt.value}>{rt.label}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Select
+                                        value={rate.unit}
+                                        onValueChange={(v) => updateExtractedRate(index, 'unit', v)}
+                                      >
+                                        <SelectTrigger className="h-8 text-xs">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {UNITS.map((u) => (
+                                            <SelectItem key={u} value={u}>{u}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Input
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={rate.value.toString()}
+                                        onChange={(e) => {
+                                          const val = parseFloat(e.target.value.replace(',', '.'));
+                                          if (!isNaN(val)) {
+                                            updateExtractedRate(index, 'value', val);
+                                          }
+                                        }}
+                                        className="h-8 text-xs font-mono"
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 text-destructive"
+                                        onClick={() => removeExtractedRate(index)}
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </ScrollArea>
+
+                          <Button variant="outline" size="sm" onClick={addManualRate}>
+                            <Plus className="h-4 w-4 mr-1" />
+                            Dodaj stawkę
+                          </Button>
+
+                          <DialogFooter>
+                            <Button variant="outline" onClick={resetImport}>
+                              Anuluj
+                            </Button>
+                            <Button
+                              onClick={handleImportSelectedRates}
+                              disabled={saving || extractedRates.length === 0}
+                            >
+                              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                              Importuj {extractedRates.length} stawek
                             </Button>
                           </DialogFooter>
                         </div>
@@ -839,113 +1184,121 @@ export default function RatesManagement() {
                         Dodaj
                       </Button>
                     </DialogTrigger>
-                  <DialogContent className="max-w-lg">
-                    <DialogHeader>
-                      <DialogTitle>{editingRateItem ? 'Edytuj stawkę' : 'Nowa stawka'}</DialogTitle>
-                      <DialogDescription>
-                        {selectedRateCardName}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div className="grid grid-cols-2 gap-4">
+                    <DialogContent className="max-w-lg">
+                      <DialogHeader>
+                        <DialogTitle>{editingRateItem ? 'Edytuj stawkę' : 'Nowa stawka'}</DialogTitle>
+                        <DialogDescription>
+                          {selectedRateCardName}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Taryfa</Label>
+                            <Select
+                              value={rateItemForm.tariff_code}
+                              onValueChange={(v) => setRateItemForm(f => ({ ...f, tariff_code: v }))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {TARIFF_CODES.map((code) => (
+                                  <SelectItem key={code} value={code}>{code}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Sezon</Label>
+                            <Select
+                              value={rateItemForm.season}
+                              onValueChange={(v) => setRateItemForm(f => ({ ...f, season: v }))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {SEASONS.map((s) => (
+                                  <SelectItem key={s} value={s}>
+                                    {s === 'ALL' ? 'Cały rok' : s === 'SUMMER' ? 'Lato' : 'Zima'}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
                         <div className="space-y-2">
-                          <Label>Taryfa</Label>
+                          <Label>Rodzaj stawki</Label>
                           <Select
-                            value={rateItemForm.tariff_code}
-                            onValueChange={(v) => setRateItemForm(f => ({ ...f, tariff_code: v }))}
+                            value={rateItemForm.rate_type}
+                            onValueChange={(v) => setRateItemForm(f => ({ ...f, rate_type: v }))}
                           >
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {TARIFF_CODES.map((code) => (
-                                <SelectItem key={code} value={code}>{code}</SelectItem>
+                              {RATE_TYPES.map((rt) => (
+                                <SelectItem key={rt.value} value={rt.value}>{rt.label}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="space-y-2">
-                          <Label>Sezon</Label>
-                          <Select
-                            value={rateItemForm.season}
-                            onValueChange={(v) => setRateItemForm(f => ({ ...f, season: v }))}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {SEASONS.map((s) => (
-                                <SelectItem key={s} value={s}>
-                                  {s === 'ALL' ? 'Cały rok' : s === 'SUMMER' ? 'Lato' : 'Zima'}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Rodzaj stawki</Label>
-                        <Select
-                          value={rateItemForm.rate_type}
-                          onValueChange={(v) => setRateItemForm(f => ({ ...f, rate_type: v }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {RATE_TYPES.map((rt) => (
-                              <SelectItem key={rt.value} value={rt.value}>{rt.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label>Wartość</Label>
-                          <Input
-                            type="text"
-                            inputMode="decimal"
-                            value={rateItemForm.value}
-                            onChange={(e) => setRateItemForm(f => ({ ...f, value: e.target.value }))}
-                            placeholder="0,00"
-                          />
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="space-y-2">
+                            <Label>Wartość</Label>
+                            <Input
+                              type="text"
+                              inputMode="decimal"
+                              value={rateItemForm.value}
+                              onChange={(e) => setRateItemForm(f => ({ ...f, value: e.target.value }))}
+                              placeholder="0,00"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Jednostka</Label>
+                            <Select
+                              value={rateItemForm.unit}
+                              onValueChange={(v) => setRateItemForm(f => ({ ...f, unit: v }))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {UNITS.map((u) => (
+                                  <SelectItem key={u} value={u}>{u}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Strefa</Label>
+                            <Input
+                              type="number"
+                              value={rateItemForm.zone_number}
+                              onChange={(e) => setRateItemForm(f => ({ ...f, zone_number: e.target.value }))}
+                              placeholder="1-3"
+                            />
+                          </div>
                         </div>
                         <div className="space-y-2">
-                          <Label>Jednostka</Label>
+                          <Label>Opis (opcjonalnie)</Label>
                           <Input
-                            value={rateItemForm.unit}
-                            onChange={(e) => setRateItemForm(f => ({ ...f, unit: e.target.value }))}
-                            placeholder="zł/kWh"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Strefa</Label>
-                          <Input
-                            type="number"
-                            value={rateItemForm.zone_number}
-                            onChange={(e) => setRateItemForm(f => ({ ...f, zone_number: e.target.value }))}
-                            placeholder="1-3"
+                            value={rateItemForm.description}
+                            onChange={(e) => setRateItemForm(f => ({ ...f, description: e.target.value }))}
+                            placeholder="Dodatkowy opis stawki"
                           />
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label>Opis (opcjonalnie)</Label>
-                        <Input
-                          value={rateItemForm.description}
-                          onChange={(e) => setRateItemForm(f => ({ ...f, description: e.target.value }))}
-                          placeholder="Dodatkowy opis stawki"
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button onClick={handleSaveRateItem} disabled={saving || !rateItemForm.value}>
-                        {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        <Save className="h-4 w-4 mr-2" />
-                        Zapisz
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                      <DialogFooter>
+                        <Button onClick={handleSaveRateItem} disabled={saving || !rateItemForm.value}>
+                          {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          <Save className="h-4 w-4 mr-2" />
+                          Zapisz
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               )}
             </CardHeader>
@@ -964,6 +1317,11 @@ export default function RatesManagement() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge variant="outline" className="text-xs">{item.tariff_code}</Badge>
+                        {item.season && item.season !== 'ALL' && (
+                          <Badge variant="secondary" className="text-xs">
+                            {item.season === 'SUMMER' ? 'Lato' : 'Zima'}
+                          </Badge>
+                        )}
                         <span className="font-medium truncate">
                           {RATE_TYPES.find(r => r.value === item.rate_type)?.label || item.rate_type}
                         </span>
