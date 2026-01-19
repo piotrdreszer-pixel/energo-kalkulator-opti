@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.rates-resolve]
 verify_jwt = false
+
+[functions.parse-rates-pdf]
+verify_jwt = false
