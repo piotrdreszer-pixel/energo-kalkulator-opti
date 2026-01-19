@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,20 +26,24 @@ interface RatesInputPanelProps {
   setOverriddenFields: (fields: Record<string, number>) => void;
 }
 
-export function RatesInputPanel({
-  prefix,
-  formData,
-  onInputChange,
-  zonesCount,
-  resolvedRates,
-  onFetchRates,
-  onResetRates,
-  isFetching,
-  isManualMode,
-  setIsManualMode,
-  overriddenFields,
-  setOverriddenFields,
-}: RatesInputPanelProps) {
+export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
+  function RatesInputPanel(
+    {
+      prefix,
+      formData,
+      onInputChange,
+      zonesCount,
+      resolvedRates,
+      onFetchRates,
+      onResetRates,
+      isFetching,
+      isManualMode,
+      setIsManualMode,
+      overriddenFields,
+      setOverriddenFields,
+    },
+    ref
+  ) {
   const zoneLabels = getZoneLabels(zonesCount);
   const isAfter = prefix === 'after';
   const title = isAfter ? 'Stan po zmianie' : 'Stan obecny';
@@ -208,4 +212,4 @@ export function RatesInputPanel({
       </CardContent>
     </Card>
   );
-}
+});
