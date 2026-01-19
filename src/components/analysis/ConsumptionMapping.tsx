@@ -1,11 +1,9 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
 import { getZoneLabels } from '@/lib/tariff-utils';
 import type { EnergyAnalysis } from '@/types/database';
 
@@ -18,29 +16,34 @@ interface ConsumptionMappingProps {
   setIsAutoMode: (value: boolean) => void;
 }
 
-export function ConsumptionMapping({
-  zonesBefore,
-  zonesAfter,
-  formData,
-  onInputChange,
-  isAutoMode,
-  setIsAutoMode,
-}: ConsumptionMappingProps) {
-  const zoneLabelsBefore = getZoneLabels(zonesBefore);
-  const zoneLabelsAfter = getZoneLabels(zonesAfter);
+const getDefaultDistribution = (zones: number): number[] => {
+  if (zones === 1) return [100];
+  if (zones === 2) return [60, 40];
+  return [40, 35, 25];
+};
 
-  // Calculate total consumption from BEFORE scenario
-  const totalConsumption = 
-    (Number(formData.consumption_before_zone1_mwh) || 0) +
-    (Number(formData.consumption_before_zone2_mwh) || 0) +
-    (Number(formData.consumption_before_zone3_mwh) || 0);
+export const ConsumptionMapping = forwardRef<HTMLDivElement, ConsumptionMappingProps>(
+  function ConsumptionMapping(
+    { zonesBefore, zonesAfter, formData, onInputChange, isAutoMode, setIsAutoMode },
+    ref
+  ) {
+    const zoneLabelsAfter = getZoneLabels(zonesAfter);
 
-  // Zone distribution percentages for auto mode
-  const [zoneDistribution, setZoneDistribution] = React.useState<number[]>(() => {
-    if (zonesAfter === 1) return [100];
-    if (zonesAfter === 2) return [60, 40];
-    return [40, 35, 25];
-  });
+    // Calculate total consumption from BEFORE scenario
+    const totalConsumption =
+      (Number(formData.consumption_before_zone1_mwh) || 0) +
+      (Number(formData.consumption_before_zone2_mwh) || 0) +
+      (Number(formData.consumption_before_zone3_mwh) || 0);
+
+    // Zone distribution percentages for auto mode
+    const [zoneDistribution, setZoneDistribution] = React.useState<number[]>(() =>
+      getDefaultDistribution(zonesAfter)
+    );
+
+    // Reset distribution when zonesAfter changes
+    React.useEffect(() => {
+      setZoneDistribution(getDefaultDistribution(zonesAfter));
+    }, [zonesAfter]);
 
   // Apply auto distribution when toggling or changing distribution
   React.useEffect(() => {
@@ -141,10 +144,10 @@ export function ConsumptionMapping({
                   <div key={index} className="space-y-1">
                     <div className="flex justify-between text-sm">
                       <span>{label}</span>
-                      <span>{zoneDistribution[index].toFixed(0)}%</span>
+                      <span>{(zoneDistribution[index] ?? 0).toFixed(0)}%</span>
                     </div>
                     <Slider
-                      value={[zoneDistribution[index]]}
+                      value={[zoneDistribution[index] ?? 0]}
                       onValueChange={(v) => handleSliderChange(index, v)}
                       min={0}
                       max={100}
@@ -202,4 +205,4 @@ export function ConsumptionMapping({
       </CardContent>
     </Card>
   );
-}
+});

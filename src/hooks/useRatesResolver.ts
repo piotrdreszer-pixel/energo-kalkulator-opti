@@ -27,20 +27,12 @@ export function useRatesResolver(): UseRatesResolverReturn {
         tariff: tariffCode,
         season,
       });
-      
+
       if (date) {
         params.append('date', date);
       }
 
-      const { data, error: fnError } = await supabase.functions.invoke('rates-resolve', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: null,
-      });
-
-      // Since invoke doesn't support query params directly, we need to call the function URL
+      // Call the edge function directly with query params
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const response = await fetch(
         `${supabaseUrl}/functions/v1/rates-resolve?${params.toString()}`,
