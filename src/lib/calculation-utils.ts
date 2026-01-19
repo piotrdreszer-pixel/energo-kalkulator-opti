@@ -17,6 +17,8 @@ export interface CalculationResult {
   contractedPowerChargeAfter: number;
   reactiveEnergyCostBefore: number;
   reactiveEnergyCostAfter: number;
+  capacityChargeBefore: number;
+  capacityChargeAfter: number;
   periodMonths: number;
 }
 
@@ -101,8 +103,9 @@ export function calculateEnergyCosts(analysis: Partial<EnergyAnalysis>): Calcula
     : 0;
   const capacityBefore = Number(analysis.capacity_charge_before) || 0;
 
-  const distributionCostBefore = fixedDistBefore + varDistBefore1 + varDistBefore2 + varDistBefore3 + 
-                                  reactiveEnergyCostBefore + capacityBefore + contractedPowerChargeBefore;
+  // Distribution cost = ONLY fixed + variable distribution charges
+  // (reactive, capacity, contracted power are separate line items in the breakdown)
+  const distributionCostBefore = fixedDistBefore + varDistBefore1 + varDistBefore2 + varDistBefore3;
 
   // Distribution AFTER - uses consumption_after_zone*_mwh for mapped consumption
   const fixedDistAfter = Number(analysis.fixed_distribution_after_total) || 0;
@@ -119,8 +122,8 @@ export function calculateEnergyCosts(analysis: Partial<EnergyAnalysis>): Calcula
     : 0;
   const capacityAfter = Number(analysis.capacity_charge_after) || 0;
 
-  const distributionCostAfter = fixedDistAfter + varDistAfter1 + varDistAfter2 + varDistAfter3 + 
-                                 reactiveEnergyCostAfter + capacityAfter + contractedPowerChargeAfter;
+  // Distribution cost = ONLY fixed + variable distribution charges
+  const distributionCostAfter = fixedDistAfter + varDistAfter1 + varDistAfter2 + varDistAfter3;
 
   // Active energy BEFORE - rates are in PLN/MWh, consumption in MWh
   const activeEnergy1Before = (Number(analysis.active_energy_price_before_zone1) || 0) * 
@@ -155,9 +158,11 @@ export function calculateEnergyCosts(analysis: Partial<EnergyAnalysis>): Calcula
   const handlingFeeBefore = Number(analysis.handling_fee_before) || 0;
   const handlingFeeAfter = Number(analysis.handling_fee_after) || 0;
 
-  // Totals
-  const totalCostBefore = distributionCostBefore + activeEnergyCostBefore + handlingFeeBefore;
-  const totalCostAfter = distributionCostAfter + activeEnergyCostAfter + handlingFeeAfter;
+  // Totals - include all cost components
+  const totalCostBefore = distributionCostBefore + activeEnergyCostBefore + handlingFeeBefore + 
+                           contractedPowerChargeBefore + reactiveEnergyCostBefore + capacityBefore;
+  const totalCostAfter = distributionCostAfter + activeEnergyCostAfter + handlingFeeAfter + 
+                          contractedPowerChargeAfter + reactiveEnergyCostAfter + capacityAfter;
 
   // Savings
   const savingsValue = totalCostBefore - totalCostAfter;
@@ -178,6 +183,8 @@ export function calculateEnergyCosts(analysis: Partial<EnergyAnalysis>): Calcula
     contractedPowerChargeAfter,
     reactiveEnergyCostBefore,
     reactiveEnergyCostAfter,
+    capacityChargeBefore: capacityBefore,
+    capacityChargeAfter: capacityAfter,
     periodMonths,
   };
 }

@@ -744,8 +744,8 @@ export default function AnalysisForm() {
                 reactiveAfter: results.reactiveEnergyCostAfter,
                 handlingBefore: results.handlingFeeBefore,
                 handlingAfter: results.handlingFeeAfter,
-                capacityBefore: Number(formData.capacity_charge_before) || 0,
-                capacityAfter: Number(formData.capacity_charge_after) || 0,
+                capacityBefore: results.capacityChargeBefore,
+                capacityAfter: results.capacityChargeAfter,
               }}
             />
           )}
