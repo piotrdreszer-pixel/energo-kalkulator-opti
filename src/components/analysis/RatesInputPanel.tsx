@@ -221,7 +221,7 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
                     className="pr-14 text-sm"
                   />
                   <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
-                    zł/kWh
+                    zł/MWh
                   </span>
                 </div>
               </div>
