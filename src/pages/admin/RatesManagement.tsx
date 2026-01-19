@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Pencil, Trash2, FileUp, Save } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Loader2, Plus, Pencil, Trash2, FileUp, Save, Upload, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -41,6 +43,17 @@ interface RateItem {
   description: string | null;
 }
 
+interface ExtractedRate {
+  tariff_code: string;
+  rate_type: string;
+  value: number;
+  unit: string;
+  zone_number: number | null;
+  season: string;
+  description: string | null;
+  selected?: boolean;
+}
+
 const RATE_TYPES = [
   { value: 'SIEC_STALA', label: 'Opłata sieciowa stała' },
   { value: 'SIEC_ZMIENNA_STREFA1', label: 'Opłata sieciowa zmienna - strefa 1' },
@@ -68,8 +81,17 @@ export default function RatesManagement() {
   // Dialogs state
   const [rateCardDialogOpen, setRateCardDialogOpen] = useState(false);
   const [rateItemDialogOpen, setRateItemDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editingRateCard, setEditingRateCard] = useState<RateCard | null>(null);
   const [editingRateItem, setEditingRateItem] = useState<RateItem | null>(null);
+
+  // PDF Import state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
+  const [parsingPdf, setParsingPdf] = useState(false);
+  const [extractedRates, setExtractedRates] = useState<ExtractedRate[]>([]);
+  const [importStep, setImportStep] = useState<'upload' | 'review' | 'done'>('upload');
+  const [uploadedFileName, setUploadedFileName] = useState<string>('');
 
   // Form state for rate card
   const [rateCardForm, setRateCardForm] = useState({
@@ -318,6 +340,150 @@ export default function RatesManagement() {
     setRateItemDialogOpen(true);
   };
 
+  // PDF Import handlers
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.includes('pdf')) {
+      toast.error('Proszę wybrać plik PDF');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Plik jest za duży (max 10MB)');
+      return;
+    }
+
+    setUploadingPdf(true);
+    setUploadedFileName(file.name);
+
+    try {
+      // Upload to storage
+      const filePath = `${selectedOperator}/${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('rate-documents')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw new Error('Błąd podczas wgrywania pliku');
+      }
+
+      toast.success('Plik wgrany, rozpoczynam analizę...');
+      setParsingPdf(true);
+
+      // Call edge function to parse PDF
+      const { data: parseResult, error: parseError } = await supabase.functions.invoke('parse-rates-pdf', {
+        body: {
+          filePath,
+          osdName: operators.find(o => o.id === selectedOperator)?.name || '',
+          tariffCodes: TARIFF_CODES,
+        },
+      });
+
+      if (parseError) {
+        console.error('Parse error:', parseError);
+        throw new Error('Błąd podczas analizy pliku');
+      }
+
+      if (!parseResult.success) {
+        throw new Error(parseResult.error || 'Błąd podczas ekstrakcji stawek');
+      }
+
+      const rates = (parseResult.rates || []).map((r: ExtractedRate) => ({
+        ...r,
+        selected: true,
+      }));
+
+      setExtractedRates(rates);
+      setImportStep('review');
+
+      if (rates.length === 0) {
+        toast.warning('Nie znaleziono stawek w dokumencie');
+      } else {
+        toast.success(`Wyekstrahowano ${rates.length} stawek`);
+      }
+
+    } catch (error) {
+      console.error('Import error:', error);
+      toast.error(error instanceof Error ? error.message : 'Błąd podczas importu');
+    } finally {
+      setUploadingPdf(false);
+      setParsingPdf(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const toggleRateSelection = (index: number) => {
+    setExtractedRates(rates =>
+      rates.map((r, i) => (i === index ? { ...r, selected: !r.selected } : r))
+    );
+  };
+
+  const toggleAllRates = (selected: boolean) => {
+    setExtractedRates(rates => rates.map(r => ({ ...r, selected })));
+  };
+
+  const handleImportSelectedRates = async () => {
+    if (!selectedRateCard) {
+      toast.error('Najpierw wybierz taryfę do której chcesz zaimportować stawki');
+      return;
+    }
+
+    const selectedRates = extractedRates.filter(r => r.selected);
+    if (selectedRates.length === 0) {
+      toast.error('Wybierz przynajmniej jedną stawkę do importu');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const ratesToInsert = selectedRates.map(rate => ({
+        rate_card_id: selectedRateCard,
+        tariff_code: rate.tariff_code,
+        season: rate.season || 'ALL',
+        rate_type: rate.rate_type,
+        unit: rate.unit,
+        value: rate.value,
+        zone_number: rate.zone_number,
+        description: rate.description,
+      }));
+
+      const { error } = await supabase
+        .from('rate_items')
+        .insert(ratesToInsert);
+
+      if (error) throw error;
+
+      toast.success(`Zaimportowano ${selectedRates.length} stawek`);
+      setImportStep('done');
+      fetchRateItems(selectedRateCard);
+
+      // Reset after short delay
+      setTimeout(() => {
+        setImportDialogOpen(false);
+        setImportStep('upload');
+        setExtractedRates([]);
+        setUploadedFileName('');
+      }, 1500);
+
+    } catch (error) {
+      console.error('Import error:', error);
+      toast.error('Błąd podczas importu stawek');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const resetImport = () => {
+    setImportStep('upload');
+    setExtractedRates([]);
+    setUploadedFileName('');
+  };
+
   const selectedOperatorName = operators.find(o => o.id === selectedOperator)?.name || '';
   const selectedRateCardName = rateCards.find(r => r.id === selectedRateCard)?.name || '';
 
@@ -504,24 +670,175 @@ export default function RatesManagement() {
                 </CardDescription>
               </div>
               {selectedRateCard && (
-                <Dialog open={rateItemDialogOpen} onOpenChange={setRateItemDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" onClick={() => {
-                      setEditingRateItem(null);
-                      setRateItemForm({
-                        tariff_code: 'C11',
-                        season: 'ALL',
-                        rate_type: 'SIEC_STALA',
-                        unit: 'zł/kW/mies',
-                        value: '',
-                        zone_number: '',
-                        description: '',
-                      });
-                    }}>
-                      <Plus className="h-4 w-4 mr-1" />
-                      Dodaj
-                    </Button>
-                  </DialogTrigger>
+                <div className="flex items-center gap-2">
+                  {/* Import PDF Button */}
+                  <Dialog open={importDialogOpen} onOpenChange={(open) => {
+                    setImportDialogOpen(open);
+                    if (!open) resetImport();
+                  }}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" variant="outline">
+                        <FileUp className="h-4 w-4 mr-1" />
+                        Import PDF
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-3xl max-h-[80vh]">
+                      <DialogHeader>
+                        <DialogTitle>Import stawek z PDF</DialogTitle>
+                        <DialogDescription>
+                          {selectedOperatorName} - {selectedRateCardName}
+                        </DialogDescription>
+                      </DialogHeader>
+
+                      {importStep === 'upload' && (
+                        <div className="py-8">
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".pdf"
+                            onChange={handleFileSelect}
+                            className="hidden"
+                          />
+                          <div
+                            onClick={() => fileInputRef.current?.click()}
+                            className="border-2 border-dashed rounded-lg p-12 text-center cursor-pointer hover:border-primary hover:bg-muted/50 transition-colors"
+                          >
+                            {uploadingPdf || parsingPdf ? (
+                              <div className="flex flex-col items-center gap-4">
+                                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                                <p className="text-muted-foreground">
+                                  {uploadingPdf ? 'Wgrywanie pliku...' : 'Analizowanie dokumentu z AI...'}
+                                </p>
+                                {parsingPdf && (
+                                  <p className="text-xs text-muted-foreground">
+                                    To może potrwać do 30 sekund
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              <>
+                                <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                                <p className="font-medium">Kliknij aby wybrać plik PDF</p>
+                                <p className="text-sm text-muted-foreground mt-2">
+                                  Dokument z taryfą OSD (max 10MB)
+                                </p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {importStep === 'review' && (
+                        <div className="py-4">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-5 w-5 text-primary" />
+                              <span className="font-medium">{uploadedFileName}</span>
+                              <Badge variant="secondary">
+                                {extractedRates.length} stawek
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleAllRates(true)}
+                              >
+                                Zaznacz wszystkie
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleAllRates(false)}
+                              >
+                                Odznacz wszystkie
+                              </Button>
+                            </div>
+                          </div>
+
+                          <ScrollArea className="h-[400px] border rounded-lg">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="w-10"></TableHead>
+                                  <TableHead>Taryfa</TableHead>
+                                  <TableHead>Rodzaj stawki</TableHead>
+                                  <TableHead>Wartość</TableHead>
+                                  <TableHead>Jednostka</TableHead>
+                                  <TableHead>Strefa</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {extractedRates.map((rate, index) => (
+                                  <TableRow key={index} className={!rate.selected ? 'opacity-50' : ''}>
+                                    <TableCell>
+                                      <Checkbox
+                                        checked={rate.selected}
+                                        onCheckedChange={() => toggleRateSelection(index)}
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant="outline">{rate.tariff_code}</Badge>
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                      {RATE_TYPES.find(r => r.value === rate.rate_type)?.label || rate.rate_type}
+                                    </TableCell>
+                                    <TableCell className="font-mono text-sm">
+                                      {rate.value.toFixed(6)}
+                                    </TableCell>
+                                    <TableCell className="text-sm">{rate.unit}</TableCell>
+                                    <TableCell className="text-sm">
+                                      {rate.zone_number || '-'}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </ScrollArea>
+
+                          <DialogFooter className="mt-4">
+                            <Button variant="outline" onClick={resetImport}>
+                              Anuluj
+                            </Button>
+                            <Button
+                              onClick={handleImportSelectedRates}
+                              disabled={saving || extractedRates.filter(r => r.selected).length === 0}
+                            >
+                              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                              Importuj {extractedRates.filter(r => r.selected).length} stawek
+                            </Button>
+                          </DialogFooter>
+                        </div>
+                      )}
+
+                      {importStep === 'done' && (
+                        <div className="py-12 text-center">
+                          <CheckCircle2 className="h-16 w-16 mx-auto text-green-500 mb-4" />
+                          <p className="text-lg font-medium">Import zakończony pomyślnie!</p>
+                        </div>
+                      )}
+                    </DialogContent>
+                  </Dialog>
+
+                  {/* Add Rate Button */}
+                  <Dialog open={rateItemDialogOpen} onOpenChange={setRateItemDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" onClick={() => {
+                        setEditingRateItem(null);
+                        setRateItemForm({
+                          tariff_code: 'C11',
+                          season: 'ALL',
+                          rate_type: 'SIEC_STALA',
+                          unit: 'zł/kW/mies',
+                          value: '',
+                          zone_number: '',
+                          description: '',
+                        });
+                      }}>
+                        <Plus className="h-4 w-4 mr-1" />
+                        Dodaj
+                      </Button>
+                    </DialogTrigger>
                   <DialogContent className="max-w-lg">
                     <DialogHeader>
                       <DialogTitle>{editingRateItem ? 'Edytuj stawkę' : 'Nowa stawka'}</DialogTitle>
@@ -629,6 +946,7 @@ export default function RatesManagement() {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
+                </div>
               )}
             </CardHeader>
             <CardContent>
