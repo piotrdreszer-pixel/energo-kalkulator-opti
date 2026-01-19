@@ -14,6 +14,8 @@ interface ConsumptionMappingProps {
   onInputChange: (field: keyof EnergyAnalysis, value: number) => void;
   isAutoMode: boolean;
   setIsAutoMode: (value: boolean) => void;
+  zoneDistribution: number[];
+  setZoneDistribution: (value: number[]) => void;
 }
 
 const getDefaultDistribution = (zones: number): number[] => {
@@ -24,7 +26,7 @@ const getDefaultDistribution = (zones: number): number[] => {
 
 export const ConsumptionMapping = forwardRef<HTMLDivElement, ConsumptionMappingProps>(
   function ConsumptionMapping(
-    { zonesBefore, zonesAfter, formData, onInputChange, isAutoMode, setIsAutoMode },
+    { zonesBefore, zonesAfter, formData, onInputChange, isAutoMode, setIsAutoMode, zoneDistribution, setZoneDistribution },
     ref
   ) {
     const zoneLabelsAfter = getZoneLabels(zonesAfter);
@@ -35,15 +37,10 @@ export const ConsumptionMapping = forwardRef<HTMLDivElement, ConsumptionMappingP
       (Number(formData.consumption_before_zone2_mwh) || 0) +
       (Number(formData.consumption_before_zone3_mwh) || 0);
 
-    // Zone distribution percentages for auto mode
-    const [zoneDistribution, setZoneDistribution] = React.useState<number[]>(() =>
-      getDefaultDistribution(zonesAfter)
-    );
-
     // Reset distribution when zonesAfter changes
     React.useEffect(() => {
       setZoneDistribution(getDefaultDistribution(zonesAfter));
-    }, [zonesAfter]);
+    }, [zonesAfter, setZoneDistribution]);
 
   // Apply auto distribution when toggling or changing distribution
   React.useEffect(() => {
