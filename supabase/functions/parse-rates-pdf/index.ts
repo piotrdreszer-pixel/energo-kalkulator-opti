@@ -13,6 +13,7 @@ interface ExtractedRate {
   zone_number: number | null
   season: string
   description: string | null
+  needsReview?: boolean
 }
 
 interface ExtractionResult {
@@ -20,6 +21,80 @@ interface ExtractionResult {
   rates: ExtractedRate[]
   raw_text?: string
   error?: string
+  parserUsed?: string
+  diagnostics?: {
+    tariffsDetected: string[]
+    recordCount: number
+    parseErrors: string[]
+  }
+}
+
+// Unit normalization based on header patterns
+function normalizeUnit(rawUnit: string): string {
+  const unit = rawUnit.toLowerCase().trim()
+  if (unit.includes('zł/mwh') || unit.includes('zl/mwh')) return 'zł/MWh'
+  if (unit.includes('zł/kwh') || unit.includes('zl/kwh')) return 'zł/kWh'
+  if (unit.includes('zł/kw/m') || unit.includes('zl/kw/m') || unit.includes('zł/kw/mies')) return 'zł/kW/mies'
+  if (unit.includes('zł/m-c') || unit.includes('zl/m-c') || unit.includes('zł/mies')) return 'zł/mies'
+  if (unit.includes('zł/kvar') || unit.includes('zl/kvar')) return 'zł/kvarh'
+  return rawUnit
+}
+
+// Map zone names to zone numbers
+function parseZoneFromDescription(desc: string): { zone_number: number | null, zone_name: string } {
+  const lower = desc.toLowerCase()
+  
+  // Energa-specific zone patterns
+  if (lower.includes('szczyt przedpołudniowy') || lower.includes('szczyt przedpoludniowy')) {
+    return { zone_number: 1, zone_name: 'szczyt przedpołudniowy' }
+  }
+  if (lower.includes('szczyt popołudniowy') || lower.includes('szczyt popoludniowy')) {
+    return { zone_number: 2, zone_name: 'szczyt popołudniowy' }
+  }
+  if (lower.includes('pozostałe godziny') || lower.includes('pozostale godziny') || lower.includes('poza szczytem')) {
+    return { zone_number: 3, zone_name: 'pozostałe godziny' }
+  }
+  if (lower.includes('dzienna') || lower.includes('dzień') || lower.includes('dzien')) {
+    return { zone_number: 1, zone_name: 'dzienna' }
+  }
+  if (lower.includes('nocna') || lower.includes('noc')) {
+    return { zone_number: 2, zone_name: 'nocna' }
+  }
+  if (lower.includes('szczyt') && !lower.includes('poza')) {
+    return { zone_number: 1, zone_name: 'szczyt' }
+  }
+  
+  return { zone_number: null, zone_name: '' }
+}
+
+// Parse season from text
+function parseSeason(text: string): string {
+  const lower = text.toLowerCase()
+  if (lower.includes('zima') || lower.includes('zimow') || lower.includes('winter')) return 'WINTER'
+  if (lower.includes('lato') || lower.includes('letni') || lower.includes('summer')) return 'SUMMER'
+  return 'ALL'
+}
+
+// Map component names to rate types
+function mapComponentToRateType(component: string, zoneNumber: number | null): string {
+  const lower = component.toLowerCase()
+  
+  if (lower.includes('stał') || lower.includes('stala') || lower.includes('składnik stały')) {
+    return 'SIEC_STALA'
+  }
+  if (lower.includes('zmienn') || lower.includes('skladnik zmienny')) {
+    if (zoneNumber === 1) return 'SIEC_ZMIENNA_STREFA1'
+    if (zoneNumber === 2) return 'SIEC_ZMIENNA_STREFA2'
+    if (zoneNumber === 3) return 'SIEC_ZMIENNA_STREFA3'
+    return 'SIEC_ZMIENNA_STREFA1'
+  }
+  if (lower.includes('mocow')) return 'OPLATA_MOCOWA'
+  if (lower.includes('jakościow') || lower.includes('jakosciow')) return 'OPLATA_JAKOSCIOWA'
+  if (lower.includes('abonament')) return 'OPLATA_ABONAMENTOWA'
+  if (lower.includes('przejściow') || lower.includes('przejsciow')) return 'OPLATA_PRZEJSCIOWA'
+  if (lower.includes('biern') || lower.includes('reaktywn')) return 'ENERGIA_BIERNA'
+  
+  return 'SIEC_ZMIENNA_STREFA1'
 }
 
 Deno.serve(async (req) => {
@@ -79,7 +154,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    const { filePath, osdName, tariffCodes } = await req.json()
+    const { filePath, osdName, tariffCodes, parserMode } = await req.json()
 
     if (!filePath) {
       return new Response(
@@ -88,7 +163,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    console.log(`[parse-rates-pdf] Processing file: ${filePath} for OSD: ${osdName}`)
+    console.log(`[parse-rates-pdf] Processing file: ${filePath} for OSD: ${osdName}, mode: ${parserMode || 'auto'}`)
 
     // Download file from storage
     const { data: fileData, error: downloadError } = await supabaseAdmin
@@ -110,38 +185,83 @@ Deno.serve(async (req) => {
 
     console.log(`[parse-rates-pdf] File size: ${arrayBuffer.byteLength} bytes`)
 
-    // Use AI to extract rates from PDF
-    const systemPrompt = `Jesteś ekspertem od polskich taryf energetycznych OSD (Operatorów Sieci Dystrybucyjnych).
-Twoim zadaniem jest analiza dokumentu PDF zawierającego taryfę dystrybucyjną i wyekstrahowanie wszystkich stawek.
+    // Detect if this is Energa based on OSD name
+    const isEnerga = osdName?.toLowerCase().includes('energa')
+
+    // Build specialized prompt based on OSD type
+    let systemPrompt = `Jesteś ekspertem od polskich taryf energetycznych OSD (Operatorów Sieci Dystrybucyjnych).
+Twoim zadaniem jest analiza dokumentu PDF zawierającego taryfę dystrybucyjną i wyekstrahowanie wszystkich stawek opłat sieciowych.
+
+WAŻNE INSTRUKCJE:
+1. Znajdź sekcję "Tabela stawek opłat sieciowych" (np. nagłówek "9.2. Tabela stawek opłat sieciowych")
+2. Wyodrębnij wiersze tabeli według grup taryfowych
 
 Dla każdej stawki określ:
-- tariff_code: kod taryfy (np. C11, C12a, C12b, C21, C22a, C22b, C23, B11, B21, B22, B23)
-- rate_type: rodzaj stawki:
-  - SIEC_STALA - opłata sieciowa stała (składnik stały stawki sieciowej)
-  - SIEC_ZMIENNA_STREFA1 - opłata sieciowa zmienna strefa 1 (szczyt)
-  - SIEC_ZMIENNA_STREFA2 - opłata sieciowa zmienna strefa 2 (reszta dnia)
-  - SIEC_ZMIENNA_STREFA3 - opłata sieciowa zmienna strefa 3 (noc)
+- tariff_code: kod taryfy (np. A23, B11, B21, B22, B23, C11, C12a, C12b, C21, C22a, C22b, C23, G11, G12)
+- rate_type: rodzaj stawki w formacie:
+  - SIEC_STALA - składnik stały stawki sieciowej
+  - SIEC_ZMIENNA_STREFA1 - składnik zmienny strefa 1 (szczyt/dzienna/szczyt przedpołudniowy)
+  - SIEC_ZMIENNA_STREFA2 - składnik zmienny strefa 2 (nocna/szczyt popołudniowy)
+  - SIEC_ZMIENNA_STREFA3 - składnik zmienny strefa 3 (pozostałe godziny)
   - OPLATA_MOCOWA - opłata mocowa
   - OPLATA_JAKOSCIOWA - opłata jakościowa
   - OPLATA_ABONAMENTOWA - opłata abonamentowa
   - OPLATA_PRZEJSCIOWA - opłata przejściowa
   - ENERGIA_BIERNA - energia bierna
 - value: wartość liczbowa stawki (użyj kropki jako separatora dziesiętnego)
-- unit: jednostka (np. zł/kW/mies, zł/kWh, zł/mies, zł/kvarh)
-- zone_number: numer strefy (1, 2 lub 3 dla stawek zmiennych, null dla pozostałych)
-- season: sezon (ALL dla całorocznych, SUMMER dla letnich, WINTER dla zimowych)
-- description: opcjonalny opis
+- unit: jednostka w znormalizowanym formacie:
+  - "zł/MWh" dla [zł/MWh]
+  - "zł/kWh" dla [zł/kWh]
+  - "zł/kW/mies" dla [zł/kW/m-c] lub [zł/kW/miesiąc]
+  - "zł/mies" dla [zł/m-c] lub [zł/miesiąc]
+  - "zł/kvarh" dla opłat za energię bierną
+- zone_number: numer strefy (1, 2 lub 3) dla stawek zmiennych, null dla stawek stałych
+- season: sezon taryfowy:
+  - "ALL" dla stawek całorocznych
+  - "SUMMER" dla stawek letnich (LATO)
+  - "WINTER" dla stawek zimowych (ZIMA)
+- description: opis strefy czasowej (np. "szczyt przedpołudniowy", "nocna")
+- needsReview: true jeśli wartość jest niepewna lub wymaga weryfikacji
 
-Zwróć wyniki jako tablicę JSON z obiektami zawierającymi powyższe pola.
-Upewnij się, że wszystkie wartości liczbowe są poprawnie wyekstrahowane - zwróć szczególną uwagę na przecinki i kropki dziesiętne.
-Jeśli taryfa ma podział na strefy czasowe, przypisz odpowiedni zone_number.`
+ROZPOZNAWANIE STREF CZASOWYCH:
+- "szczyt przedpołudniowy" → zone_number: 1
+- "szczyt popołudniowy" → zone_number: 2
+- "pozostałe godziny" / "poza szczytem" → zone_number: 3
+- "strefa dzienna" → zone_number: 1
+- "strefa nocna" → zone_number: 2
+
+ROZPOZNAWANIE SEZONÓW:
+- Jeśli tabela ma kolumny ZIMA/LATO, utwórz osobne rekordy z odpowiednim season
+- Jeśli nie ma podziału na sezony, użyj season: "ALL"
+
+Każdy wiersz taryfy powinien wygenerować:
+- 1 rekord SIEC_STALA (składnik stały)
+- N rekordów SIEC_ZMIENNA_STREFAX (po jednym na każdą strefę czasową)`
+
+    if (isEnerga) {
+      systemPrompt += `
+
+SPECYFIKA ENERGA:
+- Szukaj sekcji "9.2. Tabela stawek opłat sieciowych" lub podobnej
+- Tabele Energa często mają strukturę:
+  - Kolumny: Grupa taryfowa | Jednostka | Składnik stały | Składnik zmienny (strefy)
+  - Podział na strefy: szczyt przedpołudniowy, szczyt popołudniowy, pozostałe godziny
+  - Możliwy podział sezonowy: ZIMA, LATO
+- Taryfy Energa: A23, B11, B21, B22, B23, C11, C12a, C12b, C12w, C21, C22a, C22b, C23, G11, G12, G12w`
+    }
+
+    systemPrompt += `
+
+WYNIK:
+Zwróć TYLKO tablicę JSON bez żadnych dodatkowych komentarzy ani formatowania markdown.
+Upewnij się że JSON jest kompletny i poprawny składniowo.`
 
     const userPrompt = `Przeanalizuj załączony dokument PDF z taryfą operatora ${osdName || 'OSD'}.
 ${tariffCodes?.length ? `Skoncentruj się na taryfach: ${tariffCodes.join(', ')}` : 'Wyekstrahuj stawki dla wszystkich dostępnych taryf.'}
 
-Zwróć wyłącznie tablicę JSON ze stawkami, bez żadnego dodatkowego tekstu.`
+Zwróć wyłącznie tablicę JSON ze stawkami w opisanym formacie.`
 
-    console.log('[parse-rates-pdf] Calling AI gateway...')
+    console.log('[parse-rates-pdf] Calling AI gateway with specialized prompt...')
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -167,7 +287,7 @@ Zwróć wyłącznie tablicę JSON ze stawkami, bez żadnego dodatkowego tekstu.`
           }
         ],
         temperature: 0.1,
-        max_tokens: 16000,
+        max_tokens: 32000,
       }),
     })
 
@@ -189,7 +309,7 @@ Zwróć wyłącznie tablicę JSON ze stawkami, bez żadnego dodatkowego tekstu.`
       }
 
       return new Response(
-        JSON.stringify({ success: false, error: 'Błąd podczas analizy AI' }),
+        JSON.stringify({ success: false, error: 'Błąd podczas analizy AI', requiresManualMapping: true }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -205,12 +325,10 @@ Zwróć wyłącznie tablicę JSON ze stawkami, bez żadnego dodatkowego tekstu.`
     
     // Remove markdown code blocks if present
     if (jsonContent.startsWith('```')) {
-      // Find the end of the first line (```json or ```)
       const firstNewline = jsonContent.indexOf('\n')
       if (firstNewline !== -1) {
         jsonContent = jsonContent.substring(firstNewline + 1)
       }
-      // Remove trailing ```
       const lastBackticks = jsonContent.lastIndexOf('```')
       if (lastBackticks !== -1) {
         jsonContent = jsonContent.substring(0, lastBackticks)
@@ -218,16 +336,14 @@ Zwróć wyłącznie tablicę JSON ze stawkami, bez żadnego dodatkowego tekstu.`
       jsonContent = jsonContent.trim()
     }
 
-    // If the JSON appears truncated (doesn't end with ] or }), try to fix it
+    // If the JSON appears truncated, try to fix it
     if (!jsonContent.endsWith(']') && !jsonContent.endsWith('}')) {
       console.log('[parse-rates-pdf] JSON appears truncated, attempting to fix...')
-      // Find the last complete object
       const lastCompleteObject = jsonContent.lastIndexOf('},')
       if (lastCompleteObject !== -1) {
         jsonContent = jsonContent.substring(0, lastCompleteObject + 1) + ']'
         console.log('[parse-rates-pdf] Truncated JSON fixed by closing array')
       } else {
-        // Try to find last complete object ending with }
         const lastObject = jsonContent.lastIndexOf('}')
         if (lastObject !== -1) {
           jsonContent = jsonContent.substring(0, lastObject + 1) + ']'
@@ -236,43 +352,66 @@ Zwróć wyłącznie tablicę JSON ze stawkami, bez żadnego dodatkowego tekstu.`
     }
 
     let rates: ExtractedRate[] = []
+    const parseErrors: string[] = []
+    
     try {
       const parsed = JSON.parse(jsonContent)
       rates = Array.isArray(parsed) ? parsed : (parsed.rates || [])
     } catch (parseError) {
       console.error('[parse-rates-pdf] JSON parse error:', parseError)
-      console.log('[parse-rates-pdf] Attempted content:', jsonContent.substring(0, 500))
+      parseErrors.push(`Błąd parsowania JSON: ${parseError}`)
       
-      // Try alternative: extract individual objects
+      // Try to extract individual objects
       try {
         const objectMatches = jsonContent.matchAll(/\{[^{}]*"tariff_code"[^{}]*\}/g)
         const objects: ExtractedRate[] = []
         for (const match of objectMatches) {
           try {
-            objects.push(JSON.parse(match[0]))
+            const obj = JSON.parse(match[0])
+            obj.needsReview = true // Mark recovered objects for review
+            objects.push(obj)
           } catch {
-            // Skip invalid objects
+            parseErrors.push(`Nie udało się sparsować obiektu: ${match[0].substring(0, 50)}...`)
           }
         }
         if (objects.length > 0) {
           console.log(`[parse-rates-pdf] Recovered ${objects.length} rates from partial JSON`)
           rates = objects
         } else {
-          throw parseError
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: 'Nie udało się sparsować odpowiedzi AI',
+              requiresManualMapping: true,
+              raw_text: rawContent.substring(0, 2000),
+              diagnostics: {
+                tariffsDetected: [],
+                recordCount: 0,
+                parseErrors
+              }
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
         }
       } catch {
         return new Response(
           JSON.stringify({ 
             success: false, 
             error: 'Nie udało się sparsować odpowiedzi AI',
-            raw_text: rawContent.substring(0, 1000)
+            requiresManualMapping: true,
+            raw_text: rawContent.substring(0, 2000),
+            diagnostics: {
+              tariffsDetected: [],
+              recordCount: 0,
+              parseErrors
+            }
           }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
     }
 
-    // Validate and clean rates
+    // Validate and normalize rates
     const validRates = rates.filter(rate => {
       return rate.tariff_code && 
              rate.rate_type && 
@@ -280,20 +419,34 @@ Zwróć wyłącznie tablicę JSON ze stawkami, bez żadnego dodatkowego tekstu.`
              !isNaN(rate.value) &&
              rate.unit
     }).map(rate => ({
-      ...rate,
+      tariff_code: rate.tariff_code.toUpperCase(),
+      rate_type: rate.rate_type,
+      value: rate.value,
+      unit: normalizeUnit(rate.unit),
       zone_number: rate.zone_number || null,
       season: rate.season || 'ALL',
       description: rate.description || null,
+      needsReview: rate.needsReview || false,
     }))
 
+    // Collect diagnostics
+    const tariffsDetected = [...new Set(validRates.map(r => r.tariff_code))]
+    
     console.log(`[parse-rates-pdf] Extracted ${validRates.length} valid rates`)
+    console.log(`[parse-rates-pdf] Tariffs detected: ${tariffsDetected.join(', ')}`)
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         rates: validRates,
         total_extracted: rates.length,
-        total_valid: validRates.length
+        total_valid: validRates.length,
+        parserUsed: isEnerga ? 'energa' : 'generic',
+        diagnostics: {
+          tariffsDetected,
+          recordCount: validRates.length,
+          parseErrors
+        }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
@@ -303,7 +456,8 @@ Zwróć wyłącznie tablicę JSON ze stawkami, bez żadnego dodatkowego tekstu.`
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error instanceof Error ? error.message : 'Nieznany błąd' 
+        error: error instanceof Error ? error.message : 'Nieznany błąd',
+        requiresManualMapping: true
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
