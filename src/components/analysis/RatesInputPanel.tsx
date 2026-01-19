@@ -197,6 +197,38 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
           </div>
         </div>
 
+        <div className="space-y-3">
+          <Label className="text-sm font-medium">Ceny energii czynnej</Label>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {zoneLabels.map((label, index) => (
+              <div key={index} className="space-y-1">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-muted-foreground">{label}</span>
+                  {isOverridden(`active_energy_price_${prefix}_zone${index + 1}`) && (
+                    <Badge variant="outline" className="text-[10px] px-1">!</Badge>
+                  )}
+                </div>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    step="0.0001"
+                    value={Number(formData[`active_energy_price_${prefix}_zone${index + 1}` as keyof EnergyAnalysis]) || ''}
+                    onChange={(e) => handleInputChange(
+                      `active_energy_price_${prefix}_zone${index + 1}` as keyof EnergyAnalysis,
+                      parseFloat(e.target.value) || 0
+                    )}
+                    disabled={!isManualMode && resolvedRates !== null}
+                    className="pr-14 text-sm"
+                  />
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
+                    zł/kWh
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2">
           {renderInput(
             'Suma opłat stałych za okres',
@@ -209,6 +241,12 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
             'zł'
           )}
         </div>
+
+        {renderInput(
+          'Opłata handlowa za okres',
+          `handling_fee_${prefix}` as keyof EnergyAnalysis,
+          'zł'
+        )}
       </CardContent>
     </Card>
   );
