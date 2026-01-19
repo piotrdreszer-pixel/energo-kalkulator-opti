@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
-import { getZoneLabels } from '@/lib/tariff-utils';
+import { getZoneLabels, getDefaultDistribution } from '@/lib/tariff-utils';
 import type { EnergyAnalysis } from '@/types/database';
 
 interface ConsumptionMappingProps {
@@ -18,10 +18,13 @@ interface ConsumptionMappingProps {
   setZoneDistribution: (value: number[]) => void;
 }
 
-const getDefaultDistribution = (zones: number): number[] => {
-  if (zones === 1) return [100];
-  if (zones === 2) return [60, 40];
-  return [40, 35, 25];
+// Track the previous zonesAfter to detect actual changes
+const usePreviousZones = (zones: number) => {
+  const ref = React.useRef<number | null>(null);
+  React.useEffect(() => {
+    ref.current = zones;
+  });
+  return ref.current;
 };
 
 export const ConsumptionMapping = forwardRef<HTMLDivElement, ConsumptionMappingProps>(
@@ -30,6 +33,7 @@ export const ConsumptionMapping = forwardRef<HTMLDivElement, ConsumptionMappingP
     ref
   ) {
     const zoneLabelsAfter = getZoneLabels(zonesAfter);
+    const previousZonesAfter = usePreviousZones(zonesAfter);
 
     // Calculate total consumption from BEFORE scenario
     const totalConsumption =
@@ -37,10 +41,12 @@ export const ConsumptionMapping = forwardRef<HTMLDivElement, ConsumptionMappingP
       (Number(formData.consumption_before_zone2_mwh) || 0) +
       (Number(formData.consumption_before_zone3_mwh) || 0);
 
-    // Reset distribution when zonesAfter changes
+    // Reset distribution ONLY when zonesAfter actually changes (tariff switch)
     React.useEffect(() => {
-      setZoneDistribution(getDefaultDistribution(zonesAfter));
-    }, [zonesAfter, setZoneDistribution]);
+      if (previousZonesAfter !== null && previousZonesAfter !== zonesAfter) {
+        setZoneDistribution(getDefaultDistribution(zonesAfter));
+      }
+    }, [zonesAfter, previousZonesAfter, setZoneDistribution]);
 
   // Apply auto distribution when toggling or changing distribution
   React.useEffect(() => {

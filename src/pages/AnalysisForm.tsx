@@ -29,7 +29,7 @@ import {
   Check,
 } from 'lucide-react';
 import type { EnergyAnalysis, ClientProject, ResolvedRates } from '@/types/database';
-import { TARIFF_CODES, getZonesCount, getZoneLabels, validateContractedPower, calculatePeriodMonths } from '@/lib/tariff-utils';
+import { TARIFF_CODES, getZonesCount, getZoneLabels, validateContractedPower, calculatePeriodMonths, getDefaultDistribution } from '@/lib/tariff-utils';
 import { calculateEnergyCosts, formatCurrency, formatPercent, formatNumber } from '@/lib/calculation-utils';
 import { ReactiveEnergyInput } from '@/components/analysis/ReactiveEnergyInput';
 import { RatesInputPanel } from '@/components/analysis/RatesInputPanel';
@@ -116,7 +116,7 @@ export default function AnalysisForm() {
   const [overriddenBefore, setOverriddenBefore] = useState<Record<string, number>>({});
   const [overriddenAfter, setOverriddenAfter] = useState<Record<string, number>>({});
   const [isAutoConsumptionMode, setIsAutoConsumptionMode] = useState(true);
-  const [zoneDistribution, setZoneDistribution] = useState<number[]>([60, 40]);
+  const [zoneDistribution, setZoneDistribution] = useState<number[]>(() => getDefaultDistribution(1));
 
   const { data: osdOperators } = useOsdOperators();
   const { resolveRates, isLoading: isResolvingRates } = useRatesResolver();
