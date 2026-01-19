@@ -39,6 +39,24 @@ export function isHighVoltageTariff(tariffCode: string): boolean {
   return tariffCode.startsWith('C2') || tariffCode.startsWith('B2');
 }
 
+/**
+ * Check if tariff uses rates in zł/MWh (B and A tariffs)
+ * C tariffs use zł/kWh, B/A tariffs use zł/MWh
+ */
+export function isRatesInMWh(tariffCode: string): boolean {
+  const upperCode = tariffCode.toUpperCase();
+  return upperCode.startsWith('B') || upperCode.startsWith('A');
+}
+
+/**
+ * Get the multiplier for variable distribution rates based on tariff type
+ * C tariffs: rates in zł/kWh, consumption in MWh → multiply by 1000
+ * B/A tariffs: rates already in zł/MWh, consumption in MWh → multiply by 1
+ */
+export function getVariableDistributionMultiplier(tariffCode: string): number {
+  return isRatesInMWh(tariffCode) ? 1 : 1000;
+}
+
 export interface PowerValidationResult {
   valid: boolean;
   error?: string;

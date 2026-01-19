@@ -1,5 +1,5 @@
 import type { EnergyAnalysis } from '@/types/database';
-import { calculatePeriodMonths } from './tariff-utils';
+import { calculatePeriodMonths, getVariableDistributionMultiplier } from './tariff-utils';
 
 export interface CalculationResult {
   distributionCostBefore: number;
@@ -83,17 +83,21 @@ export function calculateEnergyCosts(analysis: Partial<EnergyAnalysis>): Calcula
     reactiveEnergyCostAfter = Number(analysis.reactive_energy_cost_after) || 0;
   }
 
+  // Get multipliers based on tariff type (C tariffs: zł/kWh → x1000, B/A tariffs: zł/MWh → x1)
+  const multiplierBefore = getVariableDistributionMultiplier(analysis.tariff_code_before || 'C11');
+  const multiplierAfter = getVariableDistributionMultiplier(analysis.tariff_code_after || 'C11');
+
   // Distribution BEFORE - uses consumption_before_zone*_mwh fields
   const fixedDistBefore = Number(analysis.fixed_distribution_before_total) || 0;
   const varDistBefore1 = (Number(analysis.variable_distribution_before_zone1_rate) || 0) * 
-                          (Number(analysis.consumption_before_zone1_mwh) || 0) * 1000;
+                          (Number(analysis.consumption_before_zone1_mwh) || 0) * multiplierBefore;
   const varDistBefore2 = zonesCountBefore >= 2 
     ? (Number(analysis.variable_distribution_before_zone2_rate) || 0) * 
-      (Number(analysis.consumption_before_zone2_mwh) || 0) * 1000 
+      (Number(analysis.consumption_before_zone2_mwh) || 0) * multiplierBefore 
     : 0;
   const varDistBefore3 = zonesCountBefore >= 3 
     ? (Number(analysis.variable_distribution_before_zone3_rate) || 0) * 
-      (Number(analysis.consumption_before_zone3_mwh) || 0) * 1000 
+      (Number(analysis.consumption_before_zone3_mwh) || 0) * multiplierBefore 
     : 0;
   const capacityBefore = Number(analysis.capacity_charge_before) || 0;
 
@@ -102,16 +106,16 @@ export function calculateEnergyCosts(analysis: Partial<EnergyAnalysis>): Calcula
 
   // Distribution AFTER - uses consumption_after_zone*_mwh for mapped consumption
   const fixedDistAfter = Number(analysis.fixed_distribution_after_total) || 0;
-  // Variable distribution rates are in PLN/kWh, consumption is in MWh, so multiply by 1000
+  // Variable distribution rates: C tariffs in PLN/kWh (x1000), B/A tariffs in PLN/MWh (x1)
   const varDistAfter1 = (Number(analysis.variable_distribution_after_zone1_rate) || 0) * 
-                         (Number(analysis.consumption_after_zone1_mwh) || 0) * 1000;
+                         (Number(analysis.consumption_after_zone1_mwh) || 0) * multiplierAfter;
   const varDistAfter2 = zonesCountAfter >= 2 
     ? (Number(analysis.variable_distribution_after_zone2_rate) || 0) * 
-      (Number(analysis.consumption_after_zone2_mwh) || 0) * 1000 
+      (Number(analysis.consumption_after_zone2_mwh) || 0) * multiplierAfter 
     : 0;
   const varDistAfter3 = zonesCountAfter >= 3 
     ? (Number(analysis.variable_distribution_after_zone3_rate) || 0) * 
-      (Number(analysis.consumption_after_zone3_mwh) || 0) * 1000 
+      (Number(analysis.consumption_after_zone3_mwh) || 0) * multiplierAfter 
     : 0;
   const capacityAfter = Number(analysis.capacity_charge_after) || 0;
 
