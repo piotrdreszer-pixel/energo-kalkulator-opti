@@ -251,14 +251,26 @@ export default function AnalysisReport() {
               </div>
             </div>
             <div>
-              <h3 className="font-medium mb-2 text-muted-foreground">Zużycie energii [MWh]</h3>
+              <h3 className="font-medium mb-2 text-muted-foreground">Zużycie energii PRZED [MWh]</h3>
               <div className="space-y-1 text-sm">
-                <p>Strefa 1: <span className="font-medium">{formatNumber(Number(analysis.consumption_zone1_mwh), 4)} MWh</span></p>
-                {(zonesCountBefore >= 2 || zonesCountAfter >= 2) && (
-                  <p>Strefa 2: <span className="font-medium">{formatNumber(Number(analysis.consumption_zone2_mwh), 4)} MWh</span></p>
+                <p>Strefa 1: <span className="font-medium">{formatNumber(Number(analysis.consumption_before_zone1_mwh), 4)} MWh</span></p>
+                {zonesCountBefore >= 2 && (
+                  <p>Strefa 2: <span className="font-medium">{formatNumber(Number(analysis.consumption_before_zone2_mwh), 4)} MWh</span></p>
                 )}
-                {(zonesCountBefore >= 3 || zonesCountAfter >= 3) && (
-                  <p>Strefa 3: <span className="font-medium">{formatNumber(Number(analysis.consumption_zone3_mwh), 4)} MWh</span></p>
+                {zonesCountBefore >= 3 && (
+                  <p>Strefa 3: <span className="font-medium">{formatNumber(Number(analysis.consumption_before_zone3_mwh), 4)} MWh</span></p>
+                )}
+              </div>
+            </div>
+            <div>
+              <h3 className="font-medium mb-2 text-muted-foreground">Zużycie energii PO [MWh]</h3>
+              <div className="space-y-1 text-sm">
+                <p>Strefa 1: <span className="font-medium">{formatNumber(Number(analysis.consumption_after_zone1_mwh), 4)} MWh</span></p>
+                {zonesCountAfter >= 2 && (
+                  <p>Strefa 2: <span className="font-medium">{formatNumber(Number(analysis.consumption_after_zone2_mwh), 4)} MWh</span></p>
+                )}
+                {zonesCountAfter >= 3 && (
+                  <p>Strefa 3: <span className="font-medium">{formatNumber(Number(analysis.consumption_after_zone3_mwh), 4)} MWh</span></p>
                 )}
               </div>
             </div>
