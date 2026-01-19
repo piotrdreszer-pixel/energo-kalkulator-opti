@@ -516,10 +516,13 @@ export default function AnalysisForm() {
                   <div className="space-y-2 max-w-xs">
                     <Label>Moc umowna [kW]</Label>
                     <Input
-                      type="number"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={formData.contracted_power_before_kw || ''}
-                      onChange={(e) => handlePowerChange(parseFloat(e.target.value) || 0)}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(',', '.');
+                        handlePowerChange(parseFloat(value) || 0);
+                      }}
                     />
                   </div>
                 ) : (
@@ -527,10 +530,13 @@ export default function AnalysisForm() {
                     <div className="space-y-2">
                       <Label>Moc umowna PRZED [kW]</Label>
                       <Input
-                        type="number"
-                        step="0.01"
+                        type="text"
+                        inputMode="decimal"
                         value={formData.contracted_power_before_kw || ''}
-                        onChange={(e) => handleInputChange('contracted_power_before_kw', parseFloat(e.target.value) || 0)}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(',', '.');
+                          handleInputChange('contracted_power_before_kw', parseFloat(value) || 0);
+                        }}
                       />
                       {validationErrors.contracted_power_before_kw && (
                         <p className="text-sm text-destructive flex items-center gap-1">
@@ -542,10 +548,13 @@ export default function AnalysisForm() {
                     <div className="space-y-2">
                       <Label>Moc umowna PO [kW]</Label>
                       <Input
-                        type="number"
-                        step="0.01"
+                        type="text"
+                        inputMode="decimal"
                         value={formData.contracted_power_after_kw || ''}
-                        onChange={(e) => handleInputChange('contracted_power_after_kw', parseFloat(e.target.value) || 0)}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(',', '.');
+                          handleInputChange('contracted_power_after_kw', parseFloat(value) || 0);
+                        }}
                       />
                       {validationErrors.contracted_power_after_kw && (
                         <p className="text-sm text-destructive flex items-center gap-1">
@@ -610,13 +619,16 @@ export default function AnalysisForm() {
                         <div key={index} className="space-y-2">
                           <Label className="text-sm text-muted-foreground">{label}</Label>
                           <Input
-                            type="number"
-                            step="0.0001"
-                            value={Number(formData[`consumption_before_zone${index + 1}_mwh` as keyof EnergyAnalysis]) || ''}
-                            onChange={(e) => handleInputChange(
-                              `consumption_before_zone${index + 1}_mwh` as keyof EnergyAnalysis,
-                              parseFloat(e.target.value) || 0
-                            )}
+                            type="text"
+                            inputMode="decimal"
+                            value={String(formData[`consumption_before_zone${index + 1}_mwh` as keyof EnergyAnalysis] || '')}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(',', '.');
+                              handleInputChange(
+                                `consumption_before_zone${index + 1}_mwh` as keyof EnergyAnalysis,
+                                parseFloat(value) || 0
+                              );
+                            }}
                           />
                         </div>
                       ))}

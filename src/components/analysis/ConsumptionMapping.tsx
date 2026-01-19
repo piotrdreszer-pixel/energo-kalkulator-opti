@@ -164,10 +164,13 @@ export const ConsumptionMapping = forwardRef<HTMLDivElement, ConsumptionMappingP
           <div className="space-y-2">
             <Label>{zoneLabelsAfter[0]} [MWh]</Label>
             <Input
-              type="number"
-              step="0.0001"
+              type="text"
+              inputMode="decimal"
               value={formData.consumption_after_zone1_mwh || ''}
-              onChange={(e) => onInputChange('consumption_after_zone1_mwh', parseFloat(e.target.value) || 0)}
+              onChange={(e) => {
+                const value = e.target.value.replace(',', '.');
+                onInputChange('consumption_after_zone1_mwh', parseFloat(value) || 0);
+              }}
               disabled={isAutoMode}
             />
           </div>
@@ -175,10 +178,13 @@ export const ConsumptionMapping = forwardRef<HTMLDivElement, ConsumptionMappingP
             <div className="space-y-2">
               <Label>{zoneLabelsAfter[1]} [MWh]</Label>
               <Input
-                type="number"
-                step="0.0001"
+                type="text"
+                inputMode="decimal"
                 value={formData.consumption_after_zone2_mwh || ''}
-                onChange={(e) => onInputChange('consumption_after_zone2_mwh', parseFloat(e.target.value) || 0)}
+                onChange={(e) => {
+                  const value = e.target.value.replace(',', '.');
+                  onInputChange('consumption_after_zone2_mwh', parseFloat(value) || 0);
+                }}
                 disabled={isAutoMode}
               />
             </div>
@@ -187,10 +193,13 @@ export const ConsumptionMapping = forwardRef<HTMLDivElement, ConsumptionMappingP
             <div className="space-y-2">
               <Label>{zoneLabelsAfter[2]} [MWh]</Label>
               <Input
-                type="number"
-                step="0.0001"
+                type="text"
+                inputMode="decimal"
                 value={formData.consumption_after_zone3_mwh || ''}
-                onChange={(e) => onInputChange('consumption_after_zone3_mwh', parseFloat(e.target.value) || 0)}
+                onChange={(e) => {
+                  const value = e.target.value.replace(',', '.');
+                  onInputChange('consumption_after_zone3_mwh', parseFloat(value) || 0);
+                }}
                 disabled={isAutoMode}
               />
             </div>
