@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -17,17 +19,36 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import {
   ArrowLeft,
+  ArrowRight,
   Save,
   Loader2,
   AlertCircle,
-  TrendingDown,
-  TrendingUp,
   Printer,
+  ChevronLeft,
+  ChevronRight,
+  Check,
 } from 'lucide-react';
-import type { EnergyAnalysis, ClientProject } from '@/types/database';
+import type { EnergyAnalysis, ClientProject, ResolvedRates } from '@/types/database';
 import { TARIFF_CODES, getZonesCount, getZoneLabels, validateContractedPower, calculatePeriodMonths } from '@/lib/tariff-utils';
 import { calculateEnergyCosts, formatCurrency, formatPercent, formatNumber } from '@/lib/calculation-utils';
 import { ReactiveEnergyInput } from '@/components/analysis/ReactiveEnergyInput';
+import { RatesInputPanel } from '@/components/analysis/RatesInputPanel';
+import { ConsumptionMapping } from '@/components/analysis/ConsumptionMapping';
+import { ComparisonSummary } from '@/components/analysis/ComparisonSummary';
+import { useOsdOperators } from '@/hooks/useOsdOperators';
+import { useRatesResolver } from '@/hooks/useRatesResolver';
+import { cn } from '@/lib/utils';
+
+const WIZARD_STEPS = [
+  { id: 'client', label: 'Klient', description: 'Dane klienta' },
+  { id: 'osd', label: 'OSD', description: 'Operator i okres' },
+  { id: 'power', label: 'Moc', description: 'Parametry techniczne' },
+  { id: 'before', label: 'PRZED', description: 'Stan obecny' },
+  { id: 'after', label: 'PO', description: 'Stan po zmianie' },
+  { id: 'summary', label: 'Podsumowanie', description: 'Porównanie' },
+] as const;
+
+type StepId = typeof WIZARD_STEPS[number]['id'];
 
 export default function AnalysisForm() {
   const { projectId, analysisId } = useParams<{ projectId: string; analysisId: string }>();
@@ -35,6 +56,7 @@ export default function AnalysisForm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const [currentStep, setCurrentStep] = useState<StepId>('client');
   const [formData, setFormData] = useState<Partial<EnergyAnalysis>>({
     name: 'Nowa analiza',
     tariff_code_before: 'C11',
@@ -43,6 +65,13 @@ export default function AnalysisForm() {
     zones_count_after: 1,
     contracted_power_before_kw: 0,
     contracted_power_after_kw: 0,
+    shared_power_mode: true,
+    season_before: 'ALL',
+    season_after: 'ALL',
+    osd_id: null,
+    rates_date: new Date().toISOString().split('T')[0],
+    rates_overridden_before: {},
+    rates_overridden_after: {},
     fixed_distribution_before_total: 0,
     variable_distribution_before_zone1_rate: 0,
     variable_distribution_before_zone2_rate: 0,
@@ -51,18 +80,6 @@ export default function AnalysisForm() {
     capacity_charge_before: 0,
     contracted_power_charge_rate_before: 0,
     reactive_monthly_mode_before: false,
-    reactive_energy_before_month_1: 0,
-    reactive_energy_before_month_2: 0,
-    reactive_energy_before_month_3: 0,
-    reactive_energy_before_month_4: 0,
-    reactive_energy_before_month_5: 0,
-    reactive_energy_before_month_6: 0,
-    reactive_energy_before_month_7: 0,
-    reactive_energy_before_month_8: 0,
-    reactive_energy_before_month_9: 0,
-    reactive_energy_before_month_10: 0,
-    reactive_energy_before_month_11: 0,
-    reactive_energy_before_month_12: 0,
     fixed_distribution_after_total: 0,
     variable_distribution_after_zone1_rate: 0,
     variable_distribution_after_zone2_rate: 0,
@@ -71,21 +88,15 @@ export default function AnalysisForm() {
     capacity_charge_after: 0,
     contracted_power_charge_rate_after: 0,
     reactive_monthly_mode_after: false,
-    reactive_energy_after_month_1: 0,
-    reactive_energy_after_month_2: 0,
-    reactive_energy_after_month_3: 0,
-    reactive_energy_after_month_4: 0,
-    reactive_energy_after_month_5: 0,
-    reactive_energy_after_month_6: 0,
-    reactive_energy_after_month_7: 0,
-    reactive_energy_after_month_8: 0,
-    reactive_energy_after_month_9: 0,
-    reactive_energy_after_month_10: 0,
-    reactive_energy_after_month_11: 0,
-    reactive_energy_after_month_12: 0,
     active_energy_price_before_zone1: 0,
     active_energy_price_before_zone2: 0,
     active_energy_price_before_zone3: 0,
+    consumption_before_zone1_mwh: 0,
+    consumption_before_zone2_mwh: 0,
+    consumption_before_zone3_mwh: 0,
+    consumption_after_zone1_mwh: 0,
+    consumption_after_zone2_mwh: 0,
+    consumption_after_zone3_mwh: 0,
     consumption_zone1_mwh: 0,
     consumption_zone2_mwh: 0,
     consumption_zone3_mwh: 0,
@@ -94,9 +105,20 @@ export default function AnalysisForm() {
     active_energy_price_after_zone3: 0,
     handling_fee_before: 0,
     handling_fee_after: 0,
+    consultant_notes: '',
   });
 
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [resolvedRatesBefore, setResolvedRatesBefore] = useState<ResolvedRates | null>(null);
+  const [resolvedRatesAfter, setResolvedRatesAfter] = useState<ResolvedRates | null>(null);
+  const [isManualModeBefore, setIsManualModeBefore] = useState(false);
+  const [isManualModeAfter, setIsManualModeAfter] = useState(false);
+  const [overriddenBefore, setOverriddenBefore] = useState<Record<string, number>>({});
+  const [overriddenAfter, setOverriddenAfter] = useState<Record<string, number>>({});
+  const [isAutoConsumptionMode, setIsAutoConsumptionMode] = useState(true);
+
+  const { data: osdOperators } = useOsdOperators();
+  const { resolveRates, isLoading: isResolvingRates } = useRatesResolver();
 
   const { data: project } = useQuery({
     queryKey: ['project', projectId],
@@ -128,15 +150,26 @@ export default function AnalysisForm() {
 
   useEffect(() => {
     if (analysis) {
-      setFormData(analysis);
+      setFormData({
+        ...analysis,
+        rates_overridden_before: (analysis.rates_overridden_before as Record<string, number>) || {},
+        rates_overridden_after: (analysis.rates_overridden_after as Record<string, number>) || {},
+      });
+      setOverriddenBefore((analysis.rates_overridden_before as Record<string, number>) || {});
+      setOverriddenAfter((analysis.rates_overridden_after as Record<string, number>) || {});
     }
   }, [analysis]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      const dataToSave = {
+        ...formData,
+        rates_overridden_before: overriddenBefore,
+        rates_overridden_after: overriddenAfter,
+      };
       const { error } = await supabase
         .from('energy_analyses')
-        .update(formData)
+        .update(dataToSave)
         .eq('id', analysisId);
       if (error) throw error;
     },
@@ -155,7 +188,6 @@ export default function AnalysisForm() {
     const zones = getZonesCount(value);
     setFormData(prev => ({ ...prev, [field]: value, [zonesField]: zones }));
     
-    // Validate power
     const powerField = field === 'tariff_code_before' ? 'contracted_power_before_kw' : 'contracted_power_after_kw';
     const power = Number(formData[powerField]) || 0;
     const validation = validateContractedPower(value, power);
@@ -169,25 +201,93 @@ export default function AnalysisForm() {
     }
   };
 
-  const handlePowerChange = (field: 'contracted_power_before_kw' | 'contracted_power_after_kw', value: number) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    
-    const tariffField = field === 'contracted_power_before_kw' ? 'tariff_code_before' : 'tariff_code_after';
-    const tariff = formData[tariffField] as string;
-    const validation = validateContractedPower(tariff, value);
-    
-    if (!validation.valid) {
-      setValidationErrors(prev => ({ ...prev, [field]: validation.error! }));
+  const handlePowerChange = (value: number) => {
+    if (formData.shared_power_mode) {
+      setFormData(prev => ({ 
+        ...prev, 
+        contracted_power_before_kw: value,
+        contracted_power_after_kw: value,
+      }));
     } else {
-      setValidationErrors(prev => {
-        const { [field]: _, ...rest } = prev;
-        return rest;
-      });
+      setFormData(prev => ({ ...prev, contracted_power_before_kw: value }));
     }
   };
 
   const handleInputChange = (field: keyof EnergyAnalysis, value: string | number | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleFetchRates = async (scenario: 'before' | 'after') => {
+    if (!formData.osd_id) {
+      toast({ variant: 'destructive', title: 'Błąd', description: 'Wybierz najpierw OSD.' });
+      return;
+    }
+
+    const tariffCode = scenario === 'before' ? formData.tariff_code_before : formData.tariff_code_after;
+    const season = scenario === 'before' ? formData.season_before : formData.season_after;
+
+    const rates = await resolveRates(
+      formData.osd_id,
+      tariffCode || 'C11',
+      season || 'ALL',
+      formData.rates_date || undefined
+    );
+
+    if (rates) {
+      if (scenario === 'before') {
+        setResolvedRatesBefore(rates);
+        // Apply rates to form
+        setFormData(prev => ({
+          ...prev,
+          contracted_power_charge_rate_before: rates.rates.fixedNetworkRate || 0,
+          variable_distribution_before_zone1_rate: rates.rates.variableRates[0]?.rate || 0,
+          variable_distribution_before_zone2_rate: rates.rates.variableRates[1]?.rate || 0,
+          variable_distribution_before_zone3_rate: rates.rates.variableRates[2]?.rate || 0,
+          capacity_charge_before: rates.rates.capacityFee || 0,
+          rate_card_id_before: rates.rateCardId,
+        }));
+        setOverriddenBefore({});
+      } else {
+        setResolvedRatesAfter(rates);
+        setFormData(prev => ({
+          ...prev,
+          contracted_power_charge_rate_after: rates.rates.fixedNetworkRate || 0,
+          variable_distribution_after_zone1_rate: rates.rates.variableRates[0]?.rate || 0,
+          variable_distribution_after_zone2_rate: rates.rates.variableRates[1]?.rate || 0,
+          variable_distribution_after_zone3_rate: rates.rates.variableRates[2]?.rate || 0,
+          capacity_charge_after: rates.rates.capacityFee || 0,
+          rate_card_id_after: rates.rateCardId,
+        }));
+        setOverriddenAfter({});
+      }
+      toast({ title: 'Pobrano stawki', description: `Stawki dla ${rates.rateCardName} zostały załadowane.` });
+    }
+  };
+
+  const handleResetRates = (scenario: 'before' | 'after') => {
+    if (scenario === 'before') {
+      setOverriddenBefore({});
+      if (resolvedRatesBefore) {
+        setFormData(prev => ({
+          ...prev,
+          contracted_power_charge_rate_before: resolvedRatesBefore.rates.fixedNetworkRate || 0,
+          variable_distribution_before_zone1_rate: resolvedRatesBefore.rates.variableRates[0]?.rate || 0,
+          variable_distribution_before_zone2_rate: resolvedRatesBefore.rates.variableRates[1]?.rate || 0,
+          variable_distribution_before_zone3_rate: resolvedRatesBefore.rates.variableRates[2]?.rate || 0,
+        }));
+      }
+    } else {
+      setOverriddenAfter({});
+      if (resolvedRatesAfter) {
+        setFormData(prev => ({
+          ...prev,
+          contracted_power_charge_rate_after: resolvedRatesAfter.rates.fixedNetworkRate || 0,
+          variable_distribution_after_zone1_rate: resolvedRatesAfter.rates.variableRates[0]?.rate || 0,
+          variable_distribution_after_zone2_rate: resolvedRatesAfter.rates.variableRates[1]?.rate || 0,
+          variable_distribution_after_zone3_rate: resolvedRatesAfter.rates.variableRates[2]?.rate || 0,
+        }));
+      }
+    }
   };
 
   const handleSave = () => {
@@ -197,6 +297,14 @@ export default function AnalysisForm() {
     }
     saveMutation.mutate();
   };
+
+  const currentStepIndex = WIZARD_STEPS.findIndex(s => s.id === currentStep);
+  const canGoNext = currentStepIndex < WIZARD_STEPS.length - 1;
+  const canGoPrev = currentStepIndex > 0;
+
+  const goToStep = (stepId: StepId) => setCurrentStep(stepId);
+  const goNext = () => canGoNext && setCurrentStep(WIZARD_STEPS[currentStepIndex + 1].id);
+  const goPrev = () => canGoPrev && setCurrentStep(WIZARD_STEPS[currentStepIndex - 1].id);
 
   const results = calculateEnergyCosts(formData);
   const zonesCountBefore = formData.zones_count_before || 1;
@@ -217,7 +325,7 @@ export default function AnalysisForm() {
 
   return (
     <AppLayout>
-      <div className="content-container max-w-5xl">
+      <div className="content-container max-w-7xl">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div className="flex items-center gap-4">
@@ -251,520 +359,414 @@ export default function AnalysisForm() {
           </div>
         </div>
 
-        <div className="space-y-6">
-          {/* General Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-display">Dane ogólne</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="space-y-2 lg:col-span-2">
-                <Label>Nazwa analizy</Label>
-                <Input
-                  value={formData.name || ''}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Data od</Label>
-                <Input
-                  type="date"
-                  value={formData.period_from || ''}
-                  onChange={(e) => handleInputChange('period_from', e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Data do</Label>
-                <Input
-                  type="date"
-                  value={formData.period_to || ''}
-                  onChange={(e) => handleInputChange('period_to', e.target.value)}
-                />
-              </div>
-              {formData.period_from && formData.period_to && (
-                <div className="lg:col-span-4 p-3 bg-muted/50 rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    Okres analizy: <span className="font-medium text-foreground">{periodMonths} {periodMonths === 1 ? 'miesiąc' : periodMonths < 5 ? 'miesiące' : 'miesięcy'}</span>
-                  </p>
+        {/* Step indicators */}
+        <div className="flex items-center justify-between mb-8 overflow-x-auto pb-2">
+          {WIZARD_STEPS.map((step, index) => (
+            <React.Fragment key={step.id}>
+              <button
+                onClick={() => goToStep(step.id)}
+                className={cn(
+                  'flex flex-col items-center min-w-[80px] transition-colors',
+                  currentStep === step.id
+                    ? 'text-primary'
+                    : index < currentStepIndex
+                    ? 'text-muted-foreground hover:text-foreground'
+                    : 'text-muted-foreground/50'
+                )}
+              >
+                <div
+                  className={cn(
+                    'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium mb-1 transition-colors',
+                    currentStep === step.id
+                      ? 'bg-primary text-primary-foreground'
+                      : index < currentStepIndex
+                      ? 'bg-primary/20 text-primary'
+                      : 'bg-muted text-muted-foreground'
+                  )}
+                >
+                  {index < currentStepIndex ? <Check className="h-4 w-4" /> : index + 1}
                 </div>
+                <span className="text-xs font-medium">{step.label}</span>
+              </button>
+              {index < WIZARD_STEPS.length - 1 && (
+                <div
+                  className={cn(
+                    'flex-1 h-0.5 mx-2',
+                    index < currentStepIndex ? 'bg-primary/40' : 'bg-muted'
+                  )}
+                />
               )}
-            </CardContent>
-          </Card>
+            </React.Fragment>
+          ))}
+        </div>
 
-          {/* Tariff and Zones */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-display">Taryfa</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-6 sm:grid-cols-2">
-              <div className="space-y-4">
-                <h4 className="font-medium text-muted-foreground">PRZED zmianami</h4>
-                <div className="space-y-2">
-                  <Label>Taryfa dystrybucyjna</Label>
-                  <Select
-                    value={formData.tariff_code_before}
-                    onValueChange={(v) => handleTariffChange('tariff_code_before', v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TARIFF_CODES.map((t) => (
-                        <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <h4 className="font-medium text-muted-foreground">PO zmianach</h4>
-                <div className="space-y-2">
-                  <Label>Taryfa dystrybucyjna</Label>
-                  <Select
-                    value={formData.tariff_code_after}
-                    onValueChange={(v) => handleTariffChange('tariff_code_after', v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TARIFF_CODES.map((t) => (
-                        <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Contracted Power */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-display">Moc umowna</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="space-y-2">
-                <Label>Moc umowna PRZED [kW]</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.contracted_power_before_kw || ''}
-                  onChange={(e) => handlePowerChange('contracted_power_before_kw', parseFloat(e.target.value) || 0)}
-                />
-                {validationErrors.contracted_power_before_kw && (
-                  <p className="text-sm text-destructive flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
-                    {validationErrors.contracted_power_before_kw}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>Stawka miesięczna PRZED [zł/kW/mies.]</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.contracted_power_charge_rate_before || ''}
-                  onChange={(e) => handleInputChange('contracted_power_charge_rate_before', parseFloat(e.target.value) || 0)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Moc umowna PO [kW]</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.contracted_power_after_kw || ''}
-                  onChange={(e) => handlePowerChange('contracted_power_after_kw', parseFloat(e.target.value) || 0)}
-                />
-                {validationErrors.contracted_power_after_kw && (
-                  <p className="text-sm text-destructive flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
-                    {validationErrors.contracted_power_after_kw}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>Stawka miesięczna PO [zł/kW/mies.]</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.contracted_power_charge_rate_after || ''}
-                  onChange={(e) => handleInputChange('contracted_power_charge_rate_after', parseFloat(e.target.value) || 0)}
-                />
-              </div>
-              <div className="lg:col-span-4 p-3 bg-muted/50 rounded-lg">
-                <p className="text-sm text-muted-foreground">
-                  Opłata za moc umowną za okres ({periodMonths} mies.): {' '}
-                  <span className="font-medium text-foreground">
-                    PRZED: {formatCurrency(results.contractedPowerChargeBefore)} → PO: {formatCurrency(results.contractedPowerChargeAfter)}
-                  </span>
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Distribution Before */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-display">Dystrybucja – przed zmianami</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="space-y-2">
-                  <Label>Suma stałych opłat za okres [zł]</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={formData.fixed_distribution_before_total || ''}
-                    onChange={(e) => handleInputChange('fixed_distribution_before_total', parseFloat(e.target.value) || 0)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Stawka zmienna {zoneLabelsBefore[0]} [zł/kWh]</Label>
-                  <Input
-                    type="number"
-                    step="0.000001"
-                    value={formData.variable_distribution_before_zone1_rate || ''}
-                    onChange={(e) => handleInputChange('variable_distribution_before_zone1_rate', parseFloat(e.target.value) || 0)}
-                  />
-                </div>
-                {zonesCountBefore >= 2 && (
-                  <div className="space-y-2">
-                    <Label>Stawka zmienna {zoneLabelsBefore[1]} [zł/kWh]</Label>
+        {/* Step content */}
+        <div className="min-h-[400px]">
+          {/* Step 1: Client */}
+          {currentStep === 'client' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Dane klienta</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label>Nazwa analizy</Label>
                     <Input
-                      type="number"
-                      step="0.000001"
-                      value={formData.variable_distribution_before_zone2_rate || ''}
-                      onChange={(e) => handleInputChange('variable_distribution_before_zone2_rate', parseFloat(e.target.value) || 0)}
+                      value={formData.name || ''}
+                      onChange={(e) => handleInputChange('name', e.target.value)}
                     />
                   </div>
-                )}
-                {zonesCountBefore >= 3 && (
+                </div>
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-1">Klient</p>
+                  <p className="font-medium">{project?.client_name}</p>
+                  <p className="text-sm text-muted-foreground">NIP: {project?.client_nip}</p>
+                  {project?.client_address && (
+                    <p className="text-sm text-muted-foreground">{project.client_address}</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 2: OSD and Period */}
+          {currentStep === 'osd' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Operator Sieci Dystrybucyjnej i okres</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>Stawka zmienna {zoneLabelsBefore[2]} [zł/kWh]</Label>
+                    <Label>OSD (Operator)</Label>
+                    <Select
+                      value={formData.osd_id || ''}
+                      onValueChange={(v) => handleInputChange('osd_id', v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Wybierz OSD" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {osdOperators?.map((osd) => (
+                          <SelectItem key={osd.id} value={osd.id}>
+                            {osd.name} ({osd.code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Data obowiązywania stawek</Label>
                     <Input
-                      type="number"
-                      step="0.000001"
-                      value={formData.variable_distribution_before_zone3_rate || ''}
-                      onChange={(e) => handleInputChange('variable_distribution_before_zone3_rate', parseFloat(e.target.value) || 0)}
+                      type="date"
+                      value={formData.rates_date || ''}
+                      onChange={(e) => handleInputChange('rates_date', e.target.value)}
                     />
                   </div>
-                )}
-                <div className="space-y-2">
-                  <Label>Opłata mocowa za okres [zł]</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={formData.capacity_charge_before || ''}
-                    onChange={(e) => handleInputChange('capacity_charge_before', parseFloat(e.target.value) || 0)}
-                  />
                 </div>
-              </div>
-              
-              {/* Reactive Energy Before */}
-              <div className="pt-4 border-t">
-                <ReactiveEnergyInput
-                  prefix="before"
-                  formData={formData}
-                  onInputChange={handleInputChange}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Distribution After */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-display">Dystrybucja – po zmianach</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="space-y-2">
-                  <Label>Suma stałych opłat za okres [zł]</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={formData.fixed_distribution_after_total || ''}
-                    onChange={(e) => handleInputChange('fixed_distribution_after_total', parseFloat(e.target.value) || 0)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Stawka zmienna {zoneLabelsAfter[0]} [zł/kWh]</Label>
-                  <Input
-                    type="number"
-                    step="0.000001"
-                    value={formData.variable_distribution_after_zone1_rate || ''}
-                    onChange={(e) => handleInputChange('variable_distribution_after_zone1_rate', parseFloat(e.target.value) || 0)}
-                  />
-                </div>
-                {zonesCountAfter >= 2 && (
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>Stawka zmienna {zoneLabelsAfter[1]} [zł/kWh]</Label>
+                    <Label>Okres od</Label>
                     <Input
-                      type="number"
-                      step="0.000001"
-                      value={formData.variable_distribution_after_zone2_rate || ''}
-                      onChange={(e) => handleInputChange('variable_distribution_after_zone2_rate', parseFloat(e.target.value) || 0)}
+                      type="date"
+                      value={formData.period_from || ''}
+                      onChange={(e) => handleInputChange('period_from', e.target.value)}
                     />
                   </div>
-                )}
-                {zonesCountAfter >= 3 && (
                   <div className="space-y-2">
-                    <Label>Stawka zmienna {zoneLabelsAfter[2]} [zł/kWh]</Label>
+                    <Label>Okres do</Label>
                     <Input
-                      type="number"
-                      step="0.000001"
-                      value={formData.variable_distribution_after_zone3_rate || ''}
-                      onChange={(e) => handleInputChange('variable_distribution_after_zone3_rate', parseFloat(e.target.value) || 0)}
+                      type="date"
+                      value={formData.period_to || ''}
+                      onChange={(e) => handleInputChange('period_to', e.target.value)}
                     />
                   </div>
+                </div>
+                {formData.period_from && formData.period_to && (
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm">
+                      Okres analizy: <span className="font-medium">{periodMonths} {periodMonths === 1 ? 'miesiąc' : periodMonths < 5 ? 'miesiące' : 'miesięcy'}</span>
+                    </p>
+                  </div>
                 )}
-                <div className="space-y-2">
-                  <Label>Opłata mocowa za okres [zł]</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={formData.capacity_charge_after || ''}
-                    onChange={(e) => handleInputChange('capacity_charge_after', parseFloat(e.target.value) || 0)}
-                  />
-                </div>
-              </div>
-              
-              {/* Reactive Energy After */}
-              <div className="pt-4 border-t">
-                <ReactiveEnergyInput
-                  prefix="after"
-                  formData={formData}
-                  onInputChange={handleInputChange}
-                />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
-          {/* Energy Consumption */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-display">Zużycie energii [MWh]</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
-                <Label>Strefa 1 ({zoneLabelsBefore[0]})</Label>
-                <Input
-                  type="number"
-                  step="0.0001"
-                  value={formData.consumption_zone1_mwh || ''}
-                  onChange={(e) => handleInputChange('consumption_zone1_mwh', parseFloat(e.target.value) || 0)}
-                />
-              </div>
-              {(zonesCountBefore >= 2 || zonesCountAfter >= 2) && (
-                <div className="space-y-2">
-                  <Label>Strefa 2 ({zoneLabelsBefore[1] || zoneLabelsAfter[1]})</Label>
-                  <Input
-                    type="number"
-                    step="0.0001"
-                    value={formData.consumption_zone2_mwh || ''}
-                    onChange={(e) => handleInputChange('consumption_zone2_mwh', parseFloat(e.target.value) || 0)}
+          {/* Step 3: Power */}
+          {currentStep === 'power' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Parametry techniczne</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center gap-4 pb-4 border-b">
+                  <Switch
+                    id="shared-power"
+                    checked={formData.shared_power_mode}
+                    onCheckedChange={(v) => handleInputChange('shared_power_mode', v)}
                   />
+                  <Label htmlFor="shared-power">
+                    Wspólna moc umowna dla obu scenariuszy
+                  </Label>
                 </div>
-              )}
-              {(zonesCountBefore >= 3 || zonesCountAfter >= 3) && (
-                <div className="space-y-2">
-                  <Label>Strefa 3 ({zoneLabelsBefore[2] || zoneLabelsAfter[2]})</Label>
-                  <Input
-                    type="number"
-                    step="0.0001"
-                    value={formData.consumption_zone3_mwh || ''}
-                    onChange={(e) => handleInputChange('consumption_zone3_mwh', parseFloat(e.target.value) || 0)}
-                  />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Active Energy Before */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-display">Energia czynna – przed zmianami [zł/MWh]</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
-                <Label>Cena {zoneLabelsBefore[0]}</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.active_energy_price_before_zone1 || ''}
-                  onChange={(e) => handleInputChange('active_energy_price_before_zone1', parseFloat(e.target.value) || 0)}
-                />
-              </div>
-              {zonesCountBefore >= 2 && (
-                <div className="space-y-2">
-                  <Label>Cena {zoneLabelsBefore[1]}</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={formData.active_energy_price_before_zone2 || ''}
-                    onChange={(e) => handleInputChange('active_energy_price_before_zone2', parseFloat(e.target.value) || 0)}
-                  />
-                </div>
-              )}
-              {zonesCountBefore >= 3 && (
-                <div className="space-y-2">
-                  <Label>Cena {zoneLabelsBefore[2]}</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={formData.active_energy_price_before_zone3 || ''}
-                    onChange={(e) => handleInputChange('active_energy_price_before_zone3', parseFloat(e.target.value) || 0)}
-                  />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Active Energy After */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-display">Energia czynna – po zmianach [zł/MWh]</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
-                <Label>Cena {zoneLabelsAfter[0]}</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.active_energy_price_after_zone1 || ''}
-                  onChange={(e) => handleInputChange('active_energy_price_after_zone1', parseFloat(e.target.value) || 0)}
-                />
-              </div>
-              {zonesCountAfter >= 2 && (
-                <div className="space-y-2">
-                  <Label>Cena {zoneLabelsAfter[1]}</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={formData.active_energy_price_after_zone2 || ''}
-                    onChange={(e) => handleInputChange('active_energy_price_after_zone2', parseFloat(e.target.value) || 0)}
-                  />
-                </div>
-              )}
-              {zonesCountAfter >= 3 && (
-                <div className="space-y-2">
-                  <Label>Cena {zoneLabelsAfter[2]}</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={formData.active_energy_price_after_zone3 || ''}
-                    onChange={(e) => handleInputChange('active_energy_price_after_zone3', parseFloat(e.target.value) || 0)}
-                  />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Handling Fee */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-display">Opłata handlowa za okres [zł]</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Opłata handlowa PRZED</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.handling_fee_before || ''}
-                  onChange={(e) => handleInputChange('handling_fee_before', parseFloat(e.target.value) || 0)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Opłata handlowa PO</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.handling_fee_after || ''}
-                  onChange={(e) => handleInputChange('handling_fee_after', parseFloat(e.target.value) || 0)}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Summary */}
-          <Card className="border-2 border-primary/20 bg-primary/5">
-            <CardHeader>
-              <CardTitle className="text-lg font-display flex items-center gap-2">
-                {results.savingsValue > 0 ? (
-                  <TrendingDown className="h-5 w-5 text-success" />
+                
+                {formData.shared_power_mode ? (
+                  <div className="space-y-2 max-w-xs">
+                    <Label>Moc umowna [kW]</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={formData.contracted_power_before_kw || ''}
+                      onChange={(e) => handlePowerChange(parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
                 ) : (
-                  <TrendingUp className="h-5 w-5 text-destructive" />
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Moc umowna PRZED [kW]</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={formData.contracted_power_before_kw || ''}
+                        onChange={(e) => handleInputChange('contracted_power_before_kw', parseFloat(e.target.value) || 0)}
+                      />
+                      {validationErrors.contracted_power_before_kw && (
+                        <p className="text-sm text-destructive flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          {validationErrors.contracted_power_before_kw}
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Moc umowna PO [kW]</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={formData.contracted_power_after_kw || ''}
+                        onChange={(e) => handleInputChange('contracted_power_after_kw', parseFloat(e.target.value) || 0)}
+                      />
+                      {validationErrors.contracted_power_after_kw && (
+                        <p className="text-sm text-destructive flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          {validationErrors.contracted_power_after_kw}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 )}
-                Podsumowanie oszczędności
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="text-center p-4 rounded-lg bg-background">
-                  <p className="text-sm text-muted-foreground mb-1">Łączny koszt PRZED</p>
-                  <p className="text-2xl font-bold">{formatCurrency(results.totalCostBefore)}</p>
-                  <p className="text-xs text-muted-foreground">za okres ({periodMonths} mies.)</p>
-                </div>
-                <div className="text-center p-4 rounded-lg bg-background">
-                  <p className="text-sm text-muted-foreground mb-1">Łączny koszt PO</p>
-                  <p className="text-2xl font-bold">{formatCurrency(results.totalCostAfter)}</p>
-                  <p className="text-xs text-muted-foreground">za okres ({periodMonths} mies.)</p>
-                </div>
-                <div className="text-center p-4 rounded-lg bg-background">
-                  <p className="text-sm text-muted-foreground mb-1">Oszczędność</p>
-                  <p className={`text-2xl font-bold ${results.savingsValue > 0 ? 'text-success' : results.savingsValue < 0 ? 'text-destructive' : ''}`}>
-                    {formatCurrency(results.savingsValue)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">za okres ({periodMonths} mies.)</p>
-                </div>
-                <div className="text-center p-4 rounded-lg bg-background">
-                  <p className="text-sm text-muted-foreground mb-1">Oszczędność</p>
-                  <p className={`text-2xl font-bold ${results.savingsValue > 0 ? 'text-success' : results.savingsValue < 0 ? 'text-destructive' : ''}`}>
-                    {formatPercent(results.savingsPercent)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">procentowo</p>
-                </div>
-              </div>
+              </CardContent>
+            </Card>
+          )}
 
-              <div className="mt-6 grid gap-4 sm:grid-cols-3 text-sm">
-                <div className="p-3 rounded-lg bg-background">
-                  <p className="text-muted-foreground">Dystrybucja</p>
-                  <p className="font-medium">{formatCurrency(results.distributionCostBefore)} → {formatCurrency(results.distributionCostAfter)}</p>
-                </div>
-                <div className="p-3 rounded-lg bg-background">
-                  <p className="text-muted-foreground">Energia czynna</p>
-                  <p className="font-medium">{formatCurrency(results.activeEnergyCostBefore)} → {formatCurrency(results.activeEnergyCostAfter)}</p>
-                </div>
-                <div className="p-3 rounded-lg bg-background">
-                  <p className="text-muted-foreground">Opłata handlowa</p>
-                  <p className="font-medium">{formatCurrency(results.handlingFeeBefore)} → {formatCurrency(results.handlingFeeAfter)}</p>
-                </div>
-              </div>
+          {/* Step 4: Before (Current State) */}
+          {currentStep === 'before' && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Stan obecny – Taryfa i zużycie</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Taryfa obecna</Label>
+                      <Select
+                        value={formData.tariff_code_before}
+                        onValueChange={(v) => handleTariffChange('tariff_code_before', v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TARIFF_CODES.map((t) => (
+                            <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Sezon</Label>
+                      <Select
+                        value={formData.season_before || 'ALL'}
+                        onValueChange={(v) => handleInputChange('season_before', v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ALL">Cały rok</SelectItem>
+                          <SelectItem value="SUMMER">Lato</SelectItem>
+                          <SelectItem value="WINTER">Zima</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
 
-              <div className="mt-4 grid gap-4 sm:grid-cols-2 text-sm">
-                <div className="p-3 rounded-lg bg-background">
-                  <p className="text-muted-foreground">Opłata za moc umowną</p>
-                  <p className="font-medium">
-                    {formatCurrency(results.contractedPowerChargeBefore)} → {formatCurrency(results.contractedPowerChargeAfter)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    (stawka mies.: {formatNumber(Number(formData.contracted_power_charge_rate_before))} → {formatNumber(Number(formData.contracted_power_charge_rate_after))} zł/kW)
-                  </p>
-                </div>
-                <div className="p-3 rounded-lg bg-background">
-                  <p className="text-muted-foreground">Energia bierna</p>
-                  <p className="font-medium">
-                    {formatCurrency(results.reactiveEnergyCostBefore)} → {formatCurrency(results.reactiveEnergyCostAfter)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    ({formData.reactive_monthly_mode_before ? 'suma miesięcy' : 'wartość całkowita'} → {formData.reactive_monthly_mode_after ? 'suma miesięcy' : 'wartość całkowita'})
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                  <div className="space-y-3">
+                    <Label className="font-medium">Zużycie energii – Stan obecny [MWh]</Label>
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      {zoneLabelsBefore.map((label, index) => (
+                        <div key={index} className="space-y-2">
+                          <Label className="text-sm text-muted-foreground">{label}</Label>
+                          <Input
+                            type="number"
+                            step="0.0001"
+                            value={Number(formData[`consumption_before_zone${index + 1}_mwh` as keyof EnergyAnalysis]) || ''}
+                            onChange={(e) => handleInputChange(
+                              `consumption_before_zone${index + 1}_mwh` as keyof EnergyAnalysis,
+                              parseFloat(e.target.value) || 0
+                            )}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <RatesInputPanel
+                prefix="before"
+                formData={formData}
+                onInputChange={handleInputChange}
+                zonesCount={zonesCountBefore}
+                resolvedRates={resolvedRatesBefore}
+                onFetchRates={() => handleFetchRates('before')}
+                onResetRates={() => handleResetRates('before')}
+                isFetching={isResolvingRates}
+                isManualMode={isManualModeBefore}
+                setIsManualMode={setIsManualModeBefore}
+                overriddenFields={overriddenBefore}
+                setOverriddenFields={setOverriddenBefore}
+              />
+            </div>
+          )}
+
+          {/* Step 5: After (Proposed State) */}
+          {currentStep === 'after' && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Stan po zmianie – Taryfa rekomendowana</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Taryfa rekomendowana</Label>
+                      <Select
+                        value={formData.tariff_code_after}
+                        onValueChange={(v) => handleTariffChange('tariff_code_after', v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TARIFF_CODES.map((t) => (
+                            <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Sezon</Label>
+                      <Select
+                        value={formData.season_after || 'ALL'}
+                        onValueChange={(v) => handleInputChange('season_after', v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ALL">Cały rok</SelectItem>
+                          <SelectItem value="SUMMER">Lato</SelectItem>
+                          <SelectItem value="WINTER">Zima</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <ConsumptionMapping
+                zonesBefore={zonesCountBefore}
+                zonesAfter={zonesCountAfter}
+                formData={formData}
+                onInputChange={handleInputChange}
+                isAutoMode={isAutoConsumptionMode}
+                setIsAutoMode={setIsAutoConsumptionMode}
+              />
+
+              <RatesInputPanel
+                prefix="after"
+                formData={formData}
+                onInputChange={handleInputChange}
+                zonesCount={zonesCountAfter}
+                resolvedRates={resolvedRatesAfter}
+                onFetchRates={() => handleFetchRates('after')}
+                onResetRates={() => handleResetRates('after')}
+                isFetching={isResolvingRates}
+                isManualMode={isManualModeAfter}
+                setIsManualMode={setIsManualModeAfter}
+                overriddenFields={overriddenAfter}
+                setOverriddenFields={setOverriddenAfter}
+              />
+            </div>
+          )}
+
+          {/* Step 6: Summary */}
+          {currentStep === 'summary' && (
+            <ComparisonSummary
+              costBefore={results.totalCostBefore}
+              costAfter={results.totalCostAfter}
+              periodMonths={periodMonths}
+              consultantNotes={formData.consultant_notes || ''}
+              onNotesChange={(notes) => handleInputChange('consultant_notes', notes)}
+              breakdown={{
+                distributionBefore: results.distributionCostBefore,
+                distributionAfter: results.distributionCostAfter,
+                activeEnergyBefore: results.activeEnergyCostBefore,
+                activeEnergyAfter: results.activeEnergyCostAfter,
+                contractedPowerBefore: results.contractedPowerChargeBefore,
+                contractedPowerAfter: results.contractedPowerChargeAfter,
+                reactiveBefore: results.reactiveEnergyCostBefore,
+                reactiveAfter: results.reactiveEnergyCostAfter,
+                handlingBefore: results.handlingFeeBefore,
+                handlingAfter: results.handlingFeeAfter,
+                capacityBefore: Number(formData.capacity_charge_before) || 0,
+                capacityAfter: Number(formData.capacity_charge_after) || 0,
+              }}
+            />
+          )}
+        </div>
+
+        {/* Navigation */}
+        <div className="flex items-center justify-between mt-8 pt-6 border-t">
+          <Button
+            variant="outline"
+            onClick={goPrev}
+            disabled={!canGoPrev}
+          >
+            <ChevronLeft className="h-4 w-4 mr-2" />
+            Wstecz
+          </Button>
+          
+          <div className="flex items-center gap-2">
+            {currentStep === 'summary' ? (
+              <Button onClick={handleSave} disabled={saveMutation.isPending}>
+                {saveMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Zapisz analizę
+              </Button>
+            ) : (
+              <Button onClick={goNext} disabled={!canGoNext}>
+                Dalej
+                <ChevronRight className="h-4 w-4 ml-2" />
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </AppLayout>

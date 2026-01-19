@@ -26,6 +26,54 @@ export interface ClientProject {
   creator_name?: string;
 }
 
+export interface OsdOperator {
+  id: string;
+  code: string;
+  name: string;
+  region: string | null;
+  created_at: string;
+}
+
+export interface RateCard {
+  id: string;
+  osd_id: string;
+  name: string;
+  valid_from: string;
+  valid_to: string | null;
+  source_document: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RateItem {
+  id: string;
+  rate_card_id: string;
+  tariff_code: string;
+  season: string;
+  rate_type: string;
+  unit: string;
+  value: number;
+  zone_number: number | null;
+  description: string | null;
+  created_at: string;
+}
+
+export interface ResolvedRates {
+  rateCardId: string;
+  rateCardName: string;
+  validFrom: string;
+  validTo: string | null;
+  sourceDocument: string | null;
+  rates: {
+    fixedNetworkRate: number | null;
+    variableRates: { zone: number; rate: number; description: string }[];
+    qualityFee: number | null;
+    subscriptionFee: number | null;
+    capacityFee: number | null;
+    reactiveEnergyRate: number | null;
+  };
+}
+
 export interface EnergyAnalysis {
   id: string;
   client_project_id: string;
@@ -33,15 +81,26 @@ export interface EnergyAnalysis {
   period_from: string | null;
   period_to: string | null;
   
+  // OSD and rates
+  osd_id: string | null;
+  rates_date: string | null;
+  rate_card_id_before: string | null;
+  rate_card_id_after: string | null;
+  rates_overridden_before: Record<string, number>;
+  rates_overridden_after: Record<string, number>;
+  
   // Tariff
   tariff_code_before: string;
   tariff_code_after: string;
   zones_count_before: number;
   zones_count_after: number;
+  season_before: string;
+  season_after: string;
   
   // Contracted power
   contracted_power_before_kw: number;
   contracted_power_after_kw: number;
+  shared_power_mode: boolean;
   
   // Distribution BEFORE
   fixed_distribution_before_total: number;
@@ -50,7 +109,7 @@ export interface EnergyAnalysis {
   variable_distribution_before_zone3_rate: number;
   reactive_energy_cost_before: number;
   capacity_charge_before: number;
-  contracted_power_charge_rate_before: number; // Monthly rate [zł/kW/miesiąc]
+  contracted_power_charge_rate_before: number;
   
   // Reactive energy monthly mode BEFORE
   reactive_monthly_mode_before: boolean;
@@ -74,7 +133,7 @@ export interface EnergyAnalysis {
   variable_distribution_after_zone3_rate: number;
   reactive_energy_cost_after: number;
   capacity_charge_after: number;
-  contracted_power_charge_rate_after: number; // Monthly rate [zł/kW/miesiąc]
+  contracted_power_charge_rate_after: number;
   
   // Reactive energy monthly mode AFTER
   reactive_monthly_mode_after: boolean;
@@ -96,10 +155,20 @@ export interface EnergyAnalysis {
   active_energy_price_before_zone2: number;
   active_energy_price_before_zone3: number;
   
-  // Consumption
+  // Consumption BEFORE (separate for each scenario)
+  consumption_before_zone1_mwh: number;
+  consumption_before_zone2_mwh: number;
+  consumption_before_zone3_mwh: number;
+  
+  // Legacy shared consumption (for backwards compatibility)
   consumption_zone1_mwh: number;
   consumption_zone2_mwh: number;
   consumption_zone3_mwh: number;
+  
+  // Consumption AFTER
+  consumption_after_zone1_mwh: number;
+  consumption_after_zone2_mwh: number;
+  consumption_after_zone3_mwh: number;
   
   // Active energy AFTER
   active_energy_price_after_zone1: number;
@@ -109,6 +178,9 @@ export interface EnergyAnalysis {
   // Handling fee
   handling_fee_before: number;
   handling_fee_after: number;
+  
+  // Consultant notes
+  consultant_notes: string | null;
   
   created_at: string;
   updated_at: string;
