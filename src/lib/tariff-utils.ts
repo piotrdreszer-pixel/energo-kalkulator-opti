@@ -87,11 +87,21 @@ export function validateContractedPower(tariffCode: string, powerKw: number): Po
 export const ZONE_LABELS = {
   1: ['Całodobowa'],
   2: ['Szczyt', 'Poza szczytem'],
-  3: ['Szczyt', 'Strefa pośrednia', 'Dolina'],
+  3: ['Szczyt przedpołudniowy', 'Szczyt popołudniowy', 'Pozostałe godziny doby'],
+} as const;
+
+export const DEFAULT_ZONE_DISTRIBUTION = {
+  1: [100],
+  2: [25, 75],
+  3: [25, 15, 60],
 } as const;
 
 export function getZoneLabels(zonesCount: number): readonly string[] {
   return ZONE_LABELS[zonesCount as keyof typeof ZONE_LABELS] || ZONE_LABELS[1];
+}
+
+export function getDefaultDistribution(zones: number): number[] {
+  return [...(DEFAULT_ZONE_DISTRIBUTION[zones as keyof typeof DEFAULT_ZONE_DISTRIBUTION] || DEFAULT_ZONE_DISTRIBUTION[1])];
 }
 
 // Month labels in Polish
