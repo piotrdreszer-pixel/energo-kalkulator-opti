@@ -85,6 +85,13 @@ export type Database = {
           capacity_charge_after: number | null
           capacity_charge_before: number | null
           client_project_id: string
+          consultant_notes: string | null
+          consumption_after_zone1_mwh: number | null
+          consumption_after_zone2_mwh: number | null
+          consumption_after_zone3_mwh: number | null
+          consumption_before_zone1_mwh: number | null
+          consumption_before_zone2_mwh: number | null
+          consumption_before_zone3_mwh: number | null
           consumption_zone1_mwh: number | null
           consumption_zone2_mwh: number | null
           consumption_zone3_mwh: number | null
@@ -99,8 +106,14 @@ export type Database = {
           handling_fee_before: number | null
           id: string
           name: string
+          osd_id: string | null
           period_from: string | null
           period_to: string | null
+          rate_card_id_after: string | null
+          rate_card_id_before: string | null
+          rates_date: string | null
+          rates_overridden_after: Json | null
+          rates_overridden_before: Json | null
           reactive_energy_after_month_1: number | null
           reactive_energy_after_month_10: number | null
           reactive_energy_after_month_11: number | null
@@ -129,6 +142,9 @@ export type Database = {
           reactive_energy_cost_before: number | null
           reactive_monthly_mode_after: boolean
           reactive_monthly_mode_before: boolean
+          season_after: string | null
+          season_before: string | null
+          shared_power_mode: boolean | null
           tariff_code_after: string
           tariff_code_before: string
           updated_at: string
@@ -151,6 +167,13 @@ export type Database = {
           capacity_charge_after?: number | null
           capacity_charge_before?: number | null
           client_project_id: string
+          consultant_notes?: string | null
+          consumption_after_zone1_mwh?: number | null
+          consumption_after_zone2_mwh?: number | null
+          consumption_after_zone3_mwh?: number | null
+          consumption_before_zone1_mwh?: number | null
+          consumption_before_zone2_mwh?: number | null
+          consumption_before_zone3_mwh?: number | null
           consumption_zone1_mwh?: number | null
           consumption_zone2_mwh?: number | null
           consumption_zone3_mwh?: number | null
@@ -165,8 +188,14 @@ export type Database = {
           handling_fee_before?: number | null
           id?: string
           name?: string
+          osd_id?: string | null
           period_from?: string | null
           period_to?: string | null
+          rate_card_id_after?: string | null
+          rate_card_id_before?: string | null
+          rates_date?: string | null
+          rates_overridden_after?: Json | null
+          rates_overridden_before?: Json | null
           reactive_energy_after_month_1?: number | null
           reactive_energy_after_month_10?: number | null
           reactive_energy_after_month_11?: number | null
@@ -195,6 +224,9 @@ export type Database = {
           reactive_energy_cost_before?: number | null
           reactive_monthly_mode_after?: boolean
           reactive_monthly_mode_before?: boolean
+          season_after?: string | null
+          season_before?: string | null
+          shared_power_mode?: boolean | null
           tariff_code_after?: string
           tariff_code_before?: string
           updated_at?: string
@@ -217,6 +249,13 @@ export type Database = {
           capacity_charge_after?: number | null
           capacity_charge_before?: number | null
           client_project_id?: string
+          consultant_notes?: string | null
+          consumption_after_zone1_mwh?: number | null
+          consumption_after_zone2_mwh?: number | null
+          consumption_after_zone3_mwh?: number | null
+          consumption_before_zone1_mwh?: number | null
+          consumption_before_zone2_mwh?: number | null
+          consumption_before_zone3_mwh?: number | null
           consumption_zone1_mwh?: number | null
           consumption_zone2_mwh?: number | null
           consumption_zone3_mwh?: number | null
@@ -231,8 +270,14 @@ export type Database = {
           handling_fee_before?: number | null
           id?: string
           name?: string
+          osd_id?: string | null
           period_from?: string | null
           period_to?: string | null
+          rate_card_id_after?: string | null
+          rate_card_id_before?: string | null
+          rates_date?: string | null
+          rates_overridden_after?: Json | null
+          rates_overridden_before?: Json | null
           reactive_energy_after_month_1?: number | null
           reactive_energy_after_month_10?: number | null
           reactive_energy_after_month_11?: number | null
@@ -261,6 +306,9 @@ export type Database = {
           reactive_energy_cost_before?: number | null
           reactive_monthly_mode_after?: boolean
           reactive_monthly_mode_before?: boolean
+          season_after?: string | null
+          season_before?: string | null
+          shared_power_mode?: boolean | null
           tariff_code_after?: string
           tariff_code_before?: string
           updated_at?: string
@@ -281,7 +329,52 @@ export type Database = {
             referencedRelation: "client_projects"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "energy_analyses_osd_id_fkey"
+            columns: ["osd_id"]
+            isOneToOne: false
+            referencedRelation: "osd_operators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "energy_analyses_rate_card_id_after_fkey"
+            columns: ["rate_card_id_after"]
+            isOneToOne: false
+            referencedRelation: "rate_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "energy_analyses_rate_card_id_before_fkey"
+            columns: ["rate_card_id_before"]
+            isOneToOne: false
+            referencedRelation: "rate_cards"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      osd_operators: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          name: string
+          region: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          name: string
+          region?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          name?: string
+          region?: string | null
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -312,6 +405,94 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      rate_cards: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          osd_id: string
+          source_document: string | null
+          updated_at: string
+          valid_from: string
+          valid_to: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          osd_id: string
+          source_document?: string | null
+          updated_at?: string
+          valid_from: string
+          valid_to?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          osd_id?: string
+          source_document?: string | null
+          updated_at?: string
+          valid_from?: string
+          valid_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rate_cards_osd_id_fkey"
+            columns: ["osd_id"]
+            isOneToOne: false
+            referencedRelation: "osd_operators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rate_items: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          rate_card_id: string
+          rate_type: string
+          season: string | null
+          tariff_code: string
+          unit: string
+          value: number
+          zone_number: number | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          rate_card_id: string
+          rate_type: string
+          season?: string | null
+          tariff_code: string
+          unit: string
+          value: number
+          zone_number?: number | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          rate_card_id?: string
+          rate_type?: string
+          season?: string | null
+          tariff_code?: string
+          unit?: string
+          value?: number
+          zone_number?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rate_items_rate_card_id_fkey"
+            columns: ["rate_card_id"]
+            isOneToOne: false
+            referencedRelation: "rate_cards"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
