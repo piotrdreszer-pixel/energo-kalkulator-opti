@@ -119,23 +119,27 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
     prefix: p,
     formData: fd,
     onInputChange: onInput,
-    parseLocaleNumber: parseNum,
-    formatDisplayValue: formatVal,
-    isManualMode: manual,
-    resolvedRates: rates,
   }: {
     prefix: ScenarioPrefix;
     formData: Partial<EnergyAnalysis>;
     onInputChange: (field: keyof EnergyAnalysis, value: number | boolean) => void;
-    parseLocaleNumber: (value: string) => number;
-    formatDisplayValue: (value: number | null | undefined) => string;
-    isManualMode: boolean;
-    resolvedRates: ResolvedRates | null;
   }) => {
     const monthlyModeField = p === 'before' ? 'reactive_monthly_mode_before' : 'reactive_monthly_mode_after';
     const totalField = p === 'before' ? 'reactive_energy_cost_before' : 'reactive_energy_cost_after';
     const isMonthlyMode = fd[monthlyModeField] as boolean || false;
     const [isOpen, setIsOpen] = React.useState(false);
+    
+    // Local state for text inputs to allow typing
+    const [totalText, setTotalText] = React.useState<string>('');
+    const [monthTexts, setMonthTexts] = React.useState<Record<number, string>>({});
+
+    // Sync local state with formData when formData changes externally
+    React.useEffect(() => {
+      const val = fd[totalField] as number;
+      if (val !== undefined && val !== null && val !== 0) {
+        setTotalText(String(val));
+      }
+    }, [fd[totalField]]);
 
     const getMonthField = (month: number): keyof EnergyAnalysis => {
       return `reactive_energy_${p}_month_${month}` as keyof EnergyAnalysis;
@@ -145,6 +149,49 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
     const monthlySum = isMonthlyMode
       ? Array.from({ length: 12 }, (_, i) => Number(fd[getMonthField(i + 1)]) || 0).reduce((a, b) => a + b, 0)
       : 0;
+
+    const handleTotalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const text = e.target.value;
+      setTotalText(text);
+      const normalized = text.replace(',', '.');
+      const parsed = parseFloat(normalized);
+      if (!isNaN(parsed)) {
+        onInput(totalField, parsed);
+      } else if (text === '' || text === '-') {
+        onInput(totalField, 0);
+      }
+    };
+
+    const handleMonthChange = (month: number, e: React.ChangeEvent<HTMLInputElement>) => {
+      const text = e.target.value;
+      setMonthTexts(prev => ({ ...prev, [month]: text }));
+      const normalized = text.replace(',', '.');
+      const parsed = parseFloat(normalized);
+      if (!isNaN(parsed)) {
+        onInput(getMonthField(month), parsed);
+      } else if (text === '' || text === '-') {
+        onInput(getMonthField(month), 0);
+      }
+    };
+
+    const getMonthDisplayValue = (month: number): string => {
+      if (monthTexts[month] !== undefined) {
+        return monthTexts[month];
+      }
+      const val = fd[getMonthField(month)] as number;
+      if (val === null || val === undefined || val === 0) return '';
+      return String(val);
+    };
+
+    const getTotalDisplayValue = (): string => {
+      // If user is actively typing, use local state
+      if (totalText !== '') {
+        return totalText;
+      }
+      const val = fd[totalField] as number;
+      if (val === null || val === undefined || val === 0) return '';
+      return String(val);
+    };
 
     return (
       <div className="space-y-3">
@@ -167,9 +214,13 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
             <Input
               type="text"
               inputMode="decimal"
-              value={formatVal(fd[totalField] as number)}
-              onChange={(e) => onInput(totalField, parseNum(e.target.value))}
-              disabled={!manual && rates !== null}
+              value={getTotalDisplayValue()}
+              onChange={handleTotalChange}
+              onBlur={() => {
+                // On blur, sync with formData value
+                const val = fd[totalField] as number;
+                setTotalText(val ? String(val) : '');
+              }}
               placeholder="0.00"
               className="pr-12"
             />
@@ -196,8 +247,13 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
                       <Input
                         type="text"
                         inputMode="decimal"
-                        value={formatVal(fd[getMonthField(idx + 1)] as number)}
-                        onChange={(e) => onInput(getMonthField(idx + 1), parseNum(e.target.value))}
+                        value={getMonthDisplayValue(idx + 1)}
+                        onChange={(e) => handleMonthChange(idx + 1, e)}
+                        onBlur={() => {
+                          // On blur, sync with formData value
+                          const val = fd[getMonthField(idx + 1)] as number;
+                          setMonthTexts(prev => ({ ...prev, [idx + 1]: val ? String(val) : '' }));
+                        }}
                         placeholder="0.00"
                         className="pr-10 h-8 text-sm"
                       />
@@ -356,10 +412,6 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
           prefix={prefix}
           formData={formData}
           onInputChange={handleInputChange}
-          parseLocaleNumber={parseLocaleNumber}
-          formatDisplayValue={formatDisplayValue}
-          isManualMode={isManualMode}
-          resolvedRates={resolvedRates}
         />
 
         {renderInput(
