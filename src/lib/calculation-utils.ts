@@ -83,17 +83,17 @@ export function calculateEnergyCosts(analysis: Partial<EnergyAnalysis>): Calcula
     reactiveEnergyCostAfter = Number(analysis.reactive_energy_cost_after) || 0;
   }
 
-  // Distribution BEFORE
+  // Distribution BEFORE - uses consumption_before_zone*_mwh fields
   const fixedDistBefore = Number(analysis.fixed_distribution_before_total) || 0;
   const varDistBefore1 = (Number(analysis.variable_distribution_before_zone1_rate) || 0) * 
-                          (Number(analysis.consumption_zone1_mwh) || 0) * 1000;
+                          (Number(analysis.consumption_before_zone1_mwh) || 0) * 1000;
   const varDistBefore2 = zonesCountBefore >= 2 
     ? (Number(analysis.variable_distribution_before_zone2_rate) || 0) * 
-      (Number(analysis.consumption_zone2_mwh) || 0) * 1000 
+      (Number(analysis.consumption_before_zone2_mwh) || 0) * 1000 
     : 0;
   const varDistBefore3 = zonesCountBefore >= 3 
     ? (Number(analysis.variable_distribution_before_zone3_rate) || 0) * 
-      (Number(analysis.consumption_zone3_mwh) || 0) * 1000 
+      (Number(analysis.consumption_before_zone3_mwh) || 0) * 1000 
     : 0;
   const capacityBefore = Number(analysis.capacity_charge_before) || 0;
 
@@ -120,14 +120,14 @@ export function calculateEnergyCosts(analysis: Partial<EnergyAnalysis>): Calcula
 
   // Active energy BEFORE - rates are in PLN/MWh, consumption in MWh
   const activeEnergy1Before = (Number(analysis.active_energy_price_before_zone1) || 0) * 
-                               (Number(analysis.consumption_zone1_mwh) || 0);
+                               (Number(analysis.consumption_before_zone1_mwh) || 0);
   const activeEnergy2Before = zonesCountBefore >= 2 
     ? (Number(analysis.active_energy_price_before_zone2) || 0) * 
-      (Number(analysis.consumption_zone2_mwh) || 0)
+      (Number(analysis.consumption_before_zone2_mwh) || 0)
     : 0;
   const activeEnergy3Before = zonesCountBefore >= 3 
     ? (Number(analysis.active_energy_price_before_zone3) || 0) * 
-      (Number(analysis.consumption_zone3_mwh) || 0)
+      (Number(analysis.consumption_before_zone3_mwh) || 0)
     : 0;
 
   const activeEnergyCostBefore = activeEnergy1Before + activeEnergy2Before + activeEnergy3Before;
