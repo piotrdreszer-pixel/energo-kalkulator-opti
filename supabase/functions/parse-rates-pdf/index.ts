@@ -167,7 +167,7 @@ Zwróć wyłącznie tablicę JSON ze stawkami, bez żadnego dodatkowego tekstu.`
           }
         ],
         temperature: 0.1,
-        max_tokens: 8000,
+        max_tokens: 16000,
       }),
     })
 
@@ -198,12 +198,41 @@ Zwróć wyłącznie tablicę JSON ze stawkami, bez żadnego dodatkowego tekstu.`
     const rawContent = aiData.choices?.[0]?.message?.content || ''
 
     console.log('[parse-rates-pdf] AI response received, parsing...')
+    console.log('[parse-rates-pdf] Raw content length:', rawContent.length)
 
     // Extract JSON from the response (handle markdown code blocks)
-    let jsonContent = rawContent
-    const jsonMatch = rawContent.match(/```(?:json)?\s*([\s\S]*?)```/)
-    if (jsonMatch) {
-      jsonContent = jsonMatch[1].trim()
+    let jsonContent = rawContent.trim()
+    
+    // Remove markdown code blocks if present
+    if (jsonContent.startsWith('```')) {
+      // Find the end of the first line (```json or ```)
+      const firstNewline = jsonContent.indexOf('\n')
+      if (firstNewline !== -1) {
+        jsonContent = jsonContent.substring(firstNewline + 1)
+      }
+      // Remove trailing ```
+      const lastBackticks = jsonContent.lastIndexOf('```')
+      if (lastBackticks !== -1) {
+        jsonContent = jsonContent.substring(0, lastBackticks)
+      }
+      jsonContent = jsonContent.trim()
+    }
+
+    // If the JSON appears truncated (doesn't end with ] or }), try to fix it
+    if (!jsonContent.endsWith(']') && !jsonContent.endsWith('}')) {
+      console.log('[parse-rates-pdf] JSON appears truncated, attempting to fix...')
+      // Find the last complete object
+      const lastCompleteObject = jsonContent.lastIndexOf('},')
+      if (lastCompleteObject !== -1) {
+        jsonContent = jsonContent.substring(0, lastCompleteObject + 1) + ']'
+        console.log('[parse-rates-pdf] Truncated JSON fixed by closing array')
+      } else {
+        // Try to find last complete object ending with }
+        const lastObject = jsonContent.lastIndexOf('}')
+        if (lastObject !== -1) {
+          jsonContent = jsonContent.substring(0, lastObject + 1) + ']'
+        }
+      }
     }
 
     let rates: ExtractedRate[] = []
@@ -212,15 +241,35 @@ Zwróć wyłącznie tablicę JSON ze stawkami, bez żadnego dodatkowego tekstu.`
       rates = Array.isArray(parsed) ? parsed : (parsed.rates || [])
     } catch (parseError) {
       console.error('[parse-rates-pdf] JSON parse error:', parseError)
-      console.log('[parse-rates-pdf] Raw content:', rawContent.substring(0, 500))
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Nie udało się sparsować odpowiedzi AI',
-          raw_text: rawContent.substring(0, 1000)
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      console.log('[parse-rates-pdf] Attempted content:', jsonContent.substring(0, 500))
+      
+      // Try alternative: extract individual objects
+      try {
+        const objectMatches = jsonContent.matchAll(/\{[^{}]*"tariff_code"[^{}]*\}/g)
+        const objects: ExtractedRate[] = []
+        for (const match of objectMatches) {
+          try {
+            objects.push(JSON.parse(match[0]))
+          } catch {
+            // Skip invalid objects
+          }
+        }
+        if (objects.length > 0) {
+          console.log(`[parse-rates-pdf] Recovered ${objects.length} rates from partial JSON`)
+          rates = objects
+        } else {
+          throw parseError
+        }
+      } catch {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Nie udało się sparsować odpowiedzi AI',
+            raw_text: rawContent.substring(0, 1000)
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
     }
 
     // Validate and clean rates
