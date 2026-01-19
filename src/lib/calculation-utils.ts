@@ -154,9 +154,9 @@ export function calculateEnergyCosts(analysis: Partial<EnergyAnalysis>): Calcula
 
   const activeEnergyCostAfter = activeEnergy1After + activeEnergy2After + activeEnergy3After;
 
-  // Handling fees
-  const handlingFeeBefore = Number(analysis.handling_fee_before) || 0;
-  const handlingFeeAfter = Number(analysis.handling_fee_after) || 0;
+  // Handling fees - monthly rate scaled to period
+  const handlingFeeBefore = (Number(analysis.handling_fee_before) || 0) * periodMonths;
+  const handlingFeeAfter = (Number(analysis.handling_fee_after) || 0) * periodMonths;
 
   // Totals - include all cost components
   const totalCostBefore = distributionCostBefore + activeEnergyCostBefore + handlingFeeBefore + 

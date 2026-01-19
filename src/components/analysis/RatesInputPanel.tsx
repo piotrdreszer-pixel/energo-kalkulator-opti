@@ -5,8 +5,9 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Download, RotateCcw } from 'lucide-react';
-import { getZoneLabels } from '@/lib/tariff-utils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Loader2, Download, RotateCcw, ChevronDown } from 'lucide-react';
+import { getZoneLabels, MONTH_LABELS } from '@/lib/tariff-utils';
 import type { EnergyAnalysis, ResolvedRates } from '@/types/database';
 
 type ScenarioPrefix = 'before' | 'after';
@@ -14,7 +15,7 @@ type ScenarioPrefix = 'before' | 'after';
 interface RatesInputPanelProps {
   prefix: ScenarioPrefix;
   formData: Partial<EnergyAnalysis>;
-  onInputChange: (field: keyof EnergyAnalysis, value: number) => void;
+  onInputChange: (field: keyof EnergyAnalysis, value: number | boolean) => void;
   zonesCount: number;
   resolvedRates: ResolvedRates | null;
   onFetchRates: () => void;
@@ -55,11 +56,11 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
     return `${base}_${prefix}` as keyof EnergyAnalysis;
   };
 
-  const handleInputChange = (field: keyof EnergyAnalysis, value: number) => {
+  const handleInputChange = (field: keyof EnergyAnalysis, value: number | boolean) => {
     onInputChange(field, value);
     
-    // Track overridden fields
-    if (isManualMode) {
+    // Track overridden fields (only for numeric values)
+    if (isManualMode && typeof value === 'number') {
       setOverriddenFields({
         ...overriddenFields,
         [field]: value,
@@ -112,6 +113,107 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
       </div>
     </div>
   );
+
+  // Reactive Energy Section with monthly breakdown option
+  const ReactiveEnergySection = ({
+    prefix: p,
+    formData: fd,
+    onInputChange: onInput,
+    parseLocaleNumber: parseNum,
+    formatDisplayValue: formatVal,
+    isManualMode: manual,
+    resolvedRates: rates,
+  }: {
+    prefix: ScenarioPrefix;
+    formData: Partial<EnergyAnalysis>;
+    onInputChange: (field: keyof EnergyAnalysis, value: number | boolean) => void;
+    parseLocaleNumber: (value: string) => number;
+    formatDisplayValue: (value: number | null | undefined) => string;
+    isManualMode: boolean;
+    resolvedRates: ResolvedRates | null;
+  }) => {
+    const monthlyModeField = p === 'before' ? 'reactive_monthly_mode_before' : 'reactive_monthly_mode_after';
+    const totalField = p === 'before' ? 'reactive_energy_cost_before' : 'reactive_energy_cost_after';
+    const isMonthlyMode = fd[monthlyModeField] as boolean || false;
+    const [isOpen, setIsOpen] = React.useState(false);
+
+    const getMonthField = (month: number): keyof EnergyAnalysis => {
+      return `reactive_energy_${p}_month_${month}` as keyof EnergyAnalysis;
+    };
+
+    // Calculate sum of monthly values
+    const monthlySum = isMonthlyMode
+      ? Array.from({ length: 12 }, (_, i) => Number(fd[getMonthField(i + 1)]) || 0).reduce((a, b) => a + b, 0)
+      : 0;
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label className="text-sm font-medium">Energia bierna</Label>
+          <div className="flex items-center gap-2">
+            <Label htmlFor={`${monthlyModeField}-switch`} className="text-xs text-muted-foreground cursor-pointer">
+              Rozbij na miesiące
+            </Label>
+            <Switch
+              id={`${monthlyModeField}-switch`}
+              checked={isMonthlyMode}
+              onCheckedChange={(checked) => onInput(monthlyModeField as keyof EnergyAnalysis, checked)}
+            />
+          </div>
+        </div>
+
+        {!isMonthlyMode ? (
+          <div className="relative">
+            <Input
+              type="text"
+              inputMode="decimal"
+              value={formatVal(fd[totalField] as number)}
+              onChange={(e) => onInput(totalField, parseNum(e.target.value))}
+              disabled={!manual && rates !== null}
+              placeholder="0.00"
+              className="pr-12"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+              zł
+            </span>
+          </div>
+        ) : (
+          <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" className="w-full justify-between" size="sm">
+                <span>
+                  Suma: {monthlySum.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
+                </span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-3">
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {MONTH_LABELS.map((label, idx) => (
+                  <div key={idx} className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">{label}</Label>
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        value={formatVal(fd[getMonthField(idx + 1)] as number)}
+                        onChange={(e) => onInput(getMonthField(idx + 1), parseNum(e.target.value))}
+                        placeholder="0.00"
+                        className="pr-10 h-8 text-sm"
+                      />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
+                        zł
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+      </div>
+    );
+  };
 
   return (
     <Card className={isAfter ? 'border-primary/30 bg-primary/5' : ''}>
@@ -247,17 +349,23 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
             `fixed_distribution_${prefix}_total` as keyof EnergyAnalysis,
             'zł'
           )}
-          {renderInput(
-            'Energia bierna',
-            `reactive_energy_cost_${prefix}` as keyof EnergyAnalysis,
-            'zł'
-          )}
         </div>
 
+        {/* Reactive Energy Section with monthly breakdown */}
+        <ReactiveEnergySection
+          prefix={prefix}
+          formData={formData}
+          onInputChange={handleInputChange}
+          parseLocaleNumber={parseLocaleNumber}
+          formatDisplayValue={formatDisplayValue}
+          isManualMode={isManualMode}
+          resolvedRates={resolvedRates}
+        />
+
         {renderInput(
-          'Opłata handlowa za okres',
+          'Opłata handlowa (miesięcznie)',
           `handling_fee_${prefix}` as keyof EnergyAnalysis,
-          'zł'
+          'zł/mies.'
         )}
       </CardContent>
     </Card>
