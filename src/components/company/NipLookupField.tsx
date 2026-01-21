@@ -266,49 +266,37 @@ export function NipLookupField({
 
       {/* Error state */}
       {error && !isLoading && (
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-sm text-destructive">
-            <AlertCircle className="h-4 w-4" />
-            <span>{error.message}</span>
-          </div>
-          {/* Show debug panel in dev mode */}
-          {isDevelopment && error.debug && (
-            <DebugPanel debug={error.debug} />
-          )}
+        <div className="flex items-center gap-2 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4" />
+          <span>{error.message}</span>
         </div>
       )}
 
       {/* Success state with source */}
       {data && !isLoading && !error && (
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-sm text-emerald-600 flex-wrap">
-            <CheckCircle2 className="h-4 w-4" />
-            <span>Dane pobrane pomyślnie</span>
-            <Badge variant="outline" className="text-xs">
-              Źródło: {data.source}
+        <div className="flex items-center gap-2 text-sm text-emerald-600 flex-wrap">
+          <CheckCircle2 className="h-4 w-4" />
+          <span>Dane pobrane pomyślnie</span>
+          <Badge variant="outline" className="text-xs">
+            Źródło: {data.source}
+          </Badge>
+          {data.debug?.cached && (
+            <Badge variant="secondary" className="text-xs">
+              Z cache
             </Badge>
-            {data.debug?.cached && (
-              <Badge variant="secondary" className="text-xs">
-                Z cache
-              </Badge>
-            )}
-            {/* Show restore button if form was manually edited */}
-            {hasManualEdits && onRestoreGusData && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onRestoreGusData}
-                className="h-6 text-xs text-muted-foreground hover:text-foreground"
-              >
-                <RotateCcw className="h-3 w-3 mr-1" />
-                Przywróć dane z GUS
-              </Button>
-            )}
-          </div>
-          {/* Show debug panel in dev mode */}
-          {isDevelopment && data.debug && (
-            <DebugPanel debug={data.debug} />
+          )}
+          {/* Show restore button if form was manually edited */}
+          {hasManualEdits && onRestoreGusData && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onRestoreGusData}
+              className="h-6 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <RotateCcw className="h-3 w-3 mr-1" />
+              Przywróć dane z GUS
+            </Button>
           )}
         </div>
       )}
