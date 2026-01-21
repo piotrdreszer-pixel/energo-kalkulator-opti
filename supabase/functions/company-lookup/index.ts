@@ -139,18 +139,16 @@ function getGusConfig() {
   };
 }
 
-function buildSoapEnvelope(action: string, body: string, sessionId?: string): string {
-  const sidHeader = sessionId 
-    ? `<wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
-         <sid>${sessionId}</sid>
-       </wsse:Security>`
-    : '';
-    
+function buildSoapEnvelope(action: string, body: string, serviceUrl: string): string {
+  // BIR 1.1 uses SOAP 1.2 with specific namespaces
+  // ns = service namespace, dat = data contract namespace
   return `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" 
-               xmlns:ns="http://CIS/BIR/PUBL/2014/07">
-  <soap:Header>
-    ${sidHeader}
+               xmlns:ns="http://CIS/BIR/PUBL/2014/07"
+               xmlns:dat="http://CIS/BIR/PUBL/2014/07/DataContract">
+  <soap:Header xmlns:wsa="http://www.w3.org/2005/08/addressing">
+    <wsa:To>${serviceUrl}</wsa:To>
+    <wsa:Action>http://CIS/BIR/PUBL/2014/07/IUslugaBIRzewnPubl/${action}</wsa:Action>
   </soap:Header>
   <soap:Body>
     ${body}
@@ -168,13 +166,16 @@ async function soapRequest(
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
   
   const headers: Record<string, string> = {
-    'Content-Type': 'application/soap+xml;charset=UTF-8',
-    'SOAPAction': `http://CIS/BIR/PUBL/2014/07/IUslugaBIRzewnPubl/${action}`,
+    'Content-Type': 'application/soap+xml;charset=UTF-8;action="http://CIS/BIR/PUBL/2014/07/IUslugaBIRzewnPubl/' + action + '"',
   };
   
+  // Session ID must be passed as a custom HTTP header 'sid'
   if (sessionId) {
     headers['sid'] = sessionId;
+    console.log(`[GUS SOAP] Using session ID: ${sessionId.substring(0, 8)}...`);
   }
+  
+  console.log(`[GUS SOAP] Request to ${serviceUrl}, action: ${action}`);
   
   try {
     const response = await fetch(serviceUrl, {
@@ -186,6 +187,17 @@ async function soapRequest(
     
     clearTimeout(timeoutId);
     const body = await response.text();
+    
+    console.log(`[GUS SOAP] Response status: ${response.status}, body length: ${body.length}`);
+    
+    // Check for error messages in response
+    if (body.includes('ErrorCode') || body.includes('Fault')) {
+      const errorMatch = body.match(/<ErrorCode>(\d+)<\/ErrorCode>/);
+      const faultMatch = body.match(/<faultstring[^>]*>([^<]+)<\/faultstring>/);
+      if (errorMatch) console.log(`[GUS SOAP] Error code in response: ${errorMatch[1]}`);
+      if (faultMatch) console.log(`[GUS SOAP] Fault: ${faultMatch[1]}`);
+    }
+    
     return { status: response.status, body };
   } catch (error) {
     clearTimeout(timeoutId);
@@ -194,16 +206,17 @@ async function soapRequest(
 }
 
 function extractFromXml(xml: string, tag: string): string | null {
-  // Handle both with and without namespace prefix
+  // Handle various XML patterns including namespaced elements
   const patterns = [
     new RegExp(`<${tag}[^>]*>([^<]*)</${tag}>`, 'i'),
     new RegExp(`<[^:]+:${tag}[^>]*>([^<]*)</[^:]+:${tag}>`, 'i'),
-    new RegExp(`<${tag}><!\\[CDATA\\[([^\\]]*)]\\]></${tag}>`, 'i'),
+    new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([^\\]]*?)\\]\\]></${tag}>`, 'is'),
+    new RegExp(`<[^:]+:${tag}[^>]*><!\\[CDATA\\[([^\\]]*?)\\]\\]></[^:]+:${tag}>`, 'is'),
   ];
   
   for (const pattern of patterns) {
     const match = xml.match(pattern);
-    if (match) return match[1].trim();
+    if (match && match[1]) return match[1].trim();
   }
   return null;
 }
@@ -213,11 +226,22 @@ function extractCData(xml: string): string | null {
   return match ? match[1] : null;
 }
 
+function decodeHtmlEntities(str: string): string {
+  return str
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#xD;/g, '')
+    .replace(/&#x([0-9A-Fa-f]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)));
+}
+
 async function gusLogin(apiKey: string, serviceUrl: string): Promise<string | null> {
   console.log('[GUS SOAP] Attempting login...');
   
   const body = `<ns:Zaloguj><ns:pKluczUzytkownika>${apiKey}</ns:pKluczUzytkownika></ns:Zaloguj>`;
-  const envelope = buildSoapEnvelope('Zaloguj', body);
+  const envelope = buildSoapEnvelope('Zaloguj', body, serviceUrl);
   
   const result = await soapRequest(serviceUrl, 'Zaloguj', envelope);
   
@@ -246,13 +270,14 @@ async function gusSearchByNip(
 ): Promise<string | null> {
   console.log(`[GUS SOAP] Searching for NIP: ${nip}`);
   
+  // Use dat: namespace for data contract parameters as required by BIR 1.1
   const body = `<ns:DaneSzukajPodmioty>
     <ns:pParametryWyszukiwania>
-      <ns:Nip>${nip}</ns:Nip>
+      <dat:Nip>${nip}</dat:Nip>
     </ns:pParametryWyszukiwania>
   </ns:DaneSzukajPodmioty>`;
   
-  const envelope = buildSoapEnvelope('DaneSzukajPodmioty', body, sessionId);
+  const envelope = buildSoapEnvelope('DaneSzukajPodmioty', body, serviceUrl);
   const result = await soapRequest(serviceUrl, 'DaneSzukajPodmioty', envelope, sessionId);
   
   if (result.status !== 200) {
@@ -260,49 +285,72 @@ async function gusSearchByNip(
     return null;
   }
   
-  // Extract result - it's usually in CDATA
-  const searchResult = extractFromXml(result.body, 'DaneSzukajPodmiotyResult');
-  if (!searchResult) {
-    // Try extracting CDATA directly
-    const cdata = extractCData(result.body);
-    if (cdata) return cdata;
-    console.log('[GUS SOAP] No search result in response');
-    return null;
+  // GUS returns results in various formats, try multiple extraction methods
+  // First try extracting the result tag which contains CDATA
+  let searchResult = extractFromXml(result.body, 'DaneSzukajPodmiotyResult');
+  
+  if (searchResult) {
+    console.log(`[GUS SOAP] Found DaneSzukajPodmiotyResult, length: ${searchResult.length}`);
+    return searchResult;
   }
   
-  return searchResult;
+  // Try extracting CDATA directly from the body
+  const cdata = extractCData(result.body);
+  if (cdata && cdata.trim().length > 0) {
+    console.log(`[GUS SOAP] Found CDATA, length: ${cdata.length}`);
+    return cdata;
+  }
+  
+  // Log response for debugging
+  console.log('[GUS SOAP] No search result in response, body sample:', result.body.substring(0, 800));
+  return null;
 }
 
 function parseGusResult(xmlData: string): CompanyData | null {
-  // Parse the XML result from GUS
-  // The result is typically a <root><dane>...</dane></root> structure
+  // Decode HTML entities first (GUS returns encoded XML)
+  const decodedXml = decodeHtmlEntities(xmlData);
   
-  const nip = extractFromXml(xmlData, 'Nip') || '';
-  const companyName = extractFromXml(xmlData, 'Nazwa') || '';
-  const regon = extractFromXml(xmlData, 'Regon') || extractFromXml(xmlData, 'Regon14') || extractFromXml(xmlData, 'Regon9');
+  // Log a sample for debugging
+  console.log('[GUS SOAP] Parsing result, sample:', decodedXml.substring(0, 300));
+  
+  // Try to extract from dane element first
+  const daneMatch = xmlData.match(/<dane>([\s\S]*?)<\/dane>/i);
+  const dataSection = daneMatch ? daneMatch[1] : xmlData;
+  
+  const nip = extractFromXml(dataSection, 'Nip') || '';
+  const companyName = extractFromXml(dataSection, 'Nazwa') || '';
+  const regon = extractFromXml(dataSection, 'Regon') || 
+                extractFromXml(dataSection, 'Regon14') || 
+                extractFromXml(dataSection, 'Regon9') || '';
+  
+  console.log(`[GUS SOAP] Extracted - NIP: "${nip}", Name: "${companyName}", REGON: "${regon}"`);
   
   if (!companyName) {
+    console.log('[GUS SOAP] No company name found, returning null');
     return null;
   }
   
-  const street = extractFromXml(xmlData, 'Ulica') || '';
-  const buildingNum = extractFromXml(xmlData, 'NrNieruchomosci') || '';
-  const apartmentNum = extractFromXml(xmlData, 'NrLokalu') || '';
-  const postalCode = extractFromXml(xmlData, 'KodPocztowy') || '';
-  const city = extractFromXml(xmlData, 'Miejscowosc') || '';
+  const street = extractFromXml(dataSection, 'Ulica') || '';
+  const buildingNum = extractFromXml(dataSection, 'NrNieruchomosci') || '';
+  const apartmentNum = extractFromXml(dataSection, 'NrLokalu') || '';
+  const postalCode = extractFromXml(dataSection, 'KodPocztowy') || '';
+  const city = extractFromXml(dataSection, 'Miejscowosc') || '';
+  const krs = extractFromXml(dataSection, 'Krs') || null;
   
   const addressLine = [street, buildingNum, apartmentNum]
     .filter(Boolean)
     .join(' ')
     .trim();
   
+  console.log('[GUS SOAP] Successfully parsed company data');
+  
   return {
     nip,
     companyName,
     regon: regon || null,
-    krs: null,
+    krs,
     status: 'Aktywny',
-    pkdMain: extractFromXml(xmlData, 'PKD') || null,
+    pkdMain: extractFromXml(dataSection, 'PKD') || null,
     pkdList: [],
     addressLine,
     postalCode,
