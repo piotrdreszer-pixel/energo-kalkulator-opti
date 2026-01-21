@@ -8,8 +8,14 @@ export interface ProviderDebug {
   success: boolean;
 }
 
+export interface GusDebug extends ProviderDebug {
+  mode: "prod" | "test" | null;
+  sessionRenewed: boolean;
+  hasApiKey: boolean;
+}
+
 export interface DebugInfo {
-  gus: ProviderDebug;
+  gus: GusDebug;
   ceidg: ProviderDebug;
   krs: ProviderDebug;
   cached: boolean;
@@ -27,7 +33,7 @@ export interface CompanyData {
   addressLine: string;
   postalCode: string;
   city: string;
-  source: "CEIDG" | "KRS" | "GUS";
+  source: "CEIDG" | "KRS" | "GUS" | "GUS_SOAP";
   debug?: DebugInfo;
 }
 
