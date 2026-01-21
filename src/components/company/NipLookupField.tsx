@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Search, AlertCircle, CheckCircle2, X, ChevronDown, ChevronUp } from 'lucide-react';
-import { useCompanyLookup, CompanyData, DebugInfo } from '@/hooks/useCompanyLookup';
+import { Loader2, Search, AlertCircle, CheckCircle2, X, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
+import { useCompanyLookup, CompanyData, DebugInfo, GusDebug, ProviderDebug } from '@/hooks/useCompanyLookup';
 import { cn } from '@/lib/utils';
 import {
   Collapsible,
@@ -20,12 +20,65 @@ interface NipLookupFieldProps {
   disabled?: boolean;
   autoFetch?: boolean;
   className?: string;
+  /** Called when user wants to restore GUS data after manual edits */
+  onRestoreGusData?: () => void;
+  /** Whether form has been manually edited after GUS fetch */
+  hasManualEdits?: boolean;
 }
 
 // Check if we're in development mode
 const isDevelopment = import.meta.env.DEV || import.meta.env.MODE === 'development';
 
-function ProviderDebugRow({ name, debug }: { name: string; debug: { attempted: boolean; httpStatus: number | null; errorMessage: string | null; durationMs: number | null; success: boolean } }) {
+function GusDebugRow({ debug }: { debug: GusDebug }) {
+  if (!debug.attempted) {
+    return (
+      <div className="flex items-center justify-between text-xs py-1 border-b border-border/50 last:border-0">
+        <span className="font-medium text-muted-foreground">GUS SOAP</span>
+        <span className="text-muted-foreground">—</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1 py-1 border-b border-border/50">
+      <div className="flex items-center justify-between text-xs">
+        <span className="font-medium">GUS SOAP</span>
+        <div className="flex items-center gap-2">
+          {debug.mode && (
+            <Badge variant="outline" className="text-xs">
+              {debug.mode === 'test' ? 'TEST' : 'PROD'}
+            </Badge>
+          )}
+          {debug.success ? (
+            <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+              OK
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-xs bg-destructive/10 text-destructive border-destructive/30">
+              {debug.httpStatus || 'Error'}
+            </Badge>
+          )}
+          {debug.durationMs !== null && (
+            <span className="text-muted-foreground">{debug.durationMs}ms</span>
+          )}
+        </div>
+      </div>
+      {debug.attempted && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          {!debug.hasApiKey && <span className="text-amber-600">Brak klucza API</span>}
+          {debug.sessionRenewed && <span className="text-blue-600">Sesja odnowiona</span>}
+          {debug.errorMessage && !debug.success && (
+            <span className="text-destructive truncate max-w-[180px]" title={debug.errorMessage}>
+              {debug.errorMessage}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProviderDebugRow({ name, debug }: { name: string; debug: ProviderDebug }) {
   if (!debug.attempted) {
     return (
       <div className="flex items-center justify-between text-xs py-1 border-b border-border/50 last:border-0">
@@ -78,7 +131,7 @@ function DebugPanel({ debug }: { debug: DebugInfo }) {
       <CollapsibleContent>
         <div className="mt-2 p-3 bg-muted/50 rounded-md border text-sm">
           <div className="space-y-1">
-            <ProviderDebugRow name="GUS/MF" debug={debug.gus} />
+            <GusDebugRow debug={debug.gus} />
             <ProviderDebugRow name="CEIDG" debug={debug.ceidg} />
             <ProviderDebugRow name="KRS" debug={debug.krs} />
           </div>
@@ -100,6 +153,8 @@ export function NipLookupField({
   disabled = false,
   autoFetch = true,
   className,
+  onRestoreGusData,
+  hasManualEdits = false,
 }: NipLookupFieldProps) {
   const { isLoading, error, data, fetchCompany, fetchWithDebounce, reset, validateNIPFormat } = useCompanyLookup();
   const [localValue, setLocalValue] = useState(value);
@@ -226,7 +281,7 @@ export function NipLookupField({
       {/* Success state with source */}
       {data && !isLoading && !error && (
         <div className="space-y-1">
-          <div className="flex items-center gap-2 text-sm text-emerald-600">
+          <div className="flex items-center gap-2 text-sm text-emerald-600 flex-wrap">
             <CheckCircle2 className="h-4 w-4" />
             <span>Dane pobrane pomyślnie</span>
             <Badge variant="outline" className="text-xs">
@@ -236,6 +291,19 @@ export function NipLookupField({
               <Badge variant="secondary" className="text-xs">
                 Z cache
               </Badge>
+            )}
+            {/* Show restore button if form was manually edited */}
+            {hasManualEdits && onRestoreGusData && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onRestoreGusData}
+                className="h-6 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <RotateCcw className="h-3 w-3 mr-1" />
+                Przywróć dane z GUS
+              </Button>
             )}
           </div>
           {/* Show debug panel in dev mode */}
