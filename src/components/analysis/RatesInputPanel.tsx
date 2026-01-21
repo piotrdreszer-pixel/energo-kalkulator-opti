@@ -257,11 +257,25 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
           onInputChange={handleInputChange}
         />
 
-        {renderInput(
-          'Opłata handlowa (miesięcznie)',
-          `handling_fee_${prefix}` as keyof EnergyAnalysis,
-          'zł/mies.'
-        )}
+        {/* Handling fee - always editable */}
+        <div className="space-y-2">
+          <Label className="text-sm">Opłata handlowa (miesięcznie)</Label>
+          <div className="relative">
+            <Input
+              type="text"
+              inputMode="decimal"
+              value={formatDisplayValue(formData[`handling_fee_${prefix}` as keyof EnergyAnalysis] as number)}
+              onChange={(e) => handleInputChange(
+                `handling_fee_${prefix}` as keyof EnergyAnalysis,
+                parseLocaleNumber(e.target.value)
+              )}
+              className="pr-16"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+              zł/mies.
+            </span>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
