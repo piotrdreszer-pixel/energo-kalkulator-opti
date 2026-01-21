@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.parse-rates-pdf]
 verify_jwt = false
+
+[functions.auth-signup]
+verify_jwt = false

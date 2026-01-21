@@ -96,36 +96,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, name: string) => {
-    // Validate email domain
-    if (!email.endsWith('@optienergia.pl')) {
+    // Client-side validation (first line of defense, but not trusted)
+    if (!email.toLowerCase().endsWith('@optienergia.pl')) {
       return { 
         error: new Error('Rejestracja dostępna wyłącznie dla adresów e-mail w domenie @optienergia.pl.') 
       };
     }
 
     try {
-      const redirectUrl = `${window.location.origin}/verify-email`;
-      
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            name,
-          },
+      // Use server-side Edge Function for signup with domain validation
+      const { data, error } = await supabase.functions.invoke('auth-signup', {
+        body: {
+          email: email.toLowerCase().trim(),
+          password,
+          name: name.trim(),
         },
       });
 
       if (error) {
-        if (error.message.includes('already registered')) {
+        console.error('Signup edge function error:', error);
+        return { error: new Error('Wystąpił błąd podczas rejestracji. Spróbuj ponownie.') };
+      }
+
+      if (data?.error) {
+        // Handle specific error codes
+        if (data.code === 'DOMAIN_NOT_ALLOWED') {
+          return { error: new Error('Rejestracja dostępna wyłącznie dla adresów e-mail w domenie @optienergia.pl.') };
+        }
+        if (data.code === 'USER_EXISTS') {
           return { error: new Error('Ten adres e-mail jest już zarejestrowany.') };
         }
-        return { error };
+        return { error: new Error(data.error) };
       }
 
       return { error: null };
     } catch (error) {
+      console.error('Signup error:', error);
       return { error: error as Error };
     }
   };
