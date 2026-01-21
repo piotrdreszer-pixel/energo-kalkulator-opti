@@ -207,16 +207,18 @@ async function soapRequest(
 
 function extractFromXml(xml: string, tag: string): string | null {
   // Handle various XML patterns including namespaced elements
+  // Use [\s\S]* to match any character including newlines
   const patterns = [
-    new RegExp(`<${tag}[^>]*>([^<]*)</${tag}>`, 'i'),
-    new RegExp(`<[^:]+:${tag}[^>]*>([^<]*)</[^:]+:${tag}>`, 'i'),
-    new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([^\\]]*?)\\]\\]></${tag}>`, 'is'),
-    new RegExp(`<[^:]+:${tag}[^>]*><!\\[CDATA\\[([^\\]]*?)\\]\\]></[^:]+:${tag}>`, 'is'),
+    new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`, 'i'),
+    new RegExp(`<[^:]+:${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</[^:]+:${tag}>`, 'i'),
   ];
   
   for (const pattern of patterns) {
     const match = xml.match(pattern);
-    if (match && match[1]) return match[1].trim();
+    if (match && match[1] !== undefined) {
+      const value = match[1].trim();
+      if (value.length > 0) return value;
+    }
   }
   return null;
 }
@@ -310,32 +312,48 @@ function parseGusResult(xmlData: string): CompanyData | null {
   // Decode HTML entities first (GUS returns encoded XML)
   const decodedXml = decodeHtmlEntities(xmlData);
   
+  // Normalize whitespace - remove carriage returns and extra whitespace
+  const normalizedXml = decodedXml
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n');
+  
   // Log a sample for debugging
-  console.log('[GUS SOAP] Parsing result, sample:', decodedXml.substring(0, 300));
+  console.log('[GUS SOAP] Parsing result, sample:', normalizedXml.substring(0, 300));
   
-  // Try to extract from dane element first
-  const daneMatch = xmlData.match(/<dane>([\s\S]*?)<\/dane>/i);
-  const dataSection = daneMatch ? daneMatch[1] : xmlData;
+  // Try to extract from dane element - use normalized xml
+  const daneMatch = normalizedXml.match(/<dane>([\s\S]*?)<\/dane>/i);
+  const dataSection = daneMatch ? daneMatch[1] : normalizedXml;
   
-  const nip = extractFromXml(dataSection, 'Nip') || '';
-  const companyName = extractFromXml(dataSection, 'Nazwa') || '';
-  const regon = extractFromXml(dataSection, 'Regon') || 
-                extractFromXml(dataSection, 'Regon14') || 
-                extractFromXml(dataSection, 'Regon9') || '';
+  console.log('[GUS SOAP] DataSection found:', daneMatch ? 'yes' : 'no', ', length:', dataSection.length);
+  
+  // Simple direct extraction - search for <Tag>value</Tag> pattern
+  const extractValue = (section: string, tagName: string): string | null => {
+    const regex = new RegExp(`<${tagName}>([^<]*)</${tagName}>`, 'i');
+    const match = section.match(regex);
+    return match ? match[1].trim() : null;
+  };
+  
+  const nip = extractValue(dataSection, 'Nip') || '';
+  const companyName = extractValue(dataSection, 'Nazwa') || '';
+  const regon = extractValue(dataSection, 'Regon') || 
+                extractValue(dataSection, 'Regon14') || 
+                extractValue(dataSection, 'Regon9') || '';
   
   console.log(`[GUS SOAP] Extracted - NIP: "${nip}", Name: "${companyName}", REGON: "${regon}"`);
   
   if (!companyName) {
-    console.log('[GUS SOAP] No company name found, returning null');
+    // Log first few tags found for debugging
+    const tagsFound = dataSection.match(/<([A-Za-z]+)>/g)?.slice(0, 10);
+    console.log('[GUS SOAP] No company name found. Tags in data:', tagsFound?.join(', '));
     return null;
   }
   
-  const street = extractFromXml(dataSection, 'Ulica') || '';
-  const buildingNum = extractFromXml(dataSection, 'NrNieruchomosci') || '';
-  const apartmentNum = extractFromXml(dataSection, 'NrLokalu') || '';
-  const postalCode = extractFromXml(dataSection, 'KodPocztowy') || '';
-  const city = extractFromXml(dataSection, 'Miejscowosc') || '';
-  const krs = extractFromXml(dataSection, 'Krs') || null;
+  const street = extractValue(dataSection, 'Ulica') || '';
+  const buildingNum = extractValue(dataSection, 'NrNieruchomosci') || '';
+  const apartmentNum = extractValue(dataSection, 'NrLokalu') || '';
+  const postalCode = extractValue(dataSection, 'KodPocztowy') || '';
+  const city = extractValue(dataSection, 'Miejscowosc') || '';
+  const krs = extractValue(dataSection, 'Krs') || null;
   
   const addressLine = [street, buildingNum, apartmentNum]
     .filter(Boolean)
@@ -350,7 +368,7 @@ function parseGusResult(xmlData: string): CompanyData | null {
     regon: regon || null,
     krs,
     status: 'Aktywny',
-    pkdMain: extractFromXml(dataSection, 'PKD') || null,
+    pkdMain: extractValue(dataSection, 'PKD') || null,
     pkdList: [],
     addressLine,
     postalCode,
