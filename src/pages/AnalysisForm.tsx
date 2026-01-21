@@ -202,47 +202,42 @@ export default function AnalysisForm() {
     }
   };
 
-  const handlePowerChange = (value: number) => {
-    if (formData.shared_power_mode) {
-      setFormData(prev => ({ 
-        ...prev, 
-        contracted_power_before_kw: value,
-        contracted_power_after_kw: value,
-      }));
-      
-      // Validate power for both tariffs
-      const validationBefore = validateContractedPower(formData.tariff_code_before || 'C11', value);
-      const validationAfter = validateContractedPower(formData.tariff_code_after || 'C11', value);
-      
-      setValidationErrors(prev => {
-        const newErrors = { ...prev };
-        if (!validationBefore.valid) {
-          newErrors.contracted_power_before_kw = validationBefore.error!;
-        } else {
-          delete newErrors.contracted_power_before_kw;
-        }
-        if (!validationAfter.valid) {
-          newErrors.contracted_power_after_kw = validationAfter.error!;
-        } else {
-          delete newErrors.contracted_power_after_kw;
-        }
-        return newErrors;
-      });
-    } else {
-      setFormData(prev => ({ ...prev, contracted_power_before_kw: value }));
-      
-      // Validate power for before tariff only
-      const validation = validateContractedPower(formData.tariff_code_before || 'C11', value);
-      setValidationErrors(prev => {
-        const newErrors = { ...prev };
-        if (!validation.valid) {
-          newErrors.contracted_power_before_kw = validation.error!;
-        } else {
-          delete newErrors.contracted_power_before_kw;
-        }
-        return newErrors;
-      });
-    }
+  const handlePowerChangeBefore = (value: number) => {
+    setFormData(prev => ({ ...prev, contracted_power_before_kw: value }));
+    
+    const validation = validateContractedPower(formData.tariff_code_before || 'C11', value);
+    setValidationErrors(prev => {
+      const newErrors = { ...prev };
+      if (!validation.valid) {
+        newErrors.contracted_power_before_kw = validation.error!;
+      } else {
+        delete newErrors.contracted_power_before_kw;
+      }
+      return newErrors;
+    });
+  };
+
+  const handlePowerChangeAfter = (value: number) => {
+    setFormData(prev => ({ ...prev, contracted_power_after_kw: value }));
+    
+    const validation = validateContractedPower(formData.tariff_code_after || 'C11', value);
+    setValidationErrors(prev => {
+      const newErrors = { ...prev };
+      if (!validation.valid) {
+        newErrors.contracted_power_after_kw = validation.error!;
+      } else {
+        delete newErrors.contracted_power_after_kw;
+      }
+      return newErrors;
+    });
+  };
+
+  const getPowerHint = (tariffCode: string): string => {
+    const isLow = tariffCode.startsWith('C1') || tariffCode.startsWith('B1');
+    const isHigh = tariffCode.startsWith('C2') || tariffCode.startsWith('B2');
+    if (isLow) return 'Dla taryf C1/B1 moc umowna musi być ≤ 40 kW';
+    if (isHigh) return 'Dla taryf C2/B2 moc umowna musi być > 40 kW';
+    return '';
   };
 
   const handleInputChange = useCallback((field: keyof EnergyAnalysis, value: string | number | boolean) => {
@@ -531,89 +526,16 @@ export default function AnalysisForm() {
             </Card>
           )}
 
-          {/* Step 3: Power */}
+          {/* Step 3: Power - Taryfy i moce */}
           {currentStep === 'power' && (
             <Card>
               <CardHeader>
-                <CardTitle>Parametry techniczne</CardTitle>
+                <CardTitle>Taryfy i moce umowne</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex items-center gap-4 pb-4 border-b">
-                  <Switch
-                    id="shared-power"
-                    checked={formData.shared_power_mode}
-                    onCheckedChange={(v) => handleInputChange('shared_power_mode', v)}
-                  />
-                  <Label htmlFor="shared-power">
-                    Wspólna moc umowna dla obu scenariuszy
-                  </Label>
-                </div>
-                
-                {formData.shared_power_mode ? (
-                  <div className="space-y-2 max-w-xs">
-                    <Label>Moc umowna [kW]</Label>
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      value={formData.contracted_power_before_kw || ''}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(',', '.');
-                        handlePowerChange(parseFloat(value) || 0);
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label>Moc umowna PRZED [kW]</Label>
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        value={formData.contracted_power_before_kw || ''}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(',', '.');
-                          handleInputChange('contracted_power_before_kw', parseFloat(value) || 0);
-                        }}
-                      />
-                      {validationErrors.contracted_power_before_kw && (
-                        <p className="text-sm text-destructive flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3" />
-                          {validationErrors.contracted_power_before_kw}
-                        </p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Moc umowna PO [kW]</Label>
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        value={formData.contracted_power_after_kw || ''}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(',', '.');
-                          handleInputChange('contracted_power_after_kw', parseFloat(value) || 0);
-                        }}
-                      />
-                      {validationErrors.contracted_power_after_kw && (
-                        <p className="text-sm text-destructive flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3" />
-                          {validationErrors.contracted_power_after_kw}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Step 4: Before (Current State) */}
-          {currentStep === 'before' && (
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Stan obecny – Taryfa i zużycie</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
+                {/* PRZED */}
+                <div className="p-4 bg-muted/30 rounded-lg space-y-4">
+                  <h3 className="font-semibold text-lg">Stan PRZED</h3>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label>Taryfa obecna</Label>
@@ -632,12 +554,111 @@ export default function AnalysisForm() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Sezon</Label>
+                      <Label>Moc umowna PRZED [kW]</Label>
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        value={formData.contracted_power_before_kw || ''}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(',', '.');
+                          handlePowerChangeBefore(parseFloat(value) || 0);
+                        }}
+                      />
+                      {validationErrors.contracted_power_before_kw ? (
+                        <p className="text-sm text-destructive flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          {validationErrors.contracted_power_before_kw}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          {getPowerHint(formData.tariff_code_before || 'C11')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* PO */}
+                <div className="p-4 bg-primary/5 rounded-lg space-y-4">
+                  <h3 className="font-semibold text-lg">Stan PO</h3>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Taryfa rekomendowana</Label>
+                      <Select
+                        value={formData.tariff_code_after}
+                        onValueChange={(v) => handleTariffChange('tariff_code_after', v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TARIFF_CODES.map((t) => (
+                            <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Moc umowna PO [kW]</Label>
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        value={formData.contracted_power_after_kw || ''}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(',', '.');
+                          handlePowerChangeAfter(parseFloat(value) || 0);
+                        }}
+                      />
+                      {validationErrors.contracted_power_after_kw ? (
+                        <p className="text-sm text-destructive flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          {validationErrors.contracted_power_after_kw}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          {getPowerHint(formData.tariff_code_after || 'C11')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 4: Before (Current State) */}
+          {currentStep === 'before' && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Stan obecny – Zużycie i stawki</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Podsumowanie wybranej taryfy */}
+                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Wybrana taryfa</p>
+                      <p className="font-semibold">{formData.tariff_code_before}</p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <Select
+                        value={formData.tariff_code_before}
+                        onValueChange={(v) => handleTariffChange('tariff_code_before', v)}
+                      >
+                        <SelectTrigger className="w-[120px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TARIFF_CODES.map((t) => (
+                            <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <Select
                         value={formData.season_before || 'ALL'}
                         onValueChange={(v) => handleInputChange('season_before', v)}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="w-[120px]">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -696,17 +717,21 @@ export default function AnalysisForm() {
             <div className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Stan po zmianie – Taryfa rekomendowana</CardTitle>
+                  <CardTitle>Stan po zmianie – Zużycie i stawki</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label>Taryfa rekomendowana</Label>
+                  {/* Podsumowanie wybranej taryfy */}
+                  <div className="flex items-center justify-between p-3 bg-primary/5 rounded-lg">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Wybrana taryfa</p>
+                      <p className="font-semibold">{formData.tariff_code_after}</p>
+                    </div>
+                    <div className="flex items-center gap-4">
                       <Select
                         value={formData.tariff_code_after}
                         onValueChange={(v) => handleTariffChange('tariff_code_after', v)}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="w-[120px]">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -715,14 +740,11 @@ export default function AnalysisForm() {
                           ))}
                         </SelectContent>
                       </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Sezon</Label>
                       <Select
                         value={formData.season_after || 'ALL'}
                         onValueChange={(v) => handleInputChange('season_after', v)}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="w-[120px]">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
