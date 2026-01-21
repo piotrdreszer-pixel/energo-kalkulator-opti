@@ -1,5 +1,21 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 
+export interface ProviderDebug {
+  attempted: boolean;
+  httpStatus: number | null;
+  errorMessage: string | null;
+  durationMs: number | null;
+  success: boolean;
+}
+
+export interface DebugInfo {
+  gus: ProviderDebug;
+  ceidg: ProviderDebug;
+  krs: ProviderDebug;
+  cached: boolean;
+  totalDurationMs: number;
+}
+
 export interface CompanyData {
   nip: string;
   companyName: string;
@@ -12,11 +28,13 @@ export interface CompanyData {
   postalCode: string;
   city: string;
   source: "CEIDG" | "KRS" | "GUS";
+  debug?: DebugInfo;
 }
 
 export interface CompanyLookupError {
-  type: 'INVALID_NIP' | 'NOT_FOUND' | 'RATE_LIMIT' | 'CONNECTION_ERROR';
+  type: 'INVALID_NIP' | 'NOT_FOUND' | 'RATE_LIMIT' | 'CONNECTION_ERROR' | 'PROVIDERS_FAILED';
   message: string;
+  debug?: DebugInfo;
 }
 
 export function useCompanyLookup() {
@@ -71,22 +89,32 @@ export function useCompanyLookup() {
         if (response.status === 400) {
           setError({
             type: 'INVALID_NIP',
-            message: result.details || 'Nieprawidłowy format NIP'
+            message: result.details || 'Nieprawidłowy format NIP',
+            debug: result.debug,
           });
         } else if (response.status === 404) {
           setError({
             type: 'NOT_FOUND',
-            message: 'Nie znaleziono w rejestrach. Uzupełnij dane ręcznie.'
+            message: 'Nie znaleziono w rejestrach. Uzupełnij dane ręcznie.',
+            debug: result.debug,
           });
         } else if (response.status === 429) {
           setError({
             type: 'RATE_LIMIT',
-            message: result.details || 'Zbyt wiele zapytań. Spróbuj za chwilę.'
+            message: result.details || 'Zbyt wiele zapytań. Spróbuj za chwilę.',
+            debug: result.debug,
+          });
+        } else if (response.status === 502) {
+          setError({
+            type: 'PROVIDERS_FAILED',
+            message: 'Błąd pobierania danych – sprawdź konfigurację lub spróbuj ponownie.',
+            debug: result.debug,
           });
         } else {
           setError({
             type: 'CONNECTION_ERROR',
-            message: 'Problem z połączeniem. Spróbuj ponownie.'
+            message: 'Problem z połączeniem. Spróbuj ponownie.',
+            debug: result.debug,
           });
         }
         setData(null);
