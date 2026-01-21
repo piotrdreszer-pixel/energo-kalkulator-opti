@@ -34,6 +34,7 @@ import { calculateEnergyCosts, formatCurrency, formatPercent, formatNumber } fro
 import { ReactiveEnergyInput } from '@/components/analysis/ReactiveEnergyInput';
 import { RatesInputPanel } from '@/components/analysis/RatesInputPanel';
 import { ConsumptionMapping } from '@/components/analysis/ConsumptionMapping';
+import { ConsumptionMappingBefore } from '@/components/analysis/ConsumptionMappingBefore';
 import { ComparisonSummary } from '@/components/analysis/ComparisonSummary';
 import { useOsdOperators } from '@/hooks/useOsdOperators';
 import { useRatesResolver } from '@/hooks/useRatesResolver';
@@ -117,6 +118,9 @@ export default function AnalysisForm() {
   const [overriddenAfter, setOverriddenAfter] = useState<Record<string, number>>({});
   const [isAutoConsumptionMode, setIsAutoConsumptionMode] = useState(true);
   const [zoneDistribution, setZoneDistribution] = useState<number[]>(() => getDefaultDistribution(1));
+  const [isAutoConsumptionModeBefore, setIsAutoConsumptionModeBefore] = useState(true);
+  const [zoneDistributionBefore, setZoneDistributionBefore] = useState<number[]>(() => getDefaultDistribution(1));
+  const [totalConsumptionBefore, setTotalConsumptionBefore] = useState<number>(0);
 
   const { data: osdOperators } = useOsdOperators();
   const { resolveRates, isLoading: isResolvingRates } = useRatesResolver();
@@ -669,31 +673,20 @@ export default function AnalysisForm() {
                       </Select>
                     </div>
                   </div>
-
-                  <div className="space-y-3">
-                    <Label className="font-medium">Zużycie energii – Stan obecny [MWh]</Label>
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      {zoneLabelsBefore.map((label, index) => (
-                        <div key={index} className="space-y-2">
-                          <Label className="text-sm text-muted-foreground">{label}</Label>
-                          <Input
-                            type="text"
-                            inputMode="decimal"
-                            value={String(formData[`consumption_before_zone${index + 1}_mwh` as keyof EnergyAnalysis] || '')}
-                            onChange={(e) => {
-                              const value = e.target.value.replace(',', '.');
-                              handleInputChange(
-                                `consumption_before_zone${index + 1}_mwh` as keyof EnergyAnalysis,
-                                parseFloat(value) || 0
-                              );
-                            }}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
                 </CardContent>
               </Card>
+
+              <ConsumptionMappingBefore
+                zonesCount={zonesCountBefore}
+                formData={formData}
+                onInputChange={handleInputChange}
+                isAutoMode={isAutoConsumptionModeBefore}
+                setIsAutoMode={setIsAutoConsumptionModeBefore}
+                zoneDistribution={zoneDistributionBefore}
+                setZoneDistribution={setZoneDistributionBefore}
+                totalConsumption={totalConsumptionBefore}
+                setTotalConsumption={setTotalConsumptionBefore}
+              />
 
               <RatesInputPanel
                 prefix="before"
