@@ -211,13 +211,16 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
           </div>
         </div>
 
-        <div className="space-y-3">
-          <Label className="text-sm font-medium">Ceny energii czynnej</Label>
+        <div className="space-y-3 p-4 -mx-4 bg-accent/10 border-y border-accent/20">
+          <Label className="text-sm font-semibold text-accent-foreground flex items-center gap-2">
+            <span className="inline-block w-1 h-4 bg-accent rounded-full"></span>
+            Ceny energii czynnej
+          </Label>
           <div className="grid gap-3 sm:grid-cols-3">
             {zoneLabels.map((label, index) => (
               <div key={index} className="space-y-1">
                 <div className="flex items-center gap-1">
-                  <span className="text-xs text-muted-foreground">{label}</span>
+                  <span className="text-xs font-medium text-accent-foreground/80">{label}</span>
                   {isOverridden(`active_energy_price_${prefix}_zone${index + 1}`) && (
                     <Badge variant="outline" className="text-[10px] px-1">!</Badge>
                   )}
@@ -231,7 +234,7 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
                       `active_energy_price_${prefix}_zone${index + 1}` as keyof EnergyAnalysis,
                       parseLocaleNumber(e.target.value)
                     )}
-                    className="pr-14 text-sm"
+                    className="pr-14 text-sm bg-background border-accent/30 focus:border-accent"
                   />
                   <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
                     zł/MWh
