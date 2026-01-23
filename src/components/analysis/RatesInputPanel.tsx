@@ -168,7 +168,7 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
 
         <div className="grid gap-4 sm:grid-cols-2">
           {renderInput(
-            'Opłata stała sieciowa',
+            'Składnik stały stawki sieciowej',
             `contracted_power_charge_rate_${prefix}` as keyof EnergyAnalysis,
             'zł/kW/mies'
           )}
@@ -180,7 +180,7 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
         </div>
 
         <div className="space-y-3">
-          <Label className="text-sm font-medium">Stawki zmienne dystrybucji</Label>
+          <Label className="text-sm font-medium">Składnik zmienny stawki sieciowej</Label>
           <div className="grid gap-3 sm:grid-cols-3">
             {zoneLabels.map((label, index) => (
               <div key={index} className="space-y-1">
