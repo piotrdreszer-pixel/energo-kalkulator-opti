@@ -172,16 +172,16 @@ export default function AnalysisReport() {
                   <td className="border border-border px-4 py-2 font-medium">Dystrybucja</td>
                   <td className="border border-border px-4 py-2 text-right">{formatCurrency(results.distributionCostBefore)}</td>
                   <td className="border border-border px-4 py-2 text-right">{formatCurrency(results.distributionCostAfter)}</td>
-                  <td className={`border border-border px-4 py-2 text-right font-medium ${results.distributionCostBefore - results.distributionCostAfter > 0 ? 'text-success' : 'text-destructive'}`}>
-                    {formatCurrency(results.distributionCostBefore - results.distributionCostAfter)}
+                  <td className={`border border-border px-4 py-2 text-right font-medium ${results.distributionCostBefore - results.distributionCostAfter > 0 ? 'text-success' : results.distributionCostBefore - results.distributionCostAfter < 0 ? 'text-destructive' : ''}`}>
+                    {formatCurrency(Math.abs(results.distributionCostBefore - results.distributionCostAfter))}
                   </td>
                 </tr>
                 <tr className="bg-muted/20">
                   <td className="border border-border px-4 py-2 pl-8 text-muted-foreground">w tym: stałe opłaty</td>
                   <td className="border border-border px-4 py-2 text-right text-muted-foreground">{formatCurrency(Number(analysis.fixed_distribution_before_total))}</td>
                   <td className="border border-border px-4 py-2 text-right text-muted-foreground">{formatCurrency(Number(analysis.fixed_distribution_after_total))}</td>
-                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">
-                    {formatCurrency(Number(analysis.fixed_distribution_before_total) - Number(analysis.fixed_distribution_after_total))}
+                  <td className={`border border-border px-4 py-2 text-right text-muted-foreground ${Number(analysis.fixed_distribution_before_total) - Number(analysis.fixed_distribution_after_total) > 0 ? 'text-success' : Number(analysis.fixed_distribution_before_total) - Number(analysis.fixed_distribution_after_total) < 0 ? 'text-destructive' : ''}`}>
+                    {formatCurrency(Math.abs(Number(analysis.fixed_distribution_before_total) - Number(analysis.fixed_distribution_after_total)))}
                   </td>
                 </tr>
                 <tr className="bg-muted/20">
@@ -190,48 +190,48 @@ export default function AnalysisReport() {
                   </td>
                   <td className="border border-border px-4 py-2 text-right text-muted-foreground">{formatCurrency(results.contractedPowerChargeBefore)}</td>
                   <td className="border border-border px-4 py-2 text-right text-muted-foreground">{formatCurrency(results.contractedPowerChargeAfter)}</td>
-                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">
-                    {formatCurrency(results.contractedPowerChargeBefore - results.contractedPowerChargeAfter)}
+                  <td className={`border border-border px-4 py-2 text-right ${results.contractedPowerChargeBefore - results.contractedPowerChargeAfter > 0 ? 'text-success' : results.contractedPowerChargeBefore - results.contractedPowerChargeAfter < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                    {formatCurrency(Math.abs(results.contractedPowerChargeBefore - results.contractedPowerChargeAfter))}
                   </td>
                 </tr>
                 <tr className="bg-muted/20">
                   <td className="border border-border px-4 py-2 pl-8 text-muted-foreground">w tym: energia bierna</td>
                   <td className="border border-border px-4 py-2 text-right text-muted-foreground">{formatCurrency(results.reactiveEnergyCostBefore)}</td>
                   <td className="border border-border px-4 py-2 text-right text-muted-foreground">{formatCurrency(results.reactiveEnergyCostAfter)}</td>
-                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">
-                    {formatCurrency(results.reactiveEnergyCostBefore - results.reactiveEnergyCostAfter)}
+                  <td className={`border border-border px-4 py-2 text-right ${results.reactiveEnergyCostBefore - results.reactiveEnergyCostAfter > 0 ? 'text-success' : results.reactiveEnergyCostBefore - results.reactiveEnergyCostAfter < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                    {formatCurrency(Math.abs(results.reactiveEnergyCostBefore - results.reactiveEnergyCostAfter))}
                   </td>
                 </tr>
                 <tr className="bg-muted/20">
                   <td className="border border-border px-4 py-2 pl-8 text-muted-foreground">w tym: opłata mocowa</td>
                   <td className="border border-border px-4 py-2 text-right text-muted-foreground">{formatCurrency(Number(analysis.capacity_charge_before))}</td>
                   <td className="border border-border px-4 py-2 text-right text-muted-foreground">{formatCurrency(Number(analysis.capacity_charge_after))}</td>
-                  <td className="border border-border px-4 py-2 text-right text-muted-foreground">
-                    {formatCurrency(Number(analysis.capacity_charge_before) - Number(analysis.capacity_charge_after))}
+                  <td className={`border border-border px-4 py-2 text-right ${Number(analysis.capacity_charge_before) - Number(analysis.capacity_charge_after) > 0 ? 'text-success' : Number(analysis.capacity_charge_before) - Number(analysis.capacity_charge_after) < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                    {formatCurrency(Math.abs(Number(analysis.capacity_charge_before) - Number(analysis.capacity_charge_after)))}
                   </td>
                 </tr>
                 <tr>
                   <td className="border border-border px-4 py-2 font-medium">Energia czynna</td>
                   <td className="border border-border px-4 py-2 text-right">{formatCurrency(results.activeEnergyCostBefore)}</td>
                   <td className="border border-border px-4 py-2 text-right">{formatCurrency(results.activeEnergyCostAfter)}</td>
-                  <td className={`border border-border px-4 py-2 text-right font-medium ${results.activeEnergyCostBefore - results.activeEnergyCostAfter > 0 ? 'text-success' : 'text-destructive'}`}>
-                    {formatCurrency(results.activeEnergyCostBefore - results.activeEnergyCostAfter)}
+                  <td className={`border border-border px-4 py-2 text-right font-medium ${results.activeEnergyCostBefore - results.activeEnergyCostAfter > 0 ? 'text-success' : results.activeEnergyCostBefore - results.activeEnergyCostAfter < 0 ? 'text-destructive' : ''}`}>
+                    {formatCurrency(Math.abs(results.activeEnergyCostBefore - results.activeEnergyCostAfter))}
                   </td>
                 </tr>
                 <tr>
                   <td className="border border-border px-4 py-2 font-medium">Opłata handlowa</td>
                   <td className="border border-border px-4 py-2 text-right">{formatCurrency(results.handlingFeeBefore)}</td>
                   <td className="border border-border px-4 py-2 text-right">{formatCurrency(results.handlingFeeAfter)}</td>
-                  <td className={`border border-border px-4 py-2 text-right font-medium ${results.handlingFeeBefore - results.handlingFeeAfter > 0 ? 'text-success' : 'text-destructive'}`}>
-                    {formatCurrency(results.handlingFeeBefore - results.handlingFeeAfter)}
+                  <td className={`border border-border px-4 py-2 text-right font-medium ${results.handlingFeeBefore - results.handlingFeeAfter > 0 ? 'text-success' : results.handlingFeeBefore - results.handlingFeeAfter < 0 ? 'text-destructive' : ''}`}>
+                    {formatCurrency(Math.abs(results.handlingFeeBefore - results.handlingFeeAfter))}
                   </td>
                 </tr>
                 <tr className="bg-primary/10 font-bold">
                   <td className="border border-border px-4 py-3">RAZEM</td>
                   <td className="border border-border px-4 py-3 text-right">{formatCurrency(results.totalCostBefore)}</td>
                   <td className="border border-border px-4 py-3 text-right">{formatCurrency(results.totalCostAfter)}</td>
-                  <td className={`border border-border px-4 py-3 text-right ${results.savingsValue > 0 ? 'text-success' : 'text-destructive'}`}>
-                    {formatCurrency(results.savingsValue)}
+                  <td className={`border border-border px-4 py-3 text-right ${results.savingsValue > 0 ? 'text-success' : results.savingsValue < 0 ? 'text-destructive' : ''}`}>
+                    {formatCurrency(Math.abs(results.savingsValue))}
                   </td>
                 </tr>
               </tbody>
@@ -294,8 +294,8 @@ export default function AnalysisReport() {
               </div>
               <div className="p-4 bg-background rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Oszczędność</p>
-                <p className={`text-xl font-bold ${results.savingsValue > 0 ? 'text-success' : 'text-destructive'}`}>
-                  {formatCurrency(results.savingsValue)}
+                <p className={`text-xl font-bold ${results.savingsValue > 0 ? 'text-success' : results.savingsValue < 0 ? 'text-destructive' : ''}`}>
+                  {formatCurrency(Math.abs(results.savingsValue))}
                 </p>
                 <p className="text-xs text-muted-foreground">za okres</p>
               </div>

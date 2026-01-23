@@ -61,7 +61,7 @@ export function ComparisonSummary({
           <span className="text-muted-foreground">→</span>
           <span className="w-24 text-right">{formatCurrency(after)}</span>
           <span className={`w-24 text-right font-medium ${getSavingsColor(diff)}`}>
-            {diff > 0 ? '-' : diff < 0 ? '+' : ''}{formatCurrency(Math.abs(diff))}
+            {formatCurrency(Math.abs(diff))}
           </span>
         </div>
       </div>
@@ -145,7 +145,7 @@ export function ComparisonSummary({
               <span className="w-4"></span>
               <span className="w-24 text-right">{formatCurrency(costAfter)}</span>
               <span className={`w-24 text-right ${getSavingsColor(savingsValue)}`}>
-                {savingsValue > 0 ? '-' : savingsValue < 0 ? '+' : ''}{formatCurrency(Math.abs(savingsValue))}
+                {formatCurrency(Math.abs(savingsValue))}
               </span>
             </div>
           </div>
