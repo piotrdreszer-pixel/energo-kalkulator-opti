@@ -247,7 +247,7 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
 
         <div className="grid gap-4 sm:grid-cols-2">
           {renderInput(
-            'Suma opłat stałych za okres',
+            'Suma pozostałych opłat',
             `fixed_distribution_${prefix}_total` as keyof EnergyAnalysis,
             'zł'
           )}
