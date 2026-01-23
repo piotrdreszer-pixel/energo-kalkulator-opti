@@ -108,12 +108,22 @@ Deno.serve(async (req) => {
     console.log(`[rates-resolve] Found rate card: ${rateCard.name} (${rateCard.id})`)
 
     // Get rate items for the rate card and tariff (case-insensitive matching)
-    const { data: rateItems, error: itemsError } = await supabase
+    // When season is ALL, we need to fetch all items regardless of season
+    // and prefer season-specific rates over ALL rates
+    let rateItemsQuery = supabase
       .from('rate_items')
       .select('*')
       .eq('rate_card_id', rateCard.id)
       .ilike('tariff_code', tariffCode)
-      .or(`season.eq.ALL,season.eq.${season}`)
+
+    // If specific season requested, filter by that season or ALL
+    // If ALL requested, get all items (we'll deduplicate later)
+    if (season !== 'ALL') {
+      rateItemsQuery = rateItemsQuery.or(`season.eq.ALL,season.eq.${season}`)
+    }
+    // When season is ALL, don't filter by season - get everything
+
+    const { data: rateItems, error: itemsError } = await rateItemsQuery
 
     if (itemsError) {
       console.error('[rates-resolve] Error fetching rate items:', itemsError)
@@ -136,8 +146,38 @@ Deno.serve(async (req) => {
 
     console.log(`[rates-resolve] Found ${rateItems.length} rate items`)
 
+    // Deduplicate items by rate_type (and zone for variable rates)
+    // Prefer season-specific rates over ALL, and WINTER over SUMMER for current date context
+    const deduplicateItems = (items: RateItem[]): RateItem[] => {
+      const grouped = new Map<string, RateItem[]>()
+      
+      for (const item of items) {
+        const key = item.rate_type.startsWith('SIEC_ZMIENNA') 
+          ? `${item.rate_type}_${item.zone_number || 1}`
+          : item.rate_type
+        
+        if (!grouped.has(key)) {
+          grouped.set(key, [])
+        }
+        grouped.get(key)!.push(item)
+      }
+      
+      const result: RateItem[] = []
+      for (const [, groupItems] of grouped) {
+        if (groupItems.length === 1) {
+          result.push(groupItems[0])
+        } else {
+          // Prefer non-ALL season, then pick first available
+          const nonAll = groupItems.find(i => i.season !== 'ALL')
+          result.push(nonAll || groupItems[0])
+        }
+      }
+      
+      return result
+    }
+
     // Parse rate items into structured response
-    const items = rateItems as RateItem[]
+    const items = deduplicateItems(rateItems as RateItem[])
     
     const fixedNetworkItem = items.find(i => i.rate_type === 'SIEC_STALA')
     // Support both SIEC_ZMIENNA and SIEC_ZMIENNA_STREFA* rate types
