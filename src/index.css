@@ -233,60 +233,82 @@
   }
 }
 
-/* Print styles */
+/* ===========================================
+   PRINT STYLES
+   Chrome + marginesy "Brak" + 100% skalowanie
+   =========================================== */
 @media print {
-  body {
-    font-size: 12px;
-    background: white !important;
+  /* Reset podstawowy */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
+  body {
+    font-size: 11pt;
+    line-height: 1.4;
+    background: white !important;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Ukryj elementy niepotrzebne na wydruku */
   .no-print {
     display: none !important;
   }
 
+  /* Kontrola łamania stron */
   .print-break-before {
     page-break-before: always;
+    break-before: page;
   }
 
   .print-break-after {
     page-break-after: always;
+    break-after: page;
   }
 
   .print-avoid-break {
     page-break-inside: avoid;
+    break-inside: avoid;
   }
 
-  /* Repeating header on each page - fixed positioning */
+  /* =====================
+     STAŁY NAGŁÓWEK NA KAŻDEJ STRONIE
+     ===================== */
   .print-header-fixed {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
+    height: 60px;
     background: white;
-    padding: 12px 24px;
-    border-bottom: 2px solid hsl(var(--primary));
-    z-index: 1000;
-    height: 84px;
+    padding: 8px 20px;
+    border-bottom: 2px solid #1a6b5f;
+    z-index: 9999;
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
     box-sizing: border-box;
   }
 
-  /* Reserve space for the fixed header on EVERY printed page */
-  @page {
-    /* top margin must be >= header height + a bit of breathing room */
-    margin-top: 180px;
-    margin-right: 24px;
-    margin-bottom: 40px;
-    margin-left: 24px;
-  }
-
-  /* Avoid adding extra space only on page 1 (page margins handle all pages) */
-  .print-content {
-    margin-top: 0 !important;
-    padding-top: 0 !important;
-  }
-
-  /* Hide the inline header on print since we have fixed header */
+  /* Ukryj nagłówek inline (na ekranie) na wydruku */
   .print-hide-header {
     display: none !important;
+  }
+
+  /* =====================
+     TREŚĆ RAPORTU
+     Musi mieć padding-top żeby nie nachodzić na stały nagłówek
+     ===================== */
+  .print-content {
+    padding-top: 80px !important;
+    margin-top: 0 !important;
+  }
+
+  /* Każda sekcja po pierwszej stronie też potrzebuje miejsca na nagłówek */
+  .print-content > section,
+  .print-content > footer {
+    page-break-inside: avoid;
   }
 }
