@@ -181,7 +181,16 @@ Deno.serve(async (req) => {
 
     // Convert PDF to base64 for AI processing
     const arrayBuffer = await fileData.arrayBuffer()
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
+    
+    // Convert to base64 in chunks to avoid stack overflow
+    const uint8Array = new Uint8Array(arrayBuffer)
+    const chunkSize = 0x8000 // 32KB chunks
+    const chunks: string[] = []
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      const chunk = uint8Array.subarray(i, i + chunkSize)
+      chunks.push(String.fromCharCode.apply(null, chunk as unknown as number[]))
+    }
+    const base64 = btoa(chunks.join(''))
 
     console.log(`[parse-rates-pdf] File size: ${arrayBuffer.byteLength} bytes`)
 
