@@ -144,10 +144,11 @@ export default function AnalysisReport() {
             </Link>
           </Button>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={handlePrint}>
+            {/* Przycisk Drukuj ukryty na życzenie użytkownika - można przywrócić w razie potrzeby */}
+            {/* <Button variant="outline" onClick={handlePrint}>
               <Printer className="h-4 w-4 mr-2" />
               Drukuj
-            </Button>
+            </Button> */}
             <Button onClick={handleDownloadPdf} disabled={isGeneratingPdf}>
               {isGeneratingPdf ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
