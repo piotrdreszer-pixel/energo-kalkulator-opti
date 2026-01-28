@@ -136,27 +136,37 @@ export default function AnalysisReport() {
       
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      // Calculate image dimensions to fit PDF width with margins
+      const margin = 10; // mm
+      const availableWidth = pdfWidth - (2 * margin);
+      const availableHeight = pdfHeight - (2 * margin);
+      
+      // Scale image to fit width
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      const scaledWidth = availableWidth;
+      const scaledHeight = (imgHeight * availableWidth) / imgWidth;
       
-      // Calculate pages needed
-      const scaledImgHeight = imgHeight * ratio;
-      const pageContentHeight = pdfHeight - 10; // 10mm margin
-      let heightLeft = scaledImgHeight;
-      let position = 5; // 5mm top margin
+      // Calculate number of pages needed
+      const totalPages = Math.ceil(scaledHeight / availableHeight);
       
-      // Add first page
-      pdf.addImage(imgData, 'PNG', imgX, position, imgWidth * ratio, scaledImgHeight);
-      heightLeft -= pageContentHeight;
-      
-      // Add additional pages if needed
-      while (heightLeft > 0) {
-        position = heightLeft - scaledImgHeight + 5;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', imgX, position, imgWidth * ratio, scaledImgHeight);
-        heightLeft -= pageContentHeight;
+      for (let page = 0; page < totalPages; page++) {
+        if (page > 0) {
+          pdf.addPage();
+        }
+        
+        // Calculate Y position to show correct portion of image
+        const yOffset = -(page * availableHeight) + margin;
+        
+        pdf.addImage(
+          imgData, 
+          'PNG', 
+          margin, 
+          yOffset, 
+          scaledWidth, 
+          scaledHeight
+        );
       }
       
       pdf.save(`${pdfTitle}.pdf`);
