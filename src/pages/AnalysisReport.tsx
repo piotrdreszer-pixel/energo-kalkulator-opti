@@ -48,7 +48,7 @@ export default function AnalysisReport() {
     if (project && profile) {
       const nip = project.client_nip || 'brak-NIP';
       const userName = profile.name || 'Nieznany';
-      document.title = `NIP ${nip}_raport Optienergia_${userName}`;
+      document.title = `NIP: ${nip}_raport Optienergia_${userName}`;
     }
     
     // Restore original title on unmount
