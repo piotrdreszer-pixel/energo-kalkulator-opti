@@ -862,6 +862,8 @@ export default function AnalysisForm() {
                 handlingAfter: results.handlingFeeAfter,
                 capacityBefore: results.capacityChargeBefore,
                 capacityAfter: results.capacityChargeAfter,
+                fixedDistributionBefore: Number(formData.fixed_distribution_before_total) || 0,
+                fixedDistributionAfter: Number(formData.fixed_distribution_after_total) || 0,
               }}
             />
           )}
