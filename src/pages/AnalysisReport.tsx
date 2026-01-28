@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Printer, Loader2 } from 'lucide-react';
+import { ArrowLeft, Printer, Loader2, Download } from 'lucide-react';
 import type { EnergyAnalysis, ClientProject } from '@/types/database';
 import { calculateEnergyCosts, formatCurrency, formatPercent, formatNumber } from '@/lib/calculation-utils';
 import { getZoneLabels } from '@/lib/tariff-utils';
@@ -11,10 +11,15 @@ import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import logo from '@/assets/logo.png';
 import { useAuth } from '@/contexts/AuthContext';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+
 export default function AnalysisReport() {
   const { projectId, analysisId } = useParams<{ projectId: string; analysisId: string }>();
   const { profile, user } = useAuth();
   const previousTitleRef = useRef<string>('');
+  const reportContentRef = useRef<HTMLDivElement>(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const { data: project } = useQuery({
     queryKey: ['project', projectId],
@@ -108,6 +113,60 @@ export default function AnalysisReport() {
     window.print();
   };
 
+  const handleDownloadPdf = async () => {
+    if (!reportContentRef.current) return;
+    
+    setIsGeneratingPdf(true);
+    try {
+      const element = reportContentRef.current;
+      
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+      
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      
+      // Calculate pages needed
+      const scaledImgHeight = imgHeight * ratio;
+      const pageContentHeight = pdfHeight - 10; // 10mm margin
+      let heightLeft = scaledImgHeight;
+      let position = 5; // 5mm top margin
+      
+      // Add first page
+      pdf.addImage(imgData, 'PNG', imgX, position, imgWidth * ratio, scaledImgHeight);
+      heightLeft -= pageContentHeight;
+      
+      // Add additional pages if needed
+      while (heightLeft > 0) {
+        position = heightLeft - scaledImgHeight + 5;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', imgX, position, imgWidth * ratio, scaledImgHeight);
+        heightLeft -= pageContentHeight;
+      }
+      
+      pdf.save(`${pdfTitle}.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Print controls */}
@@ -119,15 +178,25 @@ export default function AnalysisReport() {
               Wróć do edycji
             </Link>
           </Button>
-          <Button onClick={handlePrint}>
-            <Printer className="h-4 w-4 mr-2" />
-            Drukuj / Zapisz PDF
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handlePrint}>
+              <Printer className="h-4 w-4 mr-2" />
+              Drukuj
+            </Button>
+            <Button onClick={handleDownloadPdf} disabled={isGeneratingPdf}>
+              {isGeneratingPdf ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              Pobierz PDF
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Report Content */}
-      <div className="max-w-4xl mx-auto px-8 py-8 print:py-4 print:px-6">
+      <div ref={reportContentRef} className="max-w-4xl mx-auto px-8 py-8 print:py-4 print:px-6 bg-white">
         {/* Header */}
         <div className="flex items-center justify-between mb-8 pb-6 border-b-2 border-primary/20">
           <div className="flex items-center gap-3">
