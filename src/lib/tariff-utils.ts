@@ -7,8 +7,6 @@ export const TARIFF_CODES = [
   { code: 'C13', zones: 3, maxPower: 40 },
   // B-tariffs (below 40kW)
   { code: 'B11', zones: 1, maxPower: 40 },
-  { code: 'B12', zones: 2, maxPower: 40 },
-  { code: 'B13', zones: 3, maxPower: 40 },
   // C-tariffs (above 40kW)
   { code: 'C21', zones: 1, minPower: 40 },
   { code: 'C22a', zones: 2, minPower: 40 },
