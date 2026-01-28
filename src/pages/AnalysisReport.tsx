@@ -139,15 +139,16 @@ export default function AnalysisReport() {
           <div className="text-right text-sm text-muted-foreground">
             <p className="font-medium">Raport z analizy</p>
             <p>{format(new Date(), 'd MMMM yyyy', { locale: pl })}</p>
-            <p className="text-xs">Przygotował: {profile?.name || user?.email || 'Nieznany'}{profile?.name && user?.email && ` • ${user.email}`}</p>
+            <p className="text-xs mt-1">Przygotował: {profile?.name || user?.email || 'Nieznany'}</p>
+            {profile?.name && user?.email && <p className="text-xs">{user.email}</p>}
           </div>
         </div>
       </div>
 
       {/* Report Content */}
       <div className="max-w-4xl mx-auto px-8 py-8 print:py-4 print:px-4 print-content">
-        {/* Header - visible in screen and first page */}
-        <div className="flex items-center justify-between mb-8 pb-6 border-b-2 border-primary/20">
+        {/* Header - visible in screen only, hidden on print (replaced by fixed header) */}
+        <div className="flex items-center justify-between mb-8 pb-6 border-b-2 border-primary/20 print-hide-header">
           <div className="flex items-center gap-3">
             <img 
               src={logo} 
