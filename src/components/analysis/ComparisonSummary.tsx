@@ -24,6 +24,8 @@ interface ComparisonSummaryProps {
     handlingAfter: number;
     capacityBefore: number;
     capacityAfter: number;
+    fixedDistributionBefore: number;
+    fixedDistributionAfter: number;
   };
 }
 
@@ -130,12 +132,13 @@ export function ComparisonSummary({
                 <span className="w-24 text-right">Δ</span>
               </div>
             </div>
-            {renderDeltaRow('Dystrybucja sieciowa', breakdown.distributionBefore, breakdown.distributionAfter)}
-            {renderDeltaRow('Energia czynna', breakdown.activeEnergyBefore, breakdown.activeEnergyAfter)}
+            {renderDeltaRow('Składnik zmienny stawki sieciowej', breakdown.distributionBefore, breakdown.distributionAfter)}
             {renderDeltaRow('Opłata za moc umowną', breakdown.contractedPowerBefore, breakdown.contractedPowerAfter)}
             {renderDeltaRow('Opłata mocowa', breakdown.capacityBefore, breakdown.capacityAfter)}
             {renderDeltaRow('Energia bierna', breakdown.reactiveBefore, breakdown.reactiveAfter)}
             {renderDeltaRow('Opłata handlowa', breakdown.handlingBefore, breakdown.handlingAfter)}
+            {renderDeltaRow('Suma pozostałych opłat', breakdown.fixedDistributionBefore, breakdown.fixedDistributionAfter)}
+            {renderDeltaRow('Energia czynna', breakdown.activeEnergyBefore, breakdown.activeEnergyAfter)}
           </div>
           
           <div className="flex items-center justify-between py-3 mt-2 border-t-2 font-bold">
