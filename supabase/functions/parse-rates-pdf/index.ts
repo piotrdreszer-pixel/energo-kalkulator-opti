@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
     }
 
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return new Response(
         JSON.stringify({ success: false, error: 'Brak autoryzacji' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -126,24 +126,29 @@ Deno.serve(async (req) => {
     // Create admin client for storage access
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Create user client for auth check
+    // Create user client for auth check using getClaims for better reliability
     const supabaseUser = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
       global: { headers: { Authorization: authHeader } }
     })
 
-    // Verify user is admin
-    const { data: { user }, error: authError } = await supabaseUser.auth.getUser()
-    if (authError || !user) {
+    // Verify user using getClaims (more reliable than getUser)
+    const token = authHeader.replace('Bearer ', '')
+    const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token)
+    if (claimsError || !claimsData?.claims) {
+      console.error('[parse-rates-pdf] Auth error:', claimsError)
       return new Response(
-        JSON.stringify({ success: false, error: 'Nieautoryzowany użytkownik' }),
+        JSON.stringify({ success: false, error: 'Nieautoryzowany użytkownik - zaloguj się ponownie' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
+    const userId = claimsData.claims.sub as string
+
+    // Verify user is admin
     const { data: roleData } = await supabaseAdmin
       .from('user_roles')
       .select('role')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('role', 'admin')
       .maybeSingle()
 
