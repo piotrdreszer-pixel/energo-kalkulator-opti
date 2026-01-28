@@ -236,6 +236,13 @@
 /* ===========================================
    PRINT STYLES
    =========================================== */
+/* Hide browser's default header and footer (date, title, URL) */
+@page {
+  margin: 10mm;
+  margin-top: 15mm;
+  margin-bottom: 15mm;
+}
+
 @media print {
   * {
     -webkit-print-color-adjust: exact !important;
