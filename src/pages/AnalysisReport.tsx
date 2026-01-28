@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,7 +13,8 @@ import logo from '@/assets/logo.png';
 import { useAuth } from '@/contexts/AuthContext';
 export default function AnalysisReport() {
   const { projectId, analysisId } = useParams<{ projectId: string; analysisId: string }>();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const previousTitleRef = useRef<string>('');
 
   const { data: project } = useQuery({
     queryKey: ['project', projectId],
@@ -43,19 +44,39 @@ export default function AnalysisReport() {
     enabled: !!analysisId,
   });
 
+  const pdfTitle = useMemo(() => {
+    const nip = project?.client_nip?.trim() || 'brak-NIP';
+    const rawName = (profile?.name || user?.email || 'Nieznany')
+      .toString()
+      .trim();
+    // Friendly filename safety: remove filesystem-invalid characters
+    const safeName = rawName.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+    return `NIP: ${nip}_raport Optienergia_${safeName}`;
+  }, [project?.client_nip, profile?.name, user?.email]);
+
   // Set dynamic document title for PDF filename
   useEffect(() => {
-    if (project && profile) {
-      const nip = project.client_nip || 'brak-NIP';
-      const userName = profile.name || 'Nieznany';
-      document.title = `NIP: ${nip}_raport Optienergia_${userName}`;
-    }
-    
-    // Restore original title on unmount
-    return () => {
-      document.title = 'Optienergia Kalkulator';
+    // ustawiaj tytuł gdy tylko mamy NIP (nazwa użytkownika ma fallback)
+    if (project) document.title = pdfTitle;
+  }, [project, pdfTitle]);
+
+  // Upewnij się, że przeglądarka użyje aktualnego tytułu jako nazwy PDF (Chrome/Edge)
+  useEffect(() => {
+    const handleBeforePrint = () => {
+      previousTitleRef.current = document.title;
+      if (project) document.title = pdfTitle;
     };
-  }, [project, profile]);
+    const handleAfterPrint = () => {
+      if (previousTitleRef.current) document.title = previousTitleRef.current;
+    };
+
+    window.addEventListener('beforeprint', handleBeforePrint);
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => {
+      window.removeEventListener('beforeprint', handleBeforePrint);
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
+  }, [project, pdfTitle]);
 
 
   if (isLoading) {
