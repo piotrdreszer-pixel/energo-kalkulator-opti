@@ -147,8 +147,9 @@ Deno.serve(async (req) => {
     console.log(`[rates-resolve] Found ${rateItems.length} rate items`)
 
     // Deduplicate items by rate_type (and zone for variable rates)
-    // Prefer season-specific rates over ALL, and WINTER over SUMMER for current date context
-    const deduplicateItems = (items: RateItem[]): RateItem[] => {
+    // When season=ALL is explicitly requested, prefer ALL rates
+    // When a specific season is requested, prefer that season over ALL
+    const deduplicateItems = (items: RateItem[], requestedSeason: string): RateItem[] => {
       const grouped = new Map<string, RateItem[]>()
       
       for (const item of items) {
@@ -167,9 +168,15 @@ Deno.serve(async (req) => {
         if (groupItems.length === 1) {
           result.push(groupItems[0])
         } else {
-          // Prefer non-ALL season, then pick first available
-          const nonAll = groupItems.find(i => i.season !== 'ALL')
-          result.push(nonAll || groupItems[0])
+          if (requestedSeason === 'ALL') {
+            // When ALL is requested, prefer ALL rates if available
+            const allSeason = groupItems.find(i => i.season === 'ALL')
+            result.push(allSeason || groupItems[0])
+          } else {
+            // When specific season requested, prefer that season over ALL
+            const specificSeason = groupItems.find(i => i.season === requestedSeason)
+            result.push(specificSeason || groupItems[0])
+          }
         }
       }
       
@@ -177,7 +184,7 @@ Deno.serve(async (req) => {
     }
 
     // Parse rate items into structured response
-    const items = deduplicateItems(rateItems as RateItem[])
+    const items = deduplicateItems(rateItems as RateItem[], season)
     
     const fixedNetworkItem = items.find(i => i.rate_type === 'SIEC_STALA')
     // Support both SIEC_ZMIENNA and SIEC_ZMIENNA_STREFA* rate types
