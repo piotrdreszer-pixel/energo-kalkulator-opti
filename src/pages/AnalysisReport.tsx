@@ -138,8 +138,10 @@ export default function AnalysisReport() {
             />
           </div>
           <div className="text-right text-sm text-muted-foreground">
-            <p>Raport analizy oszczędności energii</p>
+            <p>Raport z analizy</p>
             <p className="font-medium">{format(new Date(), 'd MMMM yyyy', { locale: pl })}</p>
+            <p className="mt-1">Przygotował: {profile?.name || user?.email || 'Nieznany'}</p>
+            {profile?.name && user?.email && <p className="text-xs">{user.email}</p>}
           </div>
         </div>
 
@@ -315,7 +317,7 @@ export default function AnalysisReport() {
         {/* Summary Box */}
         <section className="print-avoid-break">
           <div className="p-6 bg-gradient-to-r from-primary/10 to-accent/10 rounded-xl border-2 border-primary/20">
-            <h2 className="text-xl font-display font-bold mb-4 text-center">Podsumowanie oszczędności</h2>
+            <h2 className="text-xl font-display font-bold mb-4 text-center">Podsumowanie</h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
               <div className="p-4 bg-background rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Koszt PRZED</p>
@@ -351,6 +353,11 @@ export default function AnalysisReport() {
             <img src={logo} alt="Optienergia" className="h-6 w-auto" />
             <span>• {format(new Date(), 'd MMMM yyyy, HH:mm', { locale: pl })}</span>
           </div>
+          <p className="mb-1">
+            <a href="https://www.optienergia.pl" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+              www.optienergia.pl
+            </a>
+          </p>
           <p>Niniejszy dokument ma charakter informacyjny i nie stanowi oferty handlowej.</p>
         </footer>
       </div>
