@@ -255,4 +255,33 @@
   .print-avoid-break {
     page-break-inside: avoid;
   }
+
+  /* Repeating header on each page */
+  .print-header {
+    position: running(reportHeader);
+  }
+
+  @page {
+    margin-top: 100px;
+    margin-bottom: 40px;
+    @top-center {
+      content: element(reportHeader);
+    }
+  }
+
+  /* Fallback for browsers that don't support running headers */
+  .print-header-fixed {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    padding: 16px 32px;
+    border-bottom: 2px solid hsl(174, 62%, 25%);
+    z-index: 1000;
+  }
+
+  .print-content {
+    margin-top: 0;
+  }
 }
