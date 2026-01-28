@@ -126,27 +126,10 @@ export default function AnalysisReport() {
         </div>
       </div>
 
-      {/* Fixed header for print - repeats on each page */}
-      <div className="hidden print:flex print-header-fixed">
-        <div className="flex items-center gap-2">
-          <img 
-            src={logo} 
-            alt="Optienergia" 
-            className="h-8 w-auto"
-          />
-        </div>
-        <div className="text-right text-xs leading-tight">
-          <p className="font-semibold text-sm">Raport z analizy</p>
-          <p>{format(new Date(), 'd MMMM yyyy', { locale: pl })}</p>
-          <p>Przygotował: {profile?.name || user?.email || 'Nieznany'}</p>
-          {profile?.name && user?.email && <p>{user.email}</p>}
-        </div>
-      </div>
-
       {/* Report Content */}
-      <div className="max-w-4xl mx-auto px-8 py-8 print:py-2 print:px-6 print-content">
-        {/* Header - visible in screen only, hidden on print (replaced by fixed header) */}
-        <div className="flex items-center justify-between mb-8 pb-6 border-b-2 border-primary/20 print-hide-header">
+      <div className="max-w-4xl mx-auto px-8 py-8 print:py-4 print:px-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8 pb-6 border-b-2 border-primary/20">
           <div className="flex items-center gap-3">
             <img 
               src={logo} 

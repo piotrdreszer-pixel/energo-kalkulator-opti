@@ -235,10 +235,8 @@
 
 /* ===========================================
    PRINT STYLES
-   Chrome + marginesy "Brak" + 100% skalowanie
    =========================================== */
 @media print {
-  /* Reset podstawowy */
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
@@ -252,12 +250,10 @@
     padding: 0;
   }
 
-  /* Ukryj elementy niepotrzebne na wydruku */
   .no-print {
     display: none !important;
   }
 
-  /* Kontrola łamania stron */
   .print-break-before {
     page-break-before: always;
     break-before: page;
@@ -271,44 +267,5 @@
   .print-avoid-break {
     page-break-inside: avoid;
     break-inside: avoid;
-  }
-
-  /* =====================
-     STAŁY NAGŁÓWEK NA KAŻDEJ STRONIE
-     ===================== */
-  .print-header-fixed {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 60px;
-    background: white;
-    padding: 8px 20px;
-    border-bottom: 2px solid #1a6b5f;
-    z-index: 9999;
-    display: flex !important;
-    align-items: center;
-    justify-content: space-between;
-    box-sizing: border-box;
-  }
-
-  /* Ukryj nagłówek inline (na ekranie) na wydruku */
-  .print-hide-header {
-    display: none !important;
-  }
-
-  /* =====================
-     TREŚĆ RAPORTU
-     Musi mieć padding-top żeby nie nachodzić na stały nagłówek
-     ===================== */
-  .print-content {
-    padding-top: 80px !important;
-    margin-top: 0 !important;
-  }
-
-  /* Każda sekcja po pierwszej stronie też potrzebuje miejsca na nagłówek */
-  .print-content > section,
-  .print-content > footer {
-    page-break-inside: avoid;
   }
 }
