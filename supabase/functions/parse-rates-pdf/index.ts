@@ -277,58 +277,103 @@ Zwróć wyłącznie tablicę JSON ze stawkami w opisanym formacie.`
 
     console.log('[parse-rates-pdf] Calling AI gateway with specialized prompt...')
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-pro',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: userPrompt },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: `data:application/pdf;base64,${base64}`
+    // Helper function to call AI with retry logic
+    async function callAIWithRetry(maxRetries = 2): Promise<{ success: boolean; data?: any; error?: string }> {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`[parse-rates-pdf] AI attempt ${attempt}/${maxRetries}`)
+          
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 180000) // 3 minute timeout
+          
+          const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${lovableApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            signal: controller.signal,
+            body: JSON.stringify({
+              model: 'google/gemini-2.5-pro',
+              messages: [
+                { role: 'system', content: systemPrompt },
+                {
+                  role: 'user',
+                  content: [
+                    { type: 'text', text: userPrompt },
+                    {
+                      type: 'image_url',
+                      image_url: {
+                        url: `data:application/pdf;base64,${base64}`
+                      }
+                    }
+                  ]
                 }
-              }
-            ]
+              ],
+              temperature: 0.1,
+              max_tokens: 32000,
+            }),
+          })
+          
+          clearTimeout(timeoutId)
+
+          if (!aiResponse.ok) {
+            const errorText = await aiResponse.text()
+            console.error('[parse-rates-pdf] AI error:', aiResponse.status, errorText)
+
+            if (aiResponse.status === 429) {
+              return { success: false, error: 'Przekroczono limit zapytań AI. Spróbuj ponownie za chwilę.' }
+            }
+            if (aiResponse.status === 402) {
+              return { success: false, error: 'Brak środków na AI. Doładuj konto.' }
+            }
+            
+            // Retry on server errors
+            if (aiResponse.status >= 500 && attempt < maxRetries) {
+              console.log(`[parse-rates-pdf] Server error, retrying in 2s...`)
+              await new Promise(r => setTimeout(r, 2000))
+              continue
+            }
+
+            return { success: false, error: 'Błąd podczas analizy AI' }
           }
-        ],
-        temperature: 0.1,
-        max_tokens: 32000,
-      }),
-    })
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text()
-      console.error('[parse-rates-pdf] AI error:', aiResponse.status, errorText)
-
-      if (aiResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Przekroczono limit zapytań AI. Spróbuj ponownie za chwilę.' }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+          const responseText = await aiResponse.text()
+          const aiData = JSON.parse(responseText)
+          return { success: true, data: aiData }
+          
+        } catch (error) {
+          console.error(`[parse-rates-pdf] Attempt ${attempt} failed:`, error)
+          
+          if (error instanceof Error) {
+            // Connection/timeout errors - retry
+            if (error.name === 'AbortError' || error.message.includes('connection') || error.message.includes('body')) {
+              if (attempt < maxRetries) {
+                console.log(`[parse-rates-pdf] Connection error, retrying in 3s...`)
+                await new Promise(r => setTimeout(r, 3000))
+                continue
+              }
+              return { success: false, error: 'Przekroczono czas oczekiwania na odpowiedź AI. Spróbuj ponownie.' }
+            }
+          }
+          
+          return { success: false, error: error instanceof Error ? error.message : 'Nieznany błąd AI' }
+        }
       }
-      if (aiResponse.status === 402) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Brak środków na AI. Doładuj konto.' }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
+      
+      return { success: false, error: 'Nie udało się połączyć z AI po kilku próbach' }
+    }
 
+    const aiResult = await callAIWithRetry(2)
+    
+    if (!aiResult.success || !aiResult.data) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Błąd podczas analizy AI', requiresManualMapping: true }),
+        JSON.stringify({ success: false, error: aiResult.error || 'Błąd AI', requiresManualMapping: true }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const aiData = await aiResponse.json()
+    const aiData = aiResult.data
     const rawContent = aiData.choices?.[0]?.message?.content || ''
 
     console.log('[parse-rates-pdf] AI response received, parsing...')
