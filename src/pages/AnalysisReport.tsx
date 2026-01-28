@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,9 +10,10 @@ import { getZoneLabels } from '@/lib/tariff-utils';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import logo from '@/assets/logo.png';
-
+import { useAuth } from '@/contexts/AuthContext';
 export default function AnalysisReport() {
   const { projectId, analysisId } = useParams<{ projectId: string; analysisId: string }>();
+  const { profile } = useAuth();
 
   const { data: project } = useQuery({
     queryKey: ['project', projectId],
@@ -41,6 +42,21 @@ export default function AnalysisReport() {
     },
     enabled: !!analysisId,
   });
+
+  // Set dynamic document title for PDF filename
+  useEffect(() => {
+    if (project && profile) {
+      const nip = project.client_nip || 'brak-NIP';
+      const userName = profile.name || 'Nieznany';
+      document.title = `NIP ${nip}_raport Optienergia_${userName}`;
+    }
+    
+    // Restore original title on unmount
+    return () => {
+      document.title = 'Optienergia Kalkulator';
+    };
+  }, [project, profile]);
+
 
   if (isLoading) {
     return (
