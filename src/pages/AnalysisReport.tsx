@@ -169,6 +169,14 @@ export default function AnalysisReport() {
               </thead>
               <tbody>
                 <tr>
+                  <td className="border border-border px-4 py-2 font-medium">Energia czynna</td>
+                  <td className="border border-border px-4 py-2 text-right">{formatCurrency(results.activeEnergyCostBefore)}</td>
+                  <td className="border border-border px-4 py-2 text-right">{formatCurrency(results.activeEnergyCostAfter)}</td>
+                  <td className={`border border-border px-4 py-2 text-right font-medium ${results.activeEnergyCostBefore - results.activeEnergyCostAfter > 0 ? 'text-success' : results.activeEnergyCostBefore - results.activeEnergyCostAfter < 0 ? 'text-destructive' : ''}`}>
+                    {formatCurrency(Math.abs(results.activeEnergyCostBefore - results.activeEnergyCostAfter))}
+                  </td>
+                </tr>
+                <tr>
                   <td className="border border-border px-4 py-2 font-medium">Składnik zmienny stawki sieciowej</td>
                   <td className="border border-border px-4 py-2 text-right">{formatCurrency(results.distributionCostBefore)}</td>
                   <td className="border border-border px-4 py-2 text-right">{formatCurrency(results.distributionCostAfter)}</td>
@@ -214,14 +222,6 @@ export default function AnalysisReport() {
                   <td className="border border-border px-4 py-2 text-right">{formatCurrency(Number(analysis.fixed_distribution_after_total))}</td>
                   <td className={`border border-border px-4 py-2 text-right font-medium ${Number(analysis.fixed_distribution_before_total) - Number(analysis.fixed_distribution_after_total) > 0 ? 'text-success' : Number(analysis.fixed_distribution_before_total) - Number(analysis.fixed_distribution_after_total) < 0 ? 'text-destructive' : ''}`}>
                     {formatCurrency(Math.abs(Number(analysis.fixed_distribution_before_total) - Number(analysis.fixed_distribution_after_total)))}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="border border-border px-4 py-2 font-medium">Energia czynna</td>
-                  <td className="border border-border px-4 py-2 text-right">{formatCurrency(results.activeEnergyCostBefore)}</td>
-                  <td className="border border-border px-4 py-2 text-right">{formatCurrency(results.activeEnergyCostAfter)}</td>
-                  <td className={`border border-border px-4 py-2 text-right font-medium ${results.activeEnergyCostBefore - results.activeEnergyCostAfter > 0 ? 'text-success' : results.activeEnergyCostBefore - results.activeEnergyCostAfter < 0 ? 'text-destructive' : ''}`}>
-                    {formatCurrency(Math.abs(results.activeEnergyCostBefore - results.activeEnergyCostAfter))}
                   </td>
                 </tr>
                 <tr className="bg-primary/10 font-bold">
