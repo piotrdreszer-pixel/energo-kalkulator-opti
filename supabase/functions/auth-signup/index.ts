@@ -92,13 +92,15 @@ serve(async (req) => {
     // Get the origin for redirect URL
     const origin = req.headers.get('origin') || 'https://energo-kalkulator-opti.lovable.app';
 
-    // Create the user with admin client
-    const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    // Create the user with signUp (requires email confirmation)
+    const { data, error } = await supabaseAdmin.auth.signUp({
       email: normalizedEmail,
       password: password,
-      email_confirm: true, // Auto-confirm since we validated the domain
-      user_metadata: {
-        name: name.trim()
+      options: {
+        emailRedirectTo: `${origin}/verify-email`,
+        data: {
+          name: name.trim()
+        }
       }
     });
 
@@ -136,7 +138,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true,
-        message: 'Konto zostało utworzone. Możesz się teraz zalogować.',
+        message: 'Konto zostało utworzone. Sprawdź swoją skrzynkę e-mail i kliknij link aktywacyjny, aby móc się zalogować.',
+        requiresEmailConfirmation: true,
         user: {
           id: data.user?.id,
           email: data.user?.email
