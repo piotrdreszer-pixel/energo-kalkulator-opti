@@ -11,8 +11,7 @@ import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import logo from '@/assets/logo.png';
 import { useAuth } from '@/contexts/AuthContext';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+import { exportElementToPdf } from '@/lib/pdf-export';
 
 export default function AnalysisReport() {
   const { projectId, analysisId } = useParams<{ projectId: string; analysisId: string }>();
@@ -118,81 +117,14 @@ export default function AnalysisReport() {
     
     setIsGeneratingPdf(true);
     try {
-      const element = reportContentRef.current;
-      
-      const canvas = await html2canvas(element, {
+      await exportElementToPdf(reportContentRef.current, {
+        filename: pdfTitle,
+        marginMm: 10,
         scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
+        // Kluczowe: nie dziel sekcji oznaczonych jako print-avoid-break (m.in. Podsumowanie)
+        avoidBreakSelector: '.print-avoid-break',
+        minSliceDomPx: 200,
       });
-      
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      });
-      
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      
-      // --- Robust pagination: slice the rendered canvas into page-sized chunks ---
-      // Using a single tall image with negative Y offsets often causes duplicated/overlapped rendering
-      // in some PDF viewers. Slicing avoids that entirely.
-      const margin = 10; // mm
-      const availableWidth = pdfWidth - 2 * margin;
-      const availableHeight = pdfHeight - 2 * margin;
-
-      // When we fit the image to availableWidth, determine how many source pixels fit into one page height.
-      // pxPerMm = canvas.width / availableWidth
-      // pageHeightPx = availableHeight * pxPerMm
-      const pageHeightPx = Math.floor((canvas.width * availableHeight) / availableWidth);
-
-      const sourceWidthPx = canvas.width;
-      const sourceHeightPx = canvas.height;
-
-      const scratch = document.createElement('canvas');
-      const scratchCtx = scratch.getContext('2d');
-      if (!scratchCtx) throw new Error('Nie udało się utworzyć kontekstu canvas dla PDF');
-
-      scratch.width = sourceWidthPx;
-
-      let y = 0;
-      let pageIndex = 0;
-
-      while (y < sourceHeightPx) {
-        const sliceHeightPx = Math.min(pageHeightPx, sourceHeightPx - y);
-        scratch.height = sliceHeightPx;
-
-        // White background to avoid transparency issues
-        scratchCtx.setTransform(1, 0, 0, 1, 0, 0);
-        scratchCtx.clearRect(0, 0, scratch.width, scratch.height);
-        scratchCtx.fillStyle = '#ffffff';
-        scratchCtx.fillRect(0, 0, scratch.width, scratch.height);
-
-        scratchCtx.drawImage(
-          canvas,
-          0,
-          y,
-          sourceWidthPx,
-          sliceHeightPx,
-          0,
-          0,
-          sourceWidthPx,
-          sliceHeightPx
-        );
-
-        const imgData = scratch.toDataURL('image/png');
-        const sliceHeightMm = (sliceHeightPx * availableWidth) / sourceWidthPx;
-
-        if (pageIndex > 0) pdf.addPage();
-        pdf.addImage(imgData, 'PNG', margin, margin, availableWidth, sliceHeightMm);
-
-        y += sliceHeightPx;
-        pageIndex += 1;
-      }
-      
-      pdf.save(`${pdfTitle}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
     } finally {
