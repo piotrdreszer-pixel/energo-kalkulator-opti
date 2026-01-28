@@ -127,7 +127,6 @@ export default function AnalysisReport() {
         backgroundColor: '#ffffff',
       });
       
-      const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
@@ -137,36 +136,60 @@ export default function AnalysisReport() {
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
       
-      // Calculate image dimensions to fit PDF width with margins
+      // --- Robust pagination: slice the rendered canvas into page-sized chunks ---
+      // Using a single tall image with negative Y offsets often causes duplicated/overlapped rendering
+      // in some PDF viewers. Slicing avoids that entirely.
       const margin = 10; // mm
-      const availableWidth = pdfWidth - (2 * margin);
-      const availableHeight = pdfHeight - (2 * margin);
-      
-      // Scale image to fit width
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      const scaledWidth = availableWidth;
-      const scaledHeight = (imgHeight * availableWidth) / imgWidth;
-      
-      // Calculate number of pages needed
-      const totalPages = Math.ceil(scaledHeight / availableHeight);
-      
-      for (let page = 0; page < totalPages; page++) {
-        if (page > 0) {
-          pdf.addPage();
-        }
-        
-        // Calculate Y position to show correct portion of image
-        const yOffset = -(page * availableHeight) + margin;
-        
-        pdf.addImage(
-          imgData, 
-          'PNG', 
-          margin, 
-          yOffset, 
-          scaledWidth, 
-          scaledHeight
+      const availableWidth = pdfWidth - 2 * margin;
+      const availableHeight = pdfHeight - 2 * margin;
+
+      // When we fit the image to availableWidth, determine how many source pixels fit into one page height.
+      // pxPerMm = canvas.width / availableWidth
+      // pageHeightPx = availableHeight * pxPerMm
+      const pageHeightPx = Math.floor((canvas.width * availableHeight) / availableWidth);
+
+      const sourceWidthPx = canvas.width;
+      const sourceHeightPx = canvas.height;
+
+      const scratch = document.createElement('canvas');
+      const scratchCtx = scratch.getContext('2d');
+      if (!scratchCtx) throw new Error('Nie udało się utworzyć kontekstu canvas dla PDF');
+
+      scratch.width = sourceWidthPx;
+
+      let y = 0;
+      let pageIndex = 0;
+
+      while (y < sourceHeightPx) {
+        const sliceHeightPx = Math.min(pageHeightPx, sourceHeightPx - y);
+        scratch.height = sliceHeightPx;
+
+        // White background to avoid transparency issues
+        scratchCtx.setTransform(1, 0, 0, 1, 0, 0);
+        scratchCtx.clearRect(0, 0, scratch.width, scratch.height);
+        scratchCtx.fillStyle = '#ffffff';
+        scratchCtx.fillRect(0, 0, scratch.width, scratch.height);
+
+        scratchCtx.drawImage(
+          canvas,
+          0,
+          y,
+          sourceWidthPx,
+          sliceHeightPx,
+          0,
+          0,
+          sourceWidthPx,
+          sliceHeightPx
         );
+
+        const imgData = scratch.toDataURL('image/png');
+        const sliceHeightMm = (sliceHeightPx * availableWidth) / sourceWidthPx;
+
+        if (pageIndex > 0) pdf.addPage();
+        pdf.addImage(imgData, 'PNG', margin, margin, availableWidth, sliceHeightMm);
+
+        y += sliceHeightPx;
+        pageIndex += 1;
       }
       
       pdf.save(`${pdfTitle}.pdf`);
