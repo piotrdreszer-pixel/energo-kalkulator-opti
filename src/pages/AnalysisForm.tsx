@@ -638,39 +638,70 @@ export default function AnalysisForm() {
                   <CardTitle>Stan obecny – Zużycie i stawki</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Podsumowanie wybranej taryfy */}
-                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Wybrana taryfa</p>
-                      <p className="font-semibold">{formData.tariff_code_before}</p>
+                  {/* Podsumowanie wybranej taryfy i mocy */}
+                  <div className="p-3 bg-muted/50 rounded-lg space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Wybrana taryfa</p>
+                        <p className="font-semibold">{formData.tariff_code_before}</p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <Select
+                          value={formData.tariff_code_before}
+                          onValueChange={(v) => handleTariffChange('tariff_code_before', v)}
+                        >
+                          <SelectTrigger className="w-[120px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TARIFF_CODES.map((t) => (
+                              <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={formData.season_before || 'ALL'}
+                          onValueChange={(v) => handleInputChange('season_before', v)}
+                        >
+                          <SelectTrigger className="w-[120px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ALL">Cały rok</SelectItem>
+                            <SelectItem value="SUMMER">Lato</SelectItem>
+                            <SelectItem value="WINTER">Zima</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <Select
-                        value={formData.tariff_code_before}
-                        onValueChange={(v) => handleTariffChange('tariff_code_before', v)}
-                      >
-                        <SelectTrigger className="w-[120px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {TARIFF_CODES.map((t) => (
-                            <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={formData.season_before || 'ALL'}
-                        onValueChange={(v) => handleInputChange('season_before', v)}
-                      >
-                        <SelectTrigger className="w-[120px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ALL">Cały rok</SelectItem>
-                          <SelectItem value="SUMMER">Lato</SelectItem>
-                          <SelectItem value="WINTER">Zima</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div className="flex items-center justify-between pt-2 border-t border-muted">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Moc umowna</p>
+                        <p className="font-semibold">{formData.contracted_power_before_kw || 0} kW</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          value={formData.contracted_power_before_kw || ''}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(',', '.');
+                            handlePowerChangeBefore(parseFloat(value) || 0);
+                          }}
+                          className="w-[120px]"
+                          placeholder="kW"
+                        />
+                        {validationErrors.contracted_power_before_kw ? (
+                          <p className="text-xs text-destructive flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" />
+                            {validationErrors.contracted_power_before_kw}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            {getPowerHint(formData.tariff_code_before || 'C11')}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -713,39 +744,70 @@ export default function AnalysisForm() {
                   <CardTitle>Stan po zmianie – Zużycie i stawki</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Podsumowanie wybranej taryfy */}
-                  <div className="flex items-center justify-between p-3 bg-primary/5 rounded-lg">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Wybrana taryfa</p>
-                      <p className="font-semibold">{formData.tariff_code_after}</p>
+                  {/* Podsumowanie wybranej taryfy i mocy */}
+                  <div className="p-3 bg-primary/5 rounded-lg space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Wybrana taryfa</p>
+                        <p className="font-semibold">{formData.tariff_code_after}</p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <Select
+                          value={formData.tariff_code_after}
+                          onValueChange={(v) => handleTariffChange('tariff_code_after', v)}
+                        >
+                          <SelectTrigger className="w-[120px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TARIFF_CODES.map((t) => (
+                              <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={formData.season_after || 'ALL'}
+                          onValueChange={(v) => handleInputChange('season_after', v)}
+                        >
+                          <SelectTrigger className="w-[120px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ALL">Cały rok</SelectItem>
+                            <SelectItem value="SUMMER">Lato</SelectItem>
+                            <SelectItem value="WINTER">Zima</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <Select
-                        value={formData.tariff_code_after}
-                        onValueChange={(v) => handleTariffChange('tariff_code_after', v)}
-                      >
-                        <SelectTrigger className="w-[120px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {TARIFF_CODES.map((t) => (
-                            <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={formData.season_after || 'ALL'}
-                        onValueChange={(v) => handleInputChange('season_after', v)}
-                      >
-                        <SelectTrigger className="w-[120px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ALL">Cały rok</SelectItem>
-                          <SelectItem value="SUMMER">Lato</SelectItem>
-                          <SelectItem value="WINTER">Zima</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div className="flex items-center justify-between pt-2 border-t border-primary/20">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Moc umowna</p>
+                        <p className="font-semibold">{formData.contracted_power_after_kw || 0} kW</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          value={formData.contracted_power_after_kw || ''}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(',', '.');
+                            handlePowerChangeAfter(parseFloat(value) || 0);
+                          }}
+                          className="w-[120px]"
+                          placeholder="kW"
+                        />
+                        {validationErrors.contracted_power_after_kw ? (
+                          <p className="text-xs text-destructive flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" />
+                            {validationErrors.contracted_power_after_kw}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            {getPowerHint(formData.tariff_code_after || 'C11')}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </CardContent>
