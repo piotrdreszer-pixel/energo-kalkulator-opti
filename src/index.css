@@ -264,15 +264,24 @@
     right: 0;
     background: white;
     padding: 12px 24px;
-    border-bottom: 2px solid hsl(174, 62%, 25%);
+    border-bottom: 2px solid hsl(var(--primary));
     z-index: 1000;
     height: 84px;
     box-sizing: border-box;
   }
 
-  /* Add top margin to content to prevent overlap with fixed header on all pages */
+  /* Reserve space for the fixed header on EVERY printed page */
+  @page {
+    /* top margin must be >= header height + a bit of breathing room */
+    margin-top: 180px;
+    margin-right: 24px;
+    margin-bottom: 40px;
+    margin-left: 24px;
+  }
+
+  /* Avoid adding extra space only on page 1 (page margins handle all pages) */
   .print-content {
-    margin-top: 140px !important;
+    margin-top: 0 !important;
     padding-top: 0 !important;
   }
 
