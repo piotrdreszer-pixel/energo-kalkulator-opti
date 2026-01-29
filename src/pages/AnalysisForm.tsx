@@ -493,12 +493,19 @@ export default function AnalysisForm() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Data obowiązywania stawek</Label>
-                    <Input
-                      type="date"
-                      value={formData.rates_date || ''}
-                      onChange={(e) => handleInputChange('rates_date', e.target.value)}
-                    />
+                    <Label>Rok obowiązywania stawek</Label>
+                    <Select
+                      value={formData.rates_date?.substring(0, 4) || '2025'}
+                      onValueChange={(year) => handleInputChange('rates_date', `${year}-01-01`)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Wybierz rok" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="2025">2025</SelectItem>
+                        <SelectItem value="2026">2026</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
