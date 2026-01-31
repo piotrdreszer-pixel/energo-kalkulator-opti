@@ -5,6 +5,13 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Loader2, Download, RotateCcw } from 'lucide-react';
 import { getZoneLabels } from '@/lib/tariff-utils';
 import { ReactiveEnergySection } from './ReactiveEnergySection';
@@ -25,6 +32,8 @@ interface RatesInputPanelProps {
   setIsManualMode: (value: boolean) => void;
   overriddenFields: Record<string, number>;
   setOverriddenFields: (fields: Record<string, number>) => void;
+  ratesYear: string;
+  setRatesYear: (year: string) => void;
 }
 
 export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
@@ -42,6 +51,8 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
       setIsManualMode,
       overriddenFields,
       setOverriddenFields,
+      ratesYear,
+      setRatesYear,
     },
     ref
   ) {
@@ -120,6 +131,15 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-medium">{title}</CardTitle>
           <div className="flex items-center gap-2">
+            <Select value={ratesYear} onValueChange={setRatesYear}>
+              <SelectTrigger className="w-[100px]">
+                <SelectValue placeholder="Rok" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="2025">2025</SelectItem>
+                <SelectItem value="2026">2026</SelectItem>
+              </SelectContent>
+            </Select>
             <Button
               variant="outline"
               size="sm"
