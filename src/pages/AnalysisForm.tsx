@@ -121,6 +121,8 @@ export default function AnalysisForm() {
   const [isAutoConsumptionModeBefore, setIsAutoConsumptionModeBefore] = useState(true);
   const [zoneDistributionBefore, setZoneDistributionBefore] = useState<number[]>(() => getDefaultDistribution(1));
   const [totalConsumptionBefore, setTotalConsumptionBefore] = useState<number>(0);
+  const [ratesYearBefore, setRatesYearBefore] = useState<string>('2025');
+  const [ratesYearAfter, setRatesYearAfter] = useState<string>('2025');
 
   const { data: osdOperators } = useOsdOperators();
   const { resolveRates, isLoading: isResolvingRates } = useRatesResolver();
@@ -256,12 +258,14 @@ export default function AnalysisForm() {
 
     const tariffCode = scenario === 'before' ? formData.tariff_code_before : formData.tariff_code_after;
     const season = scenario === 'before' ? formData.season_before : formData.season_after;
+    const ratesYear = scenario === 'before' ? ratesYearBefore : ratesYearAfter;
+    const ratesDate = `${ratesYear}-01-01`;
 
     const rates = await resolveRates(
       formData.osd_id,
       tariffCode || 'C11',
       season || 'ALL',
-      formData.rates_date || undefined
+      ratesDate
     );
 
     if (rates) {
@@ -489,21 +493,6 @@ export default function AnalysisForm() {
                             {osd.name} ({osd.code})
                           </SelectItem>
                         ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Rok obowiązywania stawek</Label>
-                    <Select
-                      value={formData.rates_date?.substring(0, 4) || '2025'}
-                      onValueChange={(year) => handleInputChange('rates_date', `${year}-01-01`)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Wybierz rok" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="2025">2025</SelectItem>
-                        <SelectItem value="2026">2026</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -739,6 +728,8 @@ export default function AnalysisForm() {
                 setIsManualMode={setIsManualModeBefore}
                 overriddenFields={overriddenBefore}
                 setOverriddenFields={setOverriddenBefore}
+                ratesYear={ratesYearBefore}
+                setRatesYear={setRatesYearBefore}
               />
             </div>
           )}
@@ -844,6 +835,8 @@ export default function AnalysisForm() {
                 setIsManualMode={setIsManualModeAfter}
                 overriddenFields={overriddenAfter}
                 setOverriddenFields={setOverriddenAfter}
+                ratesYear={ratesYearAfter}
+                setRatesYear={setRatesYearAfter}
               />
             </div>
           )}
