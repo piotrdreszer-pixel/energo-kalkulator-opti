@@ -188,7 +188,7 @@ Deno.serve(async (req) => {
     
     const fixedNetworkItem = items.find(i => i.rate_type === 'SIEC_STALA')
     // Support both SIEC_ZMIENNA and SIEC_ZMIENNA_STREFA* rate types
-    const variableItems = items
+    let variableItems = items
       .filter(i => i.rate_type === 'SIEC_ZMIENNA' || i.rate_type.startsWith('SIEC_ZMIENNA_STREFA'))
       .map(item => {
         // Extract zone number from rate_type if not set (e.g., SIEC_ZMIENNA_STREFA1 -> 1)
@@ -200,6 +200,31 @@ Deno.serve(async (req) => {
         return { ...item, zone_number: zoneNum || 1 }
       })
       .sort((a, b) => (a.zone_number || 0) - (b.zone_number || 0))
+    
+    // Determine expected zones count based on tariff code
+    // Multi-zone tariffs: C12*, C22*, B22, B23, G12* have 2 zones; C23 has 3 zones
+    const getExpectedZones = (tariff: string): number => {
+      const upperTariff = tariff.toUpperCase()
+      if (upperTariff.startsWith('C23') || upperTariff.startsWith('B23')) return 3
+      if (upperTariff.startsWith('C12') || upperTariff.startsWith('C22') || 
+          upperTariff.startsWith('B22') || upperTariff.startsWith('G12')) return 2
+      return 1
+    }
+    
+    const expectedZones = getExpectedZones(tariffCode)
+    
+    // If we have only one variable rate but expect multiple zones,
+    // replicate that rate for all expected zones (common for ENEA-style tariffs)
+    if (variableItems.length === 1 && expectedZones > 1) {
+      const baseRate = variableItems[0]
+      console.log(`[rates-resolve] Replicating single variable rate to ${expectedZones} zones for tariff ${tariffCode}`)
+      variableItems = Array.from({ length: expectedZones }, (_, i) => ({
+        ...baseRate,
+        zone_number: i + 1,
+        description: baseRate.description || `Strefa ${i + 1}`
+      }))
+    }
+    
     const qualityFeeItem = items.find(i => i.rate_type === 'OPLATA_JAKOSCIOWA')
     const subscriptionFeeItem = items.find(i => i.rate_type === 'OPLATA_ABONAMENTOWA')
     const capacityFeeItem = items.find(i => i.rate_type === 'OPLATA_MOCOWA')
