@@ -261,13 +261,36 @@ export default function AnalysisForm() {
     const ratesYear = scenario === 'before' ? ratesYearBefore : ratesYearAfter;
     const ratesDate = `${ratesYear}-01-01`;
 
-    const rates = await resolveRates(
+    // Get OSD name for error message
+    const selectedOsd = osdOperators?.find(o => o.id === formData.osd_id);
+    const osdName = selectedOsd?.name || 'wybranego OSD';
+
+    const result = await resolveRates(
       formData.osd_id,
       tariffCode || 'C11',
       season || 'ALL',
       ratesDate
     );
 
+    if (result.notFound) {
+      toast({ 
+        variant: 'destructive', 
+        title: 'Taryfa niedostępna', 
+        description: `Taryfa ${tariffCode?.toUpperCase()} nie jest dostępna dla ${osdName} w roku ${ratesYear}. Wybierz inną taryfę lub wprowadź stawki ręcznie.` 
+      });
+      return;
+    }
+
+    if (result.error) {
+      toast({ 
+        variant: 'destructive', 
+        title: 'Błąd', 
+        description: result.error 
+      });
+      return;
+    }
+
+    const rates = result.rates;
     if (rates) {
       if (scenario === 'before') {
         setResolvedRatesBefore(rates);
