@@ -118,6 +118,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Find the applicable rate card for the given OSD and date
+    // We need to find a card where valid_from <= date AND (valid_to IS NULL OR valid_to >= date)
     const { data: rateCards, error: rateCardError } = await supabase
       .from('rate_cards')
       .select('*')
@@ -125,7 +126,22 @@ Deno.serve(async (req) => {
       .lte('valid_from', dateStr)
       .or(`valid_to.is.null,valid_to.gte.${dateStr}`)
       .order('valid_from', { ascending: false })
-      .limit(1)
+
+    console.log(`[rates-resolve] Found ${rateCards?.length || 0} potential rate cards for date ${dateStr}`)
+    
+    // Filter to get the most recent card that actually covers this date
+    const applicableCard = rateCards?.find(card => {
+      const validFrom = new Date(card.valid_from)
+      const validTo = card.valid_to ? new Date(card.valid_to) : null
+      const targetDate = new Date(dateStr)
+      
+      const isAfterStart = validFrom <= targetDate
+      const isBeforeEnd = !validTo || validTo >= targetDate
+      
+      console.log(`[rates-resolve] Checking card ${card.name}: validFrom=${card.valid_from}, validTo=${card.valid_to}, target=${dateStr}, matches=${isAfterStart && isBeforeEnd}`)
+      
+      return isAfterStart && isBeforeEnd
+    })
 
     if (rateCardError) {
       console.error('[rates-resolve] Error fetching rate cards:', rateCardError)
@@ -135,7 +151,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    if (!rateCards || rateCards.length === 0) {
+    if (!applicableCard) {
       console.log('[rates-resolve] No rate card found for given parameters')
       return new Response(
         JSON.stringify({ 
@@ -146,8 +162,8 @@ Deno.serve(async (req) => {
       )
     }
 
-    const rateCard = rateCards[0] as RateCard
-    console.log(`[rates-resolve] Found rate card: ${rateCard.name} (${rateCard.id})`)
+    const rateCard = applicableCard as RateCard
+    console.log(`[rates-resolve] Selected rate card: ${rateCard.name} (${rateCard.id})`)
 
     // Get rate items for the rate card and tariff (case-insensitive matching)
     let rateItemsQuery = supabase
