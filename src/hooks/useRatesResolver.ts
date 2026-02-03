@@ -2,8 +2,14 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { ResolvedRates } from '@/types/database';
 
+export interface RatesResolverResult {
+  rates: ResolvedRates | null;
+  error: string | null;
+  notFound: boolean;
+}
+
 interface UseRatesResolverReturn {
-  resolveRates: (osdId: string, tariffCode: string, season?: string, date?: string) => Promise<ResolvedRates | null>;
+  resolveRates: (osdId: string, tariffCode: string, season?: string, date?: string) => Promise<RatesResolverResult>;
   isLoading: boolean;
   error: string | null;
 }
@@ -17,7 +23,7 @@ export function useRatesResolver(): UseRatesResolverReturn {
     tariffCode: string,
     season: string = 'ALL',
     date?: string
-  ): Promise<ResolvedRates | null> => {
+  ): Promise<RatesResolverResult> => {
     setIsLoading(true);
     setError(null);
 
@@ -48,19 +54,20 @@ export function useRatesResolver(): UseRatesResolverReturn {
       if (!response.ok) {
         const errorData = await response.json();
         if (response.status === 404) {
-          setError(errorData.message || 'Nie znaleziono stawek dla wybranych parametrów');
-          return null;
+          const errorMessage = errorData.message || 'Nie znaleziono stawek dla wybranych parametrów';
+          setError(errorMessage);
+          return { rates: null, error: errorMessage, notFound: true };
         }
         throw new Error(errorData.message || 'Błąd podczas pobierania stawek');
       }
 
       const result: ResolvedRates = await response.json();
-      return result;
+      return { rates: result, error: null, notFound: false };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Nieznany błąd';
       setError(message);
       console.error('[useRatesResolver] Error:', err);
-      return null;
+      return { rates: null, error: message, notFound: false };
     } finally {
       setIsLoading(false);
     }
