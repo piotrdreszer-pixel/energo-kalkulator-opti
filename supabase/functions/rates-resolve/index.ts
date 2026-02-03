@@ -33,13 +33,55 @@ interface ResolvedRates {
   validTo: string | null
   sourceDocument: string | null
   rates: {
-    fixedNetworkRate: number | null  // SIEC_STALA [zł/kW/mies]
-    variableRates: { zone: number; rate: number; description: string }[]  // SIEC_ZMIENNA per zone [zł/kWh]
-    qualityFee: number | null  // OPLATA_JAKOSCIOWA [zł/kWh]
-    subscriptionFee: number | null  // OPLATA_ABONAMENTOWA [zł/mies]
-    capacityFee: number | null  // OPLATA_MOCOWA
-    reactiveEnergyRate: number | null  // ENERGIA_BIERNA
+    fixedNetworkRate: number | null
+    variableRates: { zone: number; rate: number; description: string }[]
+    qualityFee: number | null
+    subscriptionFee: number | null
+    capacityFee: number | null
+    reactiveEnergyRate: number | null
   }
+}
+
+// Determine expected zones count based on tariff code
+const getExpectedZones = (tariff: string): number => {
+  const upperTariff = tariff.toUpperCase()
+  if (upperTariff.startsWith('C23') || upperTariff.startsWith('B23')) return 3
+  if (upperTariff.startsWith('C12') || upperTariff.startsWith('C22') || 
+      upperTariff.startsWith('B22') || upperTariff.startsWith('G12')) return 2
+  return 1
+}
+
+// Deduplicate items by rate_type (and zone for variable rates)
+const deduplicateItems = (items: RateItem[], requestedSeason: string): RateItem[] => {
+  const grouped = new Map<string, RateItem[]>()
+  
+  for (const item of items) {
+    const key = item.rate_type.startsWith('SIEC_ZMIENNA') 
+      ? `${item.rate_type}_${item.zone_number || 1}`
+      : item.rate_type
+    
+    if (!grouped.has(key)) {
+      grouped.set(key, [])
+    }
+    grouped.get(key)!.push(item)
+  }
+  
+  const result: RateItem[] = []
+  for (const [, groupItems] of grouped) {
+    if (groupItems.length === 1) {
+      result.push(groupItems[0])
+    } else {
+      if (requestedSeason === 'ALL') {
+        const allSeason = groupItems.find(i => i.season === 'ALL')
+        result.push(allSeason || groupItems[0])
+      } else {
+        const specificSeason = groupItems.find(i => i.season === requestedSeason)
+        result.push(specificSeason || groupItems[0])
+      }
+    }
+  }
+  
+  return result
 }
 
 Deno.serve(async (req) => {
@@ -108,8 +150,6 @@ Deno.serve(async (req) => {
     console.log(`[rates-resolve] Found rate card: ${rateCard.name} (${rateCard.id})`)
 
     // Get rate items for the rate card and tariff (case-insensitive matching)
-    // When season is ALL, we need to fetch all items regardless of season
-    // and prefer season-specific rates over ALL rates
     let rateItemsQuery = supabase
       .from('rate_items')
       .select('*')
@@ -117,11 +157,9 @@ Deno.serve(async (req) => {
       .ilike('tariff_code', tariffCode)
 
     // If specific season requested, filter by that season or ALL
-    // If ALL requested, get all items (we'll deduplicate later)
     if (season !== 'ALL') {
       rateItemsQuery = rateItemsQuery.or(`season.eq.ALL,season.eq.${season}`)
     }
-    // When season is ALL, don't filter by season - get everything
 
     const { data: rateItems, error: itemsError } = await rateItemsQuery
 
@@ -146,47 +184,11 @@ Deno.serve(async (req) => {
 
     console.log(`[rates-resolve] Found ${rateItems.length} rate items`)
 
-    // Deduplicate items by rate_type (and zone for variable rates)
-    // When season=ALL is explicitly requested, prefer ALL rates
-    // When a specific season is requested, prefer that season over ALL
-    const deduplicateItems = (items: RateItem[], requestedSeason: string): RateItem[] => {
-      const grouped = new Map<string, RateItem[]>()
-      
-      for (const item of items) {
-        const key = item.rate_type.startsWith('SIEC_ZMIENNA') 
-          ? `${item.rate_type}_${item.zone_number || 1}`
-          : item.rate_type
-        
-        if (!grouped.has(key)) {
-          grouped.set(key, [])
-        }
-        grouped.get(key)!.push(item)
-      }
-      
-      const result: RateItem[] = []
-      for (const [, groupItems] of grouped) {
-        if (groupItems.length === 1) {
-          result.push(groupItems[0])
-        } else {
-          if (requestedSeason === 'ALL') {
-            // When ALL is requested, prefer ALL rates if available
-            const allSeason = groupItems.find(i => i.season === 'ALL')
-            result.push(allSeason || groupItems[0])
-          } else {
-            // When specific season requested, prefer that season over ALL
-            const specificSeason = groupItems.find(i => i.season === requestedSeason)
-            result.push(specificSeason || groupItems[0])
-          }
-        }
-      }
-      
-      return result
-    }
-
     // Parse rate items into structured response
     const items = deduplicateItems(rateItems as RateItem[], season)
     
     const fixedNetworkItem = items.find(i => i.rate_type === 'SIEC_STALA')
+    
     // Support both SIEC_ZMIENNA and SIEC_ZMIENNA_STREFA* rate types
     let variableItems = items
       .filter(i => i.rate_type === 'SIEC_ZMIENNA' || i.rate_type.startsWith('SIEC_ZMIENNA_STREFA'))
@@ -201,23 +203,14 @@ Deno.serve(async (req) => {
       })
       .sort((a, b) => (a.zone_number || 0) - (b.zone_number || 0))
     
-    // Determine expected zones count based on tariff code
-    // Multi-zone tariffs: C12*, C22*, B22, B23, G12* have 2 zones; C23 has 3 zones
-    const getExpectedZones = (tariff: string): number => {
-      const upperTariff = tariff.toUpperCase()
-      if (upperTariff.startsWith('C23') || upperTariff.startsWith('B23')) return 3
-      if (upperTariff.startsWith('C12') || upperTariff.startsWith('C22') || 
-          upperTariff.startsWith('B22') || upperTariff.startsWith('G12')) return 2
-      return 1
-    }
-    
     const expectedZones = getExpectedZones(tariffCode)
+    console.log(`[rates-resolve] Tariff ${tariffCode} expects ${expectedZones} zones, found ${variableItems.length} variable items`)
     
     // If we have only one variable rate but expect multiple zones,
     // replicate that rate for all expected zones (common for ENEA-style tariffs)
     if (variableItems.length === 1 && expectedZones > 1) {
       const baseRate = variableItems[0]
-      console.log(`[rates-resolve] Replicating single variable rate to ${expectedZones} zones for tariff ${tariffCode}`)
+      console.log(`[rates-resolve] Replicating single variable rate (${baseRate.value}) to ${expectedZones} zones for tariff ${tariffCode}`)
       variableItems = Array.from({ length: expectedZones }, (_, i) => ({
         ...baseRate,
         zone_number: i + 1,
@@ -250,7 +243,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log('[rates-resolve] Successfully resolved rates')
+    console.log(`[rates-resolve] Successfully resolved rates with ${result.rates.variableRates.length} variable zones`)
     
     return new Response(
       JSON.stringify(result),
@@ -259,7 +252,7 @@ Deno.serve(async (req) => {
         headers: { 
           ...corsHeaders, 
           'Content-Type': 'application/json',
-          'Cache-Control': 'public, max-age=86400' // 24h cache
+          'Cache-Control': 'public, max-age=86400'
         } 
       }
     )
