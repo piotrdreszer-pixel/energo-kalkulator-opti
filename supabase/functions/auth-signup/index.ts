@@ -89,6 +89,71 @@ serve(async (req) => {
       }
     );
 
+    // Check if user already exists (confirmed or not)
+    const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+    
+    if (listError) {
+      console.error('Error checking existing users:', listError.message);
+    } else {
+      const existingUser = existingUsers?.users?.find(
+        (u) => u.email?.toLowerCase() === normalizedEmail
+      );
+      
+      if (existingUser) {
+        // User exists - check if confirmed
+        if (existingUser.email_confirmed_at) {
+          console.log(`User already exists and is confirmed: ${normalizedEmail}`);
+          return new Response(
+            JSON.stringify({ 
+              error: 'Użytkownik z tym adresem email już istnieje i jest aktywny. Użyj opcji logowania.',
+              code: 'USER_EXISTS' 
+            }),
+            { 
+              status: 409, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          );
+        } else {
+          // User exists but not confirmed - try to resend confirmation
+          console.log(`User exists but not confirmed, attempting to resend: ${normalizedEmail}`);
+          
+          const { error: resendError } = await supabaseAdmin.auth.resend({
+            type: 'signup',
+            email: normalizedEmail,
+          });
+          
+          if (resendError) {
+            if (resendError.message.includes('rate limit') || resendError.message.includes('too many')) {
+              return new Response(
+                JSON.stringify({ 
+                  error: 'Konto już istnieje ale nie zostało aktywowane. Przekroczono limit wysyłania maili - spróbuj ponownie za kilka minut.',
+                  code: 'RATE_LIMIT_EXCEEDED' 
+                }),
+                { 
+                  status: 429, 
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+                }
+              );
+            }
+            console.error('Error resending confirmation:', resendError.message);
+          }
+          
+          return new Response(
+            JSON.stringify({ 
+              success: true,
+              message: 'Konto już istnieje ale nie zostało aktywowane. Wysłano ponownie email z linkiem aktywacyjnym.',
+              requiresEmailConfirmation: true,
+              resent: true
+            }),
+            { 
+              status: 200, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          );
+        }
+      }
+    }
+
     // Get the origin for redirect URL
     const origin = req.headers.get('origin') || 'https://energo-kalkulator-opti.lovable.app';
 
@@ -111,7 +176,7 @@ serve(async (req) => {
       if (error.message.includes('rate limit') || error.message.includes('too many')) {
         return new Response(
           JSON.stringify({ 
-            error: 'Przekroczono limit rejestracji. Spróbuj ponownie za kilka minut.',
+            error: 'Przekroczono limit wysyłania maili. Spróbuj ponownie za kilka minut.',
             code: 'RATE_LIMIT_EXCEEDED' 
           }),
           { 
