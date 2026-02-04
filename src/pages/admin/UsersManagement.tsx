@@ -197,35 +197,42 @@ export default function UsersManagement() {
   // Add user mutation (using edge function for admin signup)
   const addUserMutation = useMutation({
     mutationFn: async ({ email, password, name }: { email: string; password: string; name: string }) => {
-      // Create user via admin API would require service role
-      // For now, we'll use signUp which creates unconfirmed user
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { name },
-          emailRedirectTo: `${window.location.origin}/`,
+      // Use server-side Edge Function for signup with domain validation
+      const { data, error } = await supabase.functions.invoke('auth-signup', {
+        body: {
+          email: email.toLowerCase().trim(),
+          password,
+          name: name.trim(),
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error('Błąd połączenia z serwerem');
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       setIsAddDialogOpen(false);
       setNewUserEmail('');
       setNewUserName('');
       setNewUserPassword('');
-      toast.success('Użytkownik został dodany. E-mail z potwierdzeniem został wysłany.');
+      
+      if (data?.resent) {
+        toast.success('Konto już istnieje. Wysłano ponownie email aktywacyjny.');
+      } else {
+        toast.success('Użytkownik został dodany. E-mail z potwierdzeniem został wysłany.');
+      }
     },
     onError: (error: any) => {
       console.error('Error adding user:', error);
-      if (error.message?.includes('already registered')) {
-        toast.error('Ten adres e-mail jest już zarejestrowany');
-      } else {
-        toast.error('Nie udało się dodać użytkownika');
-      }
+      toast.error(error.message || 'Nie udało się dodać użytkownika');
     },
   });
 
