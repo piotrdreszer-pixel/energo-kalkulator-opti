@@ -197,7 +197,7 @@ export default function UsersManagement() {
   // Add user mutation (using edge function for admin signup)
   const addUserMutation = useMutation({
     mutationFn: async ({ email, password, name }: { email: string; password: string; name: string }) => {
-      // Use server-side Edge Function for signup with domain validation
+      // Create user server-side (admin path creates an active account without sending email)
       const { data, error } = await supabase.functions.invoke('auth-signup', {
         body: {
           email: email.toLowerCase().trim(),
@@ -207,8 +207,15 @@ export default function UsersManagement() {
       });
 
       if (error) {
-        console.error('Edge function error:', error);
-        throw new Error('Błąd połączenia z serwerem');
+        // Prefer message from function when possible
+        const anyErr = error as any;
+        const msg =
+          anyErr?.context?.body?.error ||
+          anyErr?.context?.response?.error ||
+          anyErr?.message ||
+          'Nie udało się dodać użytkownika';
+        console.error('auth-signup invoke error:', error);
+        throw new Error(msg);
       }
 
       if (data?.error) {
@@ -224,8 +231,8 @@ export default function UsersManagement() {
       setNewUserName('');
       setNewUserPassword('');
       
-      if (data?.resent) {
-        toast.success('Konto już istnieje. Wysłano ponownie email aktywacyjny.');
+      if (data?.adminCreated) {
+        toast.success('Użytkownik został dodany (konto aktywne, bez maila).');
       } else {
         toast.success('Użytkownik został dodany. E-mail z potwierdzeniem został wysłany.');
       }
