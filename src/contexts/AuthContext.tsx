@@ -126,6 +126,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (data.code === 'USER_EXISTS') {
           return { error: new Error('Ten adres e-mail jest już zarejestrowany.') };
         }
+        if (data.code === 'RATE_LIMIT_EXCEEDED') {
+          return { error: new Error('Przekroczono limit rejestracji. Spróbuj ponownie za kilka minut.') };
+        }
         return { error: new Error(data.error) };
       }
 

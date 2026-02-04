@@ -107,6 +107,20 @@ serve(async (req) => {
     if (error) {
       console.error('Signup error:', error.message);
       
+      // Handle rate limit error
+      if (error.message.includes('rate limit') || error.message.includes('too many')) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Przekroczono limit rejestracji. Spróbuj ponownie za kilka minut.',
+            code: 'RATE_LIMIT_EXCEEDED' 
+          }),
+          { 
+            status: 429, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+      
       // Handle specific errors
       if (error.message.includes('already registered') || error.message.includes('already exists')) {
         return new Response(
