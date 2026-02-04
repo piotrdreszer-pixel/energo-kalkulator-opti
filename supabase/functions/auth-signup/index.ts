@@ -17,6 +17,11 @@ serve(async (req) => {
   try {
     const { email, password, name } = await req.json();
 
+    // If request is authenticated and caller is admin, create user WITHOUT sending confirmation email
+    // (bypasses email sending limits and enables true "admin adds user" flow)
+    const authHeader = req.headers.get('authorization') || '';
+    const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null;
+
     // Server-side email domain validation
     if (!email || typeof email !== 'string') {
       console.error('Invalid email provided');
@@ -89,70 +94,119 @@ serve(async (req) => {
       }
     );
 
-    // Check if user already exists (confirmed or not)
-    const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-    
-    if (listError) {
-      console.error('Error checking existing users:', listError.message);
-    } else {
-      const existingUser = existingUsers?.users?.find(
-        (u) => u.email?.toLowerCase() === normalizedEmail
-      );
-      
-      if (existingUser) {
-        // User exists - check if confirmed
-        if (existingUser.email_confirmed_at) {
-          console.log(`User already exists and is confirmed: ${normalizedEmail}`);
-          return new Response(
-            JSON.stringify({ 
-              error: 'Użytkownik z tym adresem email już istnieje i jest aktywny. Użyj opcji logowania.',
-              code: 'USER_EXISTS' 
-            }),
-            { 
-              status: 409, 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-            }
-          );
-        } else {
-          // User exists but not confirmed - try to resend confirmation
-          console.log(`User exists but not confirmed, attempting to resend: ${normalizedEmail}`);
-          
-          const { error: resendError } = await supabaseAdmin.auth.resend({
-            type: 'signup',
-            email: normalizedEmail,
-          });
-          
-          if (resendError) {
-            if (resendError.message.includes('rate limit') || resendError.message.includes('too many')) {
+    // Admin-create path (no confirmation email)
+    if (bearerToken) {
+      const { data: callerData, error: callerError } = await supabaseAdmin.auth.getUser(bearerToken);
+      const callerId = callerData?.user?.id;
+
+      if (!callerError && callerId) {
+        const { data: adminRole, error: roleError } = await supabaseAdmin
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', callerId)
+          .eq('role', 'admin')
+          .maybeSingle();
+
+        const isAdminCaller = !roleError && !!adminRole;
+
+        if (isAdminCaller) {
+          // Check if user already exists
+          const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+
+          if (!listError) {
+            const existingUser = existingUsers?.users?.find(
+              (u) => u.email?.toLowerCase() === normalizedEmail
+            );
+
+            if (existingUser) {
               return new Response(
-                JSON.stringify({ 
-                  error: 'Konto już istnieje ale nie zostało aktywowane. Przekroczono limit wysyłania maili - spróbuj ponownie za kilka minut.',
-                  code: 'RATE_LIMIT_EXCEEDED' 
+                JSON.stringify({
+                  error: 'Użytkownik z tym adresem email już istnieje',
+                  code: 'USER_EXISTS',
                 }),
-                { 
-                  status: 429, 
-                  headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+                {
+                  status: 409,
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 }
               );
             }
-            console.error('Error resending confirmation:', resendError.message);
           }
-          
+
+          // Create confirmed user (no email)
+          const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
+            email: normalizedEmail,
+            password,
+            email_confirm: true,
+            user_metadata: {
+              name: name.trim(),
+            },
+          });
+
+          if (createError) {
+            console.error('Admin createUser error:', createError.message);
+            return new Response(
+              JSON.stringify({
+                error: createError.message,
+                code: 'SIGNUP_ERROR',
+              }),
+              {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              }
+            );
+          }
+
+          const newUserId = created.user?.id;
+
+          if (newUserId) {
+            // Ensure profile exists
+            await supabaseAdmin
+              .from('profiles')
+              .upsert(
+                {
+                  user_id: newUserId,
+                  name: name.trim(),
+                  email: normalizedEmail,
+                  email_verified: true,
+                },
+                { onConflict: 'user_id' }
+              );
+
+            // Ensure default role exists
+            await supabaseAdmin
+              .from('user_roles')
+              .upsert(
+                {
+                  user_id: newUserId,
+                  role: 'user',
+                },
+                { onConflict: 'user_id,role' }
+              );
+          }
+
+          console.log(`Admin created user (confirmed, no email): ${normalizedEmail}`);
+
           return new Response(
-            JSON.stringify({ 
+            JSON.stringify({
               success: true,
-              message: 'Konto już istnieje ale nie zostało aktywowane. Wysłano ponownie email z linkiem aktywacyjnym.',
-              requiresEmailConfirmation: true,
-              resent: true
+              adminCreated: true,
+              message: 'Konto zostało utworzone przez administratora (bez maila aktywacyjnego).',
+              user: {
+                id: created.user?.id,
+                email: created.user?.email,
+              },
             }),
-            { 
-              status: 200, 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             }
           );
         }
       }
     }
+
+    // NOTE: for non-admin callers we intentionally do NOT attempt "resend confirmation" here.
+    // This avoids turning the endpoint into a public email-sending vector and reduces rate-limit loops.
 
     // Get the origin for redirect URL
     const origin = req.headers.get('origin') || 'https://energo-kalkulator-opti.lovable.app';
