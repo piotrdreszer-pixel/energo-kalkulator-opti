@@ -352,6 +352,30 @@ export type Database = {
           },
         ]
       }
+      manager_assignments: {
+        Row: {
+          assigned_by_user_id: string | null
+          created_at: string
+          id: string
+          managed_user_id: string
+          manager_user_id: string
+        }
+        Insert: {
+          assigned_by_user_id?: string | null
+          created_at?: string
+          id?: string
+          managed_user_id: string
+          manager_user_id: string
+        }
+        Update: {
+          assigned_by_user_id?: string | null
+          created_at?: string
+          id?: string
+          managed_user_id?: string
+          manager_user_id?: string
+        }
+        Relationships: []
+      }
       osd_operators: {
         Row: {
           code: string
@@ -527,9 +551,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_manager_of: { Args: { _managed_user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "manager"
       project_status: "roboczy" | "wysłany klientowi" | "zaakceptowany"
     }
     CompositeTypes: {
@@ -658,7 +683,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "manager"],
       project_status: ["roboczy", "wysłany klientowi", "zaakceptowany"],
     },
   },

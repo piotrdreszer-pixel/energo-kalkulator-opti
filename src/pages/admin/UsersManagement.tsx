@@ -48,6 +48,7 @@ interface UserWithStats {
   created_at: string;
   last_activity_at: string | null;
   isAdmin: boolean;
+  isManager: boolean;
   projectsCount: number;
   analysesCount: number;
 }
@@ -118,6 +119,7 @@ export default function UsersManagement() {
         }).length || 0;
 
         const isAdmin = roles?.some(r => r.user_id === profile.user_id && r.role === 'admin') || false;
+        const isManager = roles?.some(r => r.user_id === profile.user_id && r.role === 'manager') || false;
 
         return {
           id: profile.id,
@@ -127,6 +129,7 @@ export default function UsersManagement() {
           created_at: profile.created_at,
           last_activity_at: profile.last_activity_at,
           isAdmin,
+          isManager,
           projectsCount: userProjects.length,
           analysesCount,
         } as UserWithStats;
@@ -461,9 +464,14 @@ export default function UsersManagement() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={user.isAdmin ? 'default' : 'secondary'}>
-                          {user.isAdmin ? 'Admin' : 'Użytkownik'}
-                        </Badge>
+                        <div className="flex gap-1 flex-wrap">
+                          <Badge variant={user.isAdmin ? 'default' : 'secondary'}>
+                            {user.isAdmin ? 'Admin' : 'Użytkownik'}
+                          </Badge>
+                          {user.isManager && (
+                            <Badge variant="outline">Menedżer</Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-center font-medium">
                         {user.projectsCount}
