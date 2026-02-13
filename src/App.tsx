@@ -17,6 +17,7 @@ import AnalysisForm from "./pages/AnalysisForm";
 import AnalysisReport from "./pages/AnalysisReport";
 import RatesManagement from "./pages/admin/RatesManagement";
 import UsersManagement from "./pages/admin/UsersManagement";
+import ManagersManagement from "./pages/admin/ManagersManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -82,6 +83,14 @@ const App = () => (
               element={
                 <AdminRoute>
                   <RatesManagement />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/managers"
+              element={
+                <AdminRoute>
+                  <ManagersManagement />
                 </AdminRoute>
               }
             />

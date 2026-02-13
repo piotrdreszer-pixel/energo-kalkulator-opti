@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { FolderOpen, LogOut, User, Menu, X, Settings2, Users, Lock } from 'lucide-react';
+import { FolderOpen, LogOut, User, Menu, X, Settings2, Users, Lock, UserCog } from 'lucide-react';
 import { useState } from 'react';
 import logo from '@/assets/logo.png';
 import { ChangePasswordDialog } from '@/components/auth/ChangePasswordDialog';
@@ -35,6 +35,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { href: '/projects', label: 'Projekty', icon: FolderOpen },
     ...(isAdmin ? [
       { href: '/admin/users', label: 'Użytkownicy', icon: Users },
+      { href: '/admin/managers', label: 'Menedżerowie', icon: UserCog },
       { href: '/admin/rates', label: 'Stawki OSD', icon: Settings2 },
     ] : []),
   ];
