@@ -120,7 +120,7 @@ export default function AnalysisReport() {
       await exportElementToPdf(reportContentRef.current, {
         filename: pdfTitle,
         marginMm: 10,
-        scale: 2,
+        scale: 3,
         // Kluczowe: nie dziel sekcji oznaczonych jako print-avoid-break (m.in. Podsumowanie)
         avoidBreakSelector: '.print-avoid-break',
         minSliceDomPx: 200,
