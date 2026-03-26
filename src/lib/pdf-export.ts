@@ -124,7 +124,7 @@ export async function exportElementToPdf(container: HTMLElement, opts: PdfExport
 const remainingDom = containerHeightDomPx - yDom;
     if (remainingDom <= 0) break;
 
-    let targetBreakDom = Math.min(yDom + pageHeightDomPx, container.scrollHeight);
+    let targetBreakDom = Math.min(yDom + pageHeightDomPx, containerHeightDomPx);
 
     // If the break falls inside an avoid-break block, push the whole block to next page
     const containing = findBlockContainingY(avoidBlocks, targetBreakDom);
