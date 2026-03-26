@@ -12,7 +12,6 @@ import iconSavings from '@/assets/pdf/icon-savings.svg';
 
 /* ────────────────────────────────────────────
    Stałe wymiarowe – fixed A4 layout (mm→px @96dpi ≈ 3.78)
-   Używamy px, bo html2canvas renderuje DOM, nie CSS @page.
    210mm ≈ 794px, 297mm ≈ 1123px
    ──────────────────────────────────────────── */
 const PAGE_W = 794;
@@ -40,17 +39,18 @@ const RodoFooter = () => (
       bottom: 0,
       left: 0,
       right: 0,
-      padding: '0 40px 18px',
+      padding: '0 40px 16px',
     }}
   >
-    <div style={{ borderTop: '1px solid #e0e0e0', paddingTop: 10 }}>
+    <div style={{ borderTop: '1px solid #d5d9dd', paddingTop: 10 }}>
       <p
         style={{
-          fontSize: 7,
-          lineHeight: 1.4,
-          color: '#999',
+          fontSize: 7.5,
+          lineHeight: 1.5,
+          color: '#888',
           textAlign: 'center',
           margin: 0,
+          letterSpacing: 0.1,
         }}
       >
         {RODO_TEXT}
@@ -86,6 +86,18 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
     { label: 'Energia bierna', before: results.reactiveEnergyCostBefore, after: results.reactiveEnergyCostAfter },
     { label: 'Opłata handlowa', before: results.handlingFeeBefore, after: results.handlingFeeAfter },
     { label: 'Suma pozostałych opłat', before: Number(analysis.fixed_distribution_before_total), after: Number(analysis.fixed_distribution_after_total) },
+  ];
+
+  // Compute zone shares for "after" scenario (Page 3 bottom chart)
+  const totalAfterMWh =
+    Number(analysis.consumption_after_zone1_mwh || 0) +
+    Number(analysis.consumption_after_zone2_mwh || 0) +
+    Number(analysis.consumption_after_zone3_mwh || 0);
+
+  const zoneSharesAfter = [
+    { label: 'Strefa 1', value: Number(analysis.consumption_after_zone1_mwh || 0), color: '#0d6b42' },
+    ...(zonesCountAfter >= 2 ? [{ label: 'Strefa 2', value: Number(analysis.consumption_after_zone2_mwh || 0), color: '#2ea87a' }] : []),
+    ...(zonesCountAfter >= 3 ? [{ label: 'Strefa 3', value: Number(analysis.consumption_after_zone3_mwh || 0), color: '#7dd3b3' }] : []),
   ];
 
   return (
@@ -227,9 +239,9 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
         </div>
 
         {/* Cover RODO (light on dark) */}
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 40px 18px' }}>
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', paddingTop: 10 }}>
-            <p style={{ fontSize: 7, lineHeight: 1.4, color: 'rgba(255,255,255,0.35)', textAlign: 'center', margin: 0 }}>
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 40px 16px' }}>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: 10 }}>
+            <p style={{ fontSize: 7.5, lineHeight: 1.5, color: 'rgba(255,255,255,0.4)', textAlign: 'center', margin: 0, letterSpacing: 0.1 }}>
               {RODO_TEXT}
             </p>
           </div>
@@ -239,7 +251,7 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
       {/* ═══════════ PAGE 2 — COSTS TABLE ═══════════ */}
       <div style={{ ...pageBase, padding: '40px 40px 60px' }} className="print-avoid-break">
         {/* Header bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
           <img src={iconChart} alt="" style={{ width: 28, height: 28 }} />
           <h2 style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif", fontSize: 22, fontWeight: 700, color: '#0d4a42', margin: 0 }}>
             Porównanie kosztów
@@ -248,7 +260,7 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
           <img src={logo} alt="" style={{ height: 24, opacity: 0.5 }} />
         </div>
 
-        <p style={{ fontSize: 12, color: '#777', marginBottom: 20 }}>
+        <p style={{ fontSize: 12, color: '#777', marginBottom: 18, lineHeight: 1.5 }}>
           Zestawienie składników kosztów energii w wariantach PRZED i PO zmianie taryfy za okres analizy ({results.periodMonths} mies.).
         </p>
 
@@ -302,36 +314,38 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
           </tbody>
         </table>
 
-        {/* Visual comparison bar */}
-        <div style={{ marginTop: 36 }}>
-          <p style={{ fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 12 }}>Wizualne porównanie kosztów</p>
-          <CostBar label="PRZED" value={results.totalCostBefore} max={Math.max(results.totalCostBefore, results.totalCostAfter)} color="#94a3b8" />
-          <CostBar label="PO" value={results.totalCostAfter} max={Math.max(results.totalCostBefore, results.totalCostAfter)} color="#1a6b5a" />
+        {/* Premium visual comparison bars */}
+        <div style={{ marginTop: 32 }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: '#0d4a42', marginBottom: 16, letterSpacing: 0.2 }}>
+            Wizualne porównanie kosztów
+          </p>
+          <CostBar label="PRZED" value={results.totalCostBefore} max={Math.max(results.totalCostBefore, results.totalCostAfter)} color="#8b9db5" gradientTo="#6b7f99" />
+          <CostBar label="PO" value={results.totalCostAfter} max={Math.max(results.totalCostBefore, results.totalCostAfter)} color="#0d6b42" gradientTo="#1a8a5a" />
         </div>
 
         {/* Savings highlight */}
         <div
           style={{
-            marginTop: 32,
+            marginTop: 28,
             background: 'linear-gradient(135deg, #e8f5f0, #dff0ea)',
             borderRadius: 14,
-            padding: '20px 28px',
+            padding: '22px 28px',
             display: 'flex',
             alignItems: 'center',
             gap: 20,
             border: '1px solid #c8e6d8',
           }}
         >
-          <img src={iconSavings} alt="" style={{ width: 36, height: 36, opacity: 0.7 }} />
+          <img src={iconSavings} alt="" style={{ width: 38, height: 38, opacity: 0.7 }} />
           <div>
-            <p style={{ fontSize: 13, color: '#555', margin: 0 }}>Szacowana oszczędność za okres analizy</p>
-            <p style={{ fontSize: 28, fontWeight: 800, color: results.savingsValue > 0 ? '#0d6b42' : '#d32f2f', margin: '4px 0 0', fontFamily: "'Plus Jakarta Sans'" }}>
+            <p style={{ fontSize: 12, color: '#666', margin: 0, fontWeight: 500 }}>Szacowana oszczędność za okres analizy</p>
+            <p style={{ fontSize: 30, fontWeight: 800, color: results.savingsValue > 0 ? '#0d6b42' : '#d32f2f', margin: '4px 0 0', fontFamily: "'Plus Jakarta Sans'" }}>
               {formatCurrency(Math.abs(results.savingsValue))}
             </p>
           </div>
           <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-            <p style={{ fontSize: 13, color: '#555', margin: 0 }}>Procentowo</p>
-            <p style={{ fontSize: 24, fontWeight: 800, color: results.savingsValue > 0 ? '#0d6b42' : '#d32f2f', margin: '4px 0 0', fontFamily: "'Plus Jakarta Sans'" }}>
+            <p style={{ fontSize: 12, color: '#666', margin: 0, fontWeight: 500 }}>Procentowo</p>
+            <p style={{ fontSize: 26, fontWeight: 800, color: results.savingsValue > 0 ? '#0d6b42' : '#d32f2f', margin: '4px 0 0', fontFamily: "'Plus Jakarta Sans'" }}>
               {formatPercent(results.savingsPercent)}
             </p>
           </div>
@@ -343,7 +357,7 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
       {/* ═══════════ PAGE 3 — PARAMETERS ═══════════ */}
       <div style={{ ...pageBase, padding: '40px 40px 60px' }} className="print-avoid-break">
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
           <img src={iconPower} alt="" style={{ width: 28, height: 28 }} />
           <h2 style={{ fontFamily: "'Plus Jakarta Sans'", fontSize: 22, fontWeight: 700, color: '#0d4a42', margin: 0 }}>
             Parametry analizy
@@ -353,7 +367,7 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
         </div>
 
         {/* Cards grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
           {/* Moc umowna */}
           <ParamCard icon={iconPower} title="Moc umowna">
             <ParamRow label="PRZED" value={`${formatNumber(Number(analysis.contracted_power_before_kw))} kW × ${formatNumber(Number(analysis.contracted_power_charge_rate_before))} zł/kW/mies.`} />
@@ -378,7 +392,7 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
           <ParamCard icon={iconChart} title="Stawki energii czynnej">
             <ParamRow label="PRZED S1" value={`${formatNumber(Number(analysis.active_energy_price_before_zone1))} zł/MWh`} />
             {zonesCountBefore >= 2 && <ParamRow label="PRZED S2" value={`${formatNumber(Number(analysis.active_energy_price_before_zone2))} zł/MWh`} />}
-            <div style={{ height: 6 }} />
+            <div style={{ height: 5 }} />
             <ParamRow label="PO S1" value={`${formatNumber(Number(analysis.active_energy_price_after_zone1))} zł/MWh`} />
             {zonesCountAfter >= 2 && <ParamRow label="PO S2" value={`${formatNumber(Number(analysis.active_energy_price_after_zone2))} zł/MWh`} />}
           </ParamCard>
@@ -387,7 +401,7 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
           <ParamCard icon={iconSavings} title="Opłaty dodatkowe">
             <ParamRow label="Opl. mocowa PRZED" value={formatCurrency(results.capacityChargeBefore)} />
             <ParamRow label="Opl. mocowa PO" value={formatCurrency(results.capacityChargeAfter)} />
-            <div style={{ height: 6 }} />
+            <div style={{ height: 5 }} />
             <ParamRow label="Opl. handlowa PRZED" value={`${formatNumber(Number(analysis.handling_fee_before))} zł/mies.`} />
             <ParamRow label="Opl. handlowa PO" value={`${formatNumber(Number(analysis.handling_fee_after))} zł/mies.`} />
           </ParamCard>
@@ -399,13 +413,71 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
           </ParamCard>
         </div>
 
+        {/* ── Bottom insight: Zone share chart (PO scenario) ── */}
+        {totalAfterMWh > 0 && (
+          <div
+            style={{
+              marginTop: 24,
+              background: 'linear-gradient(135deg, #f0f7f4, #f8fafb)',
+              borderRadius: 14,
+              padding: '22px 28px',
+              border: '1px solid #dce8e2',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <img src={iconChart} alt="" style={{ width: 18, height: 18, opacity: 0.6 }} />
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#0d4a42', margin: 0 }}>
+                Struktura zużycia energii — scenariusz PO
+              </p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+              {/* Horizontal stacked bar */}
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', height: 28, borderRadius: 8, overflow: 'hidden' }}>
+                  {zoneSharesAfter.map((z, i) => {
+                    const pct = totalAfterMWh > 0 ? (z.value / totalAfterMWh) * 100 : 0;
+                    return pct > 0 ? (
+                      <div
+                        key={i}
+                        style={{
+                          width: `${pct}%`,
+                          background: z.color,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#fff',
+                          fontSize: 10,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {pct >= 8 ? `${pct.toFixed(1)}%` : ''}
+                      </div>
+                    ) : null;
+                  })}
+                </div>
+                {/* Legend */}
+                <div style={{ display: 'flex', gap: 20, marginTop: 10 }}>
+                  {zoneSharesAfter.map((z, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ width: 10, height: 10, borderRadius: 3, background: z.color }} />
+                      <span style={{ fontSize: 11, color: '#555' }}>
+                        {z.label}: {formatNumber(z.value, 2)} MWh ({totalAfterMWh > 0 ? ((z.value / totalAfterMWh) * 100).toFixed(1) : '0'}%)
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <RodoFooter />
       </div>
 
       {/* ═══════════ PAGE 4 — RESULTS TILES ═══════════ */}
       <div style={{ ...pageBase, padding: '40px 40px 60px' }} className="print-avoid-break">
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
           <img src={iconSavings} alt="" style={{ width: 28, height: 28 }} />
           <h2 style={{ fontFamily: "'Plus Jakarta Sans'", fontSize: 22, fontWeight: 700, color: '#0d4a42', margin: 0 }}>
             Podsumowanie
@@ -450,19 +522,28 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
           />
         </div>
 
-        {/* Consultant notes */}
+        {/* Consultant notes — premium advisory style */}
         {analysis.consultant_notes && (
           <div
             style={{
-              background: '#f8fafb',
-              borderRadius: 14,
-              padding: '24px 28px',
-              border: '1px solid #e8ecef',
+              background: 'linear-gradient(135deg, #f8fafb, #f0f4f3)',
+              borderRadius: 16,
+              padding: '28px 30px',
+              border: '1px solid #d5ddd9',
               marginBottom: 24,
+              position: 'relative',
+              overflow: 'hidden',
             }}
           >
-            <p style={{ fontSize: 13, fontWeight: 600, color: '#0d4a42', marginBottom: 8 }}>Uwagi konsultanta</p>
-            <p style={{ fontSize: 12, color: '#555', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>
+            {/* Decorative left accent bar */}
+            <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 4, background: 'linear-gradient(180deg, #0d6b42, #1a8a5a)', borderRadius: '16px 0 0 16px' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <img src={iconChart} alt="" style={{ width: 20, height: 20, opacity: 0.6 }} />
+              <p style={{ fontSize: 14, fontWeight: 700, color: '#0d4a42', margin: 0, fontFamily: "'Plus Jakarta Sans'" }}>
+                Rekomendacja doradcy energetycznego
+              </p>
+            </div>
+            <p style={{ fontSize: 12.5, color: '#444', lineHeight: 1.8, margin: 0, whiteSpace: 'pre-wrap', paddingLeft: 8 }}>
               {analysis.consultant_notes}
             </p>
           </div>
@@ -472,7 +553,7 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
         <div
           style={{
             position: 'absolute',
-            bottom: 70,
+            bottom: 68,
             left: 40,
             right: 40,
             borderTop: '2px solid #0d4a42',
@@ -519,11 +600,11 @@ function ParamCard({ icon, title, children }: { icon: string; title: string; chi
       style={{
         background: '#f8fafb',
         borderRadius: 14,
-        padding: '20px 22px',
+        padding: '18px 20px',
         border: '1px solid #e8ecef',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <img src={icon} alt="" style={{ width: 20, height: 20, opacity: 0.7 }} />
         <p style={{ fontSize: 13, fontWeight: 700, color: '#0d4a42', margin: 0 }}>{title}</p>
       </div>
@@ -534,22 +615,36 @@ function ParamCard({ icon, title, children }: { icon: string; title: string; chi
 
 function ParamRow({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
       <span style={{ fontSize: 11, color: '#888' }}>{label}</span>
       <span style={{ fontSize: 12, fontWeight: 600, color: '#333' }}>{value}</span>
     </div>
   );
 }
 
-function CostBar({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
+function CostBar({ label, value, max, color, gradientTo }: { label: string; value: number; max: number; color: string; gradientTo: string }) {
   const pct = max > 0 ? (value / max) * 100 : 0;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-      <span style={{ fontSize: 12, fontWeight: 600, color: '#555', width: 60 }}>{label}</span>
-      <div style={{ flex: 1, height: 22, background: '#f0f2f5', borderRadius: 6, overflow: 'hidden' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 6, transition: 'width 0.3s' }} />
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+      <span style={{ fontSize: 13, fontWeight: 700, color: '#444', width: 60, letterSpacing: 0.3 }}>{label}</span>
+      <div style={{ flex: 1, height: 32, background: '#f0f2f5', borderRadius: 10, overflow: 'hidden', position: 'relative' }}>
+        <div
+          style={{
+            width: `${pct}%`,
+            height: '100%',
+            background: `linear-gradient(90deg, ${color}, ${gradientTo})`,
+            borderRadius: 10,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            paddingRight: 12,
+          }}
+        >
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.2)' }}>
+            {formatCurrency(value)}
+          </span>
+        </div>
       </div>
-      <span style={{ fontSize: 12, fontWeight: 600, color: '#333', width: 110, textAlign: 'right' }}>{formatCurrency(value)}</span>
     </div>
   );
 }
