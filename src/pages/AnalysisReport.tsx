@@ -162,7 +162,11 @@ export default function AnalysisReport() {
       </div>
 
       {/* Report Content */}
-      <div ref={reportContentRef} className="max-w-4xl mx-auto px-8 py-8 print:py-4 print:px-6 bg-white">
+     <div
+  ref={reportContentRef}
+  data-pdf-root="true"
+  className="max-w-4xl mx-auto px-8 py-8 print:py-4 print:px-6 bg-white"
+>
         {/* Header */}
         <div className="flex items-center justify-between mb-8 pb-6 border-b-2 border-primary/20">
           <div className="flex items-center gap-3">
