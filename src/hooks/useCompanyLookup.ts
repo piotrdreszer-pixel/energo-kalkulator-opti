@@ -47,7 +47,7 @@ export function useCompanyLookup() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<CompanyLookupError | null>(null);
   const [data, setData] = useState<CompanyData | null>(null);
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Cleanup debounce on unmount
   useEffect(() => {
