@@ -56,11 +56,28 @@ export async function exportElementToPdf(container: HTMLElement, opts: PdfExport
 
   // 1) Render DOM → canvas
   const canvas = await html2canvas(container, {
-    scale,
-    useCORS: true,
-    logging: false,
-    backgroundColor: '#ffffff',
-  });
+  scale: Math.max(scale, 2.5),
+  useCORS: true,
+  logging: false,
+  backgroundColor: '#ffffff',
+  allowTaint: false,
+  foreignObjectRendering: false,
+  imageTimeout: 15000,
+  onclone: (clonedDoc) => {
+    const clonedBody = clonedDoc.body;
+    clonedBody.style.background = '#ffffff';
+
+    const clonedContainer = clonedDoc.querySelector('[data-pdf-root="true"]') as HTMLElement | null;
+    if (clonedContainer) {
+      clonedContainer.style.maxWidth = '210mm';
+      clonedContainer.style.width = '210mm';
+      clonedContainer.style.margin = '0';
+      clonedContainer.style.padding = '0';
+      clonedContainer.style.background = '#ffffff';
+      clonedContainer.style.boxSizing = 'border-box';
+    }
+  },
+});
 
   // 2) Setup PDF
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
