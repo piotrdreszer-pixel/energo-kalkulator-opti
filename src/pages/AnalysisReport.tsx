@@ -235,8 +235,8 @@ export default function AnalysisReport() {
         {/* Cost Comparison Table */}
         <section className="mb-8 print-avoid-break">
           <h2 className="text-lg font-display font-semibold mb-4 text-primary">Porównanie kosztów za okres analizy</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-sm">
+          <div className="w-full">
+  <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="bg-muted/50">
                   <th className="border border-border px-4 py-3 text-left font-semibold">Składnik kosztu</th>
