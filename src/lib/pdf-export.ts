@@ -80,7 +80,12 @@ export async function exportElementToPdf(container: HTMLElement, opts: PdfExport
 });
 
   // 2) Setup PDF
-  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+ const pdf = new jsPDF({
+  orientation: 'portrait',
+  unit: 'mm',
+  format: 'a4',
+  compress: true,
+});
   const pdfWidth = pdf.internal.pageSize.getWidth();
   const pdfHeight = pdf.internal.pageSize.getHeight();
   const availableWidthMm = pdfWidth - 2 * margin;
