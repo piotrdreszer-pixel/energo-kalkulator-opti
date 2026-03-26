@@ -3,15 +3,12 @@ import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Printer, Loader2, Download } from 'lucide-react';
+import { ArrowLeft, Loader2, Download } from 'lucide-react';
 import type { EnergyAnalysis, ClientProject } from '@/types/database';
-import { calculateEnergyCosts, formatCurrency, formatPercent, formatNumber } from '@/lib/calculation-utils';
-import { getZoneLabels } from '@/lib/tariff-utils';
-import { format } from 'date-fns';
-import { pl } from 'date-fns/locale';
-import logo from '@/assets/logo.png';
+import { calculateEnergyCosts } from '@/lib/calculation-utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { exportElementToPdf } from '@/lib/pdf-export';
+import AnalysisPdfDocument from '@/components/pdf/AnalysisPdfDocument';
 
 export default function AnalysisReport() {
   const { projectId, analysisId } = useParams<{ projectId: string; analysisId: string }>();
