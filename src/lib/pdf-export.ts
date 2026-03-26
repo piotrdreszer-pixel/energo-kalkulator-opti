@@ -115,7 +115,13 @@ export async function exportElementToPdf(container: HTMLElement, opts: PdfExport
   let pageIndex = 0;
 
   while (true) {
-    const remainingDom = container.scrollHeight - yDom;
+   const containerHeightDomPx = Math.max(
+  container.scrollHeight,
+  container.offsetHeight,
+  container.getBoundingClientRect().height
+);
+
+const remainingDom = containerHeightDomPx - yDom;
     if (remainingDom <= 0) break;
 
     let targetBreakDom = Math.min(yDom + pageHeightDomPx, container.scrollHeight);
