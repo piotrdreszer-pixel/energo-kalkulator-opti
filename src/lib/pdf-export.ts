@@ -157,7 +157,7 @@ export async function exportElementToPdf(container: HTMLElement, opts: PdfExport
     const sliceHeightMm = (sliceHeightPx * availableWidthMm) / sourceWidthPx;
 
     if (pageIndex > 0) pdf.addPage();
-    pdf.addImage(imgData, 'PNG', margin, margin, availableWidthMm, sliceHeightMm);
+    pdf.addImage(imgData, 'JPEG', margin, margin, availableWidthMm, sliceHeightMm);
 
     pageIndex += 1;
     yDom = targetBreakDom;
