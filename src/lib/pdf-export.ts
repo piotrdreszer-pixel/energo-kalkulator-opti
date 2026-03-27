@@ -153,7 +153,7 @@ export async function exportElementToPdf(container: HTMLElement, opts: PdfExport
       sliceHeightPx
     );
 
-    const imgData = scratch.toDataURL('image/png');
+    const imgData = scratch.toDataURL('image/jpeg', 0.85);
     const sliceHeightMm = (sliceHeightPx * availableWidthMm) / sourceWidthPx;
 
     if (pageIndex > 0) pdf.addPage();
