@@ -50,7 +50,7 @@ function findBlockContainingY(blocks: AvoidBlock[], yDomPx: number) {
 
 export async function exportElementToPdf(container: HTMLElement, opts: PdfExportOptions) {
   const margin = opts.marginMm ?? 10;
-  const scale = opts.scale ?? 3;
+  const scale = opts.scale ?? 2;
   const avoidBreakSelector = opts.avoidBreakSelector ?? '.print-avoid-break';
   const minSliceDomPx = opts.minSliceDomPx ?? 180;
 
@@ -61,7 +61,7 @@ export async function exportElementToPdf(container: HTMLElement, opts: PdfExport
   );
 
   const canvas = await html2canvas(container, {
-    scale: Math.max(scale, 2.5),
+    scale: Math.max(scale, 2),
     useCORS: true,
     logging: false,
     backgroundColor: '#ffffff',
