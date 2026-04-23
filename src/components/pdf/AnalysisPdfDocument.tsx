@@ -252,7 +252,7 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
       </div>
 
       {/* ═══════════ PAGE 2 — COSTS TABLE ═══════════ */}
-      <div style={{ ...pageBase, padding: '40px 40px 60px' }} className="print-avoid-break">
+      <div style={{ ...pageBase, ...pageBreak, padding: '40px 40px 60px' }} className="print-avoid-break">
         {/* Header bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
           <img src={iconChart} alt="" style={{ width: 28, height: 28 }} />
