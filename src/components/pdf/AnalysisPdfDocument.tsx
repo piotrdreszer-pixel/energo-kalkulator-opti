@@ -21,15 +21,18 @@ const RODO_TEXT =
 
 /* ── Shared helpers ── */
 const pageBase: React.CSSProperties = {
-  width: PAGE_W,
-  minHeight: PAGE_H,
-  height: PAGE_H,
+  width: '210mm',
+  height: '297mm',
   position: 'relative',
   overflow: 'hidden',
   boxSizing: 'border-box',
   fontFamily: "'Inter', system-ui, sans-serif",
   background: '#ffffff',
+};
+
+const pageBreak: React.CSSProperties = {
   pageBreakAfter: 'always',
+  breakAfter: 'page',
 };
 
 const RodoFooter = () => (
