@@ -395,9 +395,11 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
           <ParamCard icon={iconChart} title="Stawki energii czynnej">
             <ParamRow label="PRZED S1" value={`${formatNumber(Number(analysis.active_energy_price_before_zone1))} zł/MWh`} />
             {zonesCountBefore >= 2 && <ParamRow label="PRZED S2" value={`${formatNumber(Number(analysis.active_energy_price_before_zone2))} zł/MWh`} />}
+            {zonesCountBefore >= 3 && <ParamRow label="PRZED S3" value={`${formatNumber(Number(analysis.active_energy_price_before_zone3))} zł/MWh`} />}
             <div style={{ height: 5 }} />
             <ParamRow label="PO S1" value={`${formatNumber(Number(analysis.active_energy_price_after_zone1))} zł/MWh`} />
             {zonesCountAfter >= 2 && <ParamRow label="PO S2" value={`${formatNumber(Number(analysis.active_energy_price_after_zone2))} zł/MWh`} />}
+            {zonesCountAfter >= 3 && <ParamRow label="PO S3" value={`${formatNumber(Number(analysis.active_energy_price_after_zone3))} zł/MWh`} />}
           </ParamCard>
 
           {/* Opłata mocowa */}
