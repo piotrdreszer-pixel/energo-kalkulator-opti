@@ -358,7 +358,7 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
       </div>
 
       {/* ═══════════ PAGE 3 — PARAMETERS ═══════════ */}
-      <div style={{ ...pageBase, padding: '40px 40px 60px' }} className="print-avoid-break">
+      <div style={{ ...pageBase, ...pageBreak, padding: '40px 40px 60px' }} className="print-avoid-break">
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
           <img src={iconPower} alt="" style={{ width: 28, height: 28 }} />
