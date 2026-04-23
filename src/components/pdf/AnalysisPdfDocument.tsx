@@ -106,7 +106,7 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
   return (
     <div style={{ width: PAGE_W, background: '#fff' }}>
       {/* ═══════════ PAGE 1 — COVER ═══════════ */}
-      <div style={{ ...pageBase, padding: 0 }} className="print-avoid-break">
+      <div style={{ ...pageBase, ...pageBreak, padding: 0 }} className="print-avoid-break">
         {/* Full-bleed background */}
         <img
           src={coverPattern}
