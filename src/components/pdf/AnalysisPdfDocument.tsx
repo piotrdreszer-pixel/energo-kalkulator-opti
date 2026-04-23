@@ -21,15 +21,18 @@ const RODO_TEXT =
 
 /* ── Shared helpers ── */
 const pageBase: React.CSSProperties = {
-  width: PAGE_W,
-  minHeight: PAGE_H,
-  height: PAGE_H,
+  width: '210mm',
+  height: '297mm',
   position: 'relative',
   overflow: 'hidden',
   boxSizing: 'border-box',
   fontFamily: "'Inter', system-ui, sans-serif",
   background: '#ffffff',
+};
+
+const pageBreak: React.CSSProperties = {
   pageBreakAfter: 'always',
+  breakAfter: 'page',
 };
 
 const RodoFooter = () => (
@@ -103,7 +106,7 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
   return (
     <div style={{ width: PAGE_W, background: '#fff' }}>
       {/* ═══════════ PAGE 1 — COVER ═══════════ */}
-      <div style={{ ...pageBase, padding: 0 }} className="print-avoid-break">
+      <div style={{ ...pageBase, ...pageBreak, padding: 0 }} className="print-avoid-break">
         {/* Full-bleed background */}
         <img
           src={coverPattern}
@@ -249,7 +252,7 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
       </div>
 
       {/* ═══════════ PAGE 2 — COSTS TABLE ═══════════ */}
-      <div style={{ ...pageBase, padding: '40px 40px 60px' }} className="print-avoid-break">
+      <div style={{ ...pageBase, ...pageBreak, padding: '40px 40px 60px' }} className="print-avoid-break">
         {/* Header bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
           <img src={iconChart} alt="" style={{ width: 28, height: 28 }} />
@@ -355,7 +358,7 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
       </div>
 
       {/* ═══════════ PAGE 3 — PARAMETERS ═══════════ */}
-      <div style={{ ...pageBase, padding: '40px 40px 60px' }} className="print-avoid-break">
+      <div style={{ ...pageBase, ...pageBreak, padding: '40px 40px 60px' }} className="print-avoid-break">
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
           <img src={iconPower} alt="" style={{ width: 28, height: 28 }} />
@@ -392,9 +395,11 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
           <ParamCard icon={iconChart} title="Stawki energii czynnej">
             <ParamRow label="PRZED S1" value={`${formatNumber(Number(analysis.active_energy_price_before_zone1))} zł/MWh`} />
             {zonesCountBefore >= 2 && <ParamRow label="PRZED S2" value={`${formatNumber(Number(analysis.active_energy_price_before_zone2))} zł/MWh`} />}
+            {zonesCountBefore >= 3 && <ParamRow label="PRZED S3" value={`${formatNumber(Number(analysis.active_energy_price_before_zone3))} zł/MWh`} />}
             <div style={{ height: 5 }} />
             <ParamRow label="PO S1" value={`${formatNumber(Number(analysis.active_energy_price_after_zone1))} zł/MWh`} />
             {zonesCountAfter >= 2 && <ParamRow label="PO S2" value={`${formatNumber(Number(analysis.active_energy_price_after_zone2))} zł/MWh`} />}
+            {zonesCountAfter >= 3 && <ParamRow label="PO S3" value={`${formatNumber(Number(analysis.active_energy_price_after_zone3))} zł/MWh`} />}
           </ParamCard>
 
           {/* Opłata mocowa */}
