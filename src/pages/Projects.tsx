@@ -40,6 +40,7 @@ import {
   Loader2,
   FolderOpen,
   Trash2,
+  Users,
 } from 'lucide-react';
 import type { ClientProject, ProjectStatus } from '@/types/database';
 import { format } from 'date-fns';
