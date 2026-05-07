@@ -139,12 +139,22 @@ export default function Projects() {
     return Array.from(groups.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [projects, profileMap]);
 
+  const showingUserList = showUserGrouping && !selectedUserId;
+
   const filteredProjects = projects?.filter((project) => {
+    if (showUserGrouping && selectedUserId) {
+      if ((project.created_by_user_id || 'unknown') !== selectedUserId) return false;
+    }
     const query = searchQuery.toLowerCase();
     return (
       project.client_name.toLowerCase().includes(query) ||
       project.client_nip.toLowerCase().includes(query)
     );
+  });
+
+  const filteredUserGroups = userGroups.filter(g => {
+    const q = searchQuery.toLowerCase();
+    return !q || g.name.toLowerCase().includes(q) || g.email.toLowerCase().includes(q);
   });
 
   const handleCreateProject = async () => {
