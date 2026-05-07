@@ -78,6 +78,10 @@ export default function Projects() {
 
   const { user } = useAuth();
   const { toast } = useToast();
+  const { isAdmin, isManager, loading: rolesLoading } = useUserRoles();
+  const showUserGrouping = isAdmin || isManager;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedUserId = searchParams.get('user');
 
   const { data: projects, isLoading, refetch } = useQuery({
     queryKey: ['projects'],
@@ -92,6 +96,48 @@ export default function Projects() {
       return (data || []) as ClientProject[];
     },
   });
+
+  // Fetch creator profiles for admin/manager grouping
+  const { data: creatorProfiles } = useQuery({
+    queryKey: ['projects-creator-profiles', showUserGrouping],
+    enabled: showUserGrouping,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id, name, email');
+      if (error) throw error;
+      return data as { user_id: string; name: string; email: string }[];
+    },
+  });
+
+  const profileMap = useMemo(
+    () => new Map((creatorProfiles || []).map(p => [p.user_id, p])),
+    [creatorProfiles]
+  );
+
+  // Group projects by creator
+  const userGroups = useMemo(() => {
+    if (!projects) return [];
+    const groups = new Map<string, { user_id: string; name: string; email: string; count: number; lastUpdate: string }>();
+    for (const p of projects) {
+      const uid = p.created_by_user_id || 'unknown';
+      const profile = profileMap.get(uid);
+      const existing = groups.get(uid);
+      if (existing) {
+        existing.count += 1;
+        if (p.updated_at > existing.lastUpdate) existing.lastUpdate = p.updated_at;
+      } else {
+        groups.set(uid, {
+          user_id: uid,
+          name: profile?.name || 'Nieznany użytkownik',
+          email: profile?.email || '',
+          count: 1,
+          lastUpdate: p.updated_at,
+        });
+      }
+    }
+    return Array.from(groups.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [projects, profileMap]);
 
   const filteredProjects = projects?.filter((project) => {
     const query = searchQuery.toLowerCase();
