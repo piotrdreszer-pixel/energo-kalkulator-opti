@@ -525,80 +525,82 @@ export default function Projects() {
         )}
 
         {/* Projects List */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : filteredProjects?.length === 0 ? (
-          <Card className="text-center py-12">
-            <CardContent>
-              <FolderOpen className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium text-foreground mb-2">
-                {searchQuery ? 'Brak wyników' : 'Brak projektów'}
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                {searchQuery
-                  ? 'Nie znaleziono projektów pasujących do wyszukiwania.'
-                  : 'Utwórz pierwszy projekt, aby rozpocząć.'}
-              </p>
-              {!searchQuery && (
-                <Button onClick={() => setIsCreateDialogOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Utwórz projekt
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredProjects?.map((project) => (
-              <Card key={project.id} className="card-interactive h-full relative group">
-                <Link to={`/projects/${project.id}`} className="block">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-lg font-display line-clamp-2">
-                        {project.client_name}
-                      </CardTitle>
-                      <Badge variant={STATUS_VARIANTS[project.status]}>
-                        {STATUS_LABELS[project.status]}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Building2 className="h-4 w-4" />
-                      <span>NIP: {project.client_nip}</span>
-                    </div>
-                    
-                    {project.client_address && (
-                      <p className="text-sm text-muted-foreground line-clamp-1">
-                        {project.client_address}
-                      </p>
-                    )}
+        {!showingUserList && (
+          isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : filteredProjects?.length === 0 ? (
+            <Card className="text-center py-12">
+              <CardContent>
+                <FolderOpen className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">
+                  {searchQuery ? 'Brak wyników' : 'Brak projektów'}
+                </h3>
+                <p className="text-muted-foreground mb-4">
+                  {searchQuery
+                    ? 'Nie znaleziono projektów pasujących do wyszukiwania.'
+                    : 'Utwórz pierwszy projekt, aby rozpocząć.'}
+                </p>
+                {!searchQuery && (
+                  <Button onClick={() => setIsCreateDialogOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Utwórz projekt
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredProjects?.map((project) => (
+                <Card key={project.id} className="card-interactive h-full relative group">
+                  <Link to={`/projects/${project.id}`} className="block">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <CardTitle className="text-lg font-display line-clamp-2">
+                          {project.client_name}
+                        </CardTitle>
+                        <Badge variant={STATUS_VARIANTS[project.status]}>
+                          {STATUS_LABELS[project.status]}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Building2 className="h-4 w-4" />
+                        <span>NIP: {project.client_nip}</span>
+                      </div>
+                      
+                      {project.client_address && (
+                        <p className="text-sm text-muted-foreground line-clamp-1">
+                          {project.client_address}
+                        </p>
+                      )}
 
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t">
-                      <Calendar className="h-3 w-3" />
-                      <span>
-                        Aktualizacja: {format(new Date(project.updated_at), 'd MMM yyyy', { locale: pl })}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Link>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setProjectToDelete(project);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </Card>
-            ))}
-          </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t">
+                        <Calendar className="h-3 w-3" />
+                        <span>
+                          Aktualizacja: {format(new Date(project.updated_at), 'd MMM yyyy', { locale: pl })}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Link>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setProjectToDelete(project);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </Card>
+              ))}
+            </div>
+          )
         )}
 
         {/* Delete Confirmation Dialog */}
