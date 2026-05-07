@@ -1,5 +1,7 @@
-import React, { useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useCallback, useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useUserRoles } from '@/hooks/useUserRoles';
+import { ArrowLeft, User as UserIcon } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
