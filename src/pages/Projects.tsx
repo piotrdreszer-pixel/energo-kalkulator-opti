@@ -420,16 +420,109 @@ export default function Projects() {
           </Dialog>
         </div>
 
+        {/* Back button when viewing a user's projects */}
+        {showUserGrouping && selectedUserId && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              const next = new URLSearchParams(searchParams);
+              next.delete('user');
+              setSearchParams(next);
+              setSearchQuery('');
+            }}
+            className="mb-4"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Wróć do listy użytkowników
+          </Button>
+        )}
+
+        {showUserGrouping && selectedUserId && (
+          <div className="mb-4">
+            <h2 className="text-xl font-display font-semibold">
+              Projekty: {profileMap.get(selectedUserId)?.name || 'Nieznany użytkownik'}
+            </h2>
+            {profileMap.get(selectedUserId)?.email && (
+              <p className="text-sm text-muted-foreground">{profileMap.get(selectedUserId)?.email}</p>
+            )}
+          </div>
+        )}
+
         {/* Search */}
         <div className="relative mb-6">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Szukaj po nazwie klienta lub NIP..."
+            placeholder={showingUserList ? 'Szukaj użytkownika...' : 'Szukaj po nazwie klienta lub NIP...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 max-w-md"
           />
         </div>
+
+        {showingUserList && (
+          isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : filteredUserGroups.length === 0 ? (
+            <Card className="text-center py-12">
+              <CardContent>
+                <Users className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">
+                  {searchQuery ? 'Brak wyników' : 'Brak projektów'}
+                </h3>
+                <p className="text-muted-foreground">
+                  {searchQuery
+                    ? 'Nie znaleziono użytkowników pasujących do wyszukiwania.'
+                    : 'Żaden użytkownik nie posiada jeszcze projektów.'}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredUserGroups.map((g) => (
+                <Card
+                  key={g.user_id}
+                  className="card-interactive h-full cursor-pointer"
+                  onClick={() => {
+                    const next = new URLSearchParams(searchParams);
+                    next.set('user', g.user_id);
+                    setSearchParams(next);
+                    setSearchQuery('');
+                  }}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <UserIcon className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="min-w-0">
+                          <CardTitle className="text-base font-display truncate">
+                            {g.name}
+                          </CardTitle>
+                          {g.email && (
+                            <p className="text-xs text-muted-foreground truncate">{g.email}</p>
+                          )}
+                        </div>
+                      </div>
+                      <Badge variant="secondary">{g.count}</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Calendar className="h-3 w-3" />
+                      <span>
+                        Ostatnia aktualizacja: {format(new Date(g.lastUpdate), 'd MMM yyyy', { locale: pl })}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )
+        )}
 
         {/* Projects List */}
         {isLoading ? (
