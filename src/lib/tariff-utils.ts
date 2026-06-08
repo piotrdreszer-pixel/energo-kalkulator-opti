@@ -14,6 +14,10 @@ export const TARIFF_CODES = [
   { code: 'C22a', zones: 2, minPower: 40 },
   { code: 'C22b', zones: 2, minPower: 40 },
   { code: 'C23', zones: 3, minPower: 40 },
+  // G-tariffs (residential, low voltage, no power limit)
+  { code: 'G11', zones: 1, maxPower: 40 },
+  { code: 'G12', zones: 2, maxPower: 40 },
+  { code: 'G12w', zones: 2, maxPower: 40 },
 ] as const;
 
 export type TariffCode = typeof TARIFF_CODES[number]['code'];
@@ -28,7 +32,7 @@ export function getZonesCount(tariffCode: string): number {
 }
 
 export function isLowVoltageTariff(tariffCode: string): boolean {
-  return tariffCode.startsWith('C1') || tariffCode.startsWith('B1');
+  return tariffCode.startsWith('C1') || tariffCode.startsWith('B1') || tariffCode.startsWith('G');
 }
 
 export function isHighVoltageTariff(tariffCode: string): boolean {

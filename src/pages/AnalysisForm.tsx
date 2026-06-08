@@ -239,9 +239,9 @@ export default function AnalysisForm() {
   };
 
   const getPowerHint = (tariffCode: string): string => {
-    const isLow = tariffCode.startsWith('C1') || tariffCode.startsWith('B1');
+    const isLow = tariffCode.startsWith('C1') || tariffCode.startsWith('B1') || tariffCode.startsWith('G');
     const isHigh = tariffCode.startsWith('C2') || tariffCode.startsWith('B2');
-    if (isLow) return 'Dla taryf C1/B1 moc umowna musi być ≤ 40 kW';
+    if (isLow) return 'Dla taryf C1/B1/G moc umowna musi być ≤ 40 kW';
     if (isHigh) return 'Dla taryf C2/B2 moc umowna musi być > 40 kW';
     return '';
   };
