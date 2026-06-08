@@ -32,7 +32,7 @@ export function getZonesCount(tariffCode: string): number {
 }
 
 export function isLowVoltageTariff(tariffCode: string): boolean {
-  return tariffCode.startsWith('C1') || tariffCode.startsWith('B1');
+  return tariffCode.startsWith('C1') || tariffCode.startsWith('B1') || tariffCode.startsWith('G');
 }
 
 export function isHighVoltageTariff(tariffCode: string): boolean {
