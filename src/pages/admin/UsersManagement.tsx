@@ -495,7 +495,11 @@ export default function UsersManagement() {
                           {user.isManager && (
                             <Badge variant="outline">Menedżer</Badge>
                           )}
+                          {user.blocked_at && (
+                            <Badge variant="destructive">Zablokowany</Badge>
+                          )}
                         </div>
+
                       </TableCell>
                       <TableCell className="text-center font-medium">
                         {user.projectsCount}
