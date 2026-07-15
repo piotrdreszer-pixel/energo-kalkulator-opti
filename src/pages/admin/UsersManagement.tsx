@@ -36,7 +36,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Users, UserPlus, Trash2, BarChart3, Calendar, FileText, Loader2, Shield } from 'lucide-react';
+import { Users, UserPlus, Trash2, BarChart3, Calendar, FileText, Loader2, Shield, Ban, CheckCircle2 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
