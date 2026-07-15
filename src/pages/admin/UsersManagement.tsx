@@ -130,11 +130,13 @@ export default function UsersManagement() {
           email: profile.email,
           created_at: profile.created_at,
           last_activity_at: profile.last_activity_at,
+          blocked_at: (profile as any).blocked_at ?? null,
           isAdmin,
           isManager,
           projectsCount: userProjects.length,
           analysesCount,
         } as UserWithStats;
+
       }) || [];
 
       return userStats;
