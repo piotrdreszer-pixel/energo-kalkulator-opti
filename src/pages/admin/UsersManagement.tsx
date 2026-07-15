@@ -538,9 +538,48 @@ export default function UsersManagement() {
                           </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
+                              <Button
+                                variant={user.blocked_at ? 'default' : 'outline'}
+                                size="sm"
+                                disabled={toggleBlockMutation.isPending}
+                              >
+                                {user.blocked_at ? (
+                                  <><CheckCircle2 className="h-4 w-4 mr-1" />Odblokuj</>
+                                ) : (
+                                  <><Ban className="h-4 w-4 mr-1" />Zablokuj</>
+                                )}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  {user.blocked_at ? 'Odblokować konto?' : 'Zablokować konto?'}
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  {user.blocked_at
+                                    ? `Użytkownik ${user.email} znów będzie mógł się zalogować.`
+                                    : `Użytkownik ${user.email} nie będzie mógł się zalogować. Istniejąca sesja pozostanie aktywna do wygaśnięcia.`}
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Anuluj</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => toggleBlockMutation.mutate({
+                                    userId: user.user_id,
+                                    isBlocked: !!user.blocked_at,
+                                  })}
+                                >
+                                  {user.blocked_at ? 'Odblokuj' : 'Zablokuj'}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
                               <Button variant="destructive" size="sm">
                                 <Trash2 className="h-4 w-4" />
                               </Button>
+
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
