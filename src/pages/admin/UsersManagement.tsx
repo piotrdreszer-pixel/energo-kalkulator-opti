@@ -47,11 +47,13 @@ interface UserWithStats {
   email: string;
   created_at: string;
   last_activity_at: string | null;
+  blocked_at: string | null;
   isAdmin: boolean;
   isManager: boolean;
   projectsCount: number;
   analysesCount: number;
 }
+
 
 export default function UsersManagement() {
   const queryClient = useQueryClient();
