@@ -279,6 +279,26 @@ export default function UsersManagement() {
     },
   });
 
+  // Toggle blocked status
+  const toggleBlockMutation = useMutation({
+    mutationFn: async ({ userId, isBlocked }: { userId: string; isBlocked: boolean }) => {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ blocked_at: isBlocked ? null : new Date().toISOString() } as any)
+        .eq('user_id', userId);
+      if (error) throw error;
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      toast.success(vars.isBlocked ? 'Konto zostało odblokowane' : 'Konto zostało zablokowane');
+    },
+    onError: (error: any) => {
+      console.error('Error toggling block:', error);
+      toast.error('Nie udało się zmienić statusu konta');
+    },
+  });
+
+
   const handleAddUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserEmail || !newUserPassword || !newUserName) {
