@@ -89,11 +89,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error };
       }
 
+      // Check if account is blocked
+      if (data.user) {
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('blocked_at')
+          .eq('user_id', data.user.id)
+          .maybeSingle();
+        if (prof && (prof as any).blocked_at) {
+          await supabase.auth.signOut();
+          return { error: new Error('Twoje konto zostało zablokowane przez administratora. Skontaktuj się z zespołem Optienergia.') };
+        }
+      }
+
       return { error: null };
     } catch (error) {
       return { error: error as Error };
     }
   };
+
 
   const signUp = async (email: string, password: string, name: string) => {
     // Client-side validation (first line of defense, but not trusted)

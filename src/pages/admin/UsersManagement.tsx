@@ -36,7 +36,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Users, UserPlus, Trash2, BarChart3, Calendar, FileText, Loader2, Shield } from 'lucide-react';
+import { Users, UserPlus, Trash2, BarChart3, Calendar, FileText, Loader2, Shield, Ban, CheckCircle2 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
@@ -47,11 +47,13 @@ interface UserWithStats {
   email: string;
   created_at: string;
   last_activity_at: string | null;
+  blocked_at: string | null;
   isAdmin: boolean;
   isManager: boolean;
   projectsCount: number;
   analysesCount: number;
 }
+
 
 export default function UsersManagement() {
   const queryClient = useQueryClient();
@@ -128,11 +130,13 @@ export default function UsersManagement() {
           email: profile.email,
           created_at: profile.created_at,
           last_activity_at: profile.last_activity_at,
+          blocked_at: (profile as any).blocked_at ?? null,
           isAdmin,
           isManager,
           projectsCount: userProjects.length,
           analysesCount,
         } as UserWithStats;
+
       }) || [];
 
       return userStats;
@@ -274,6 +278,26 @@ export default function UsersManagement() {
       toast.error('Nie udało się zmienić roli użytkownika');
     },
   });
+
+  // Toggle blocked status
+  const toggleBlockMutation = useMutation({
+    mutationFn: async ({ userId, isBlocked }: { userId: string; isBlocked: boolean }) => {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ blocked_at: isBlocked ? null : new Date().toISOString() } as any)
+        .eq('user_id', userId);
+      if (error) throw error;
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      toast.success(vars.isBlocked ? 'Konto zostało odblokowane' : 'Konto zostało zablokowane');
+    },
+    onError: (error: any) => {
+      console.error('Error toggling block:', error);
+      toast.error('Nie udało się zmienić statusu konta');
+    },
+  });
+
 
   const handleAddUser = (e: React.FormEvent) => {
     e.preventDefault();
@@ -471,7 +495,11 @@ export default function UsersManagement() {
                           {user.isManager && (
                             <Badge variant="outline">Menedżer</Badge>
                           )}
+                          {user.blocked_at && (
+                            <Badge variant="destructive">Zablokowany</Badge>
+                          )}
                         </div>
+
                       </TableCell>
                       <TableCell className="text-center font-medium">
                         {user.projectsCount}
@@ -510,9 +538,48 @@ export default function UsersManagement() {
                           </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
+                              <Button
+                                variant={user.blocked_at ? 'default' : 'outline'}
+                                size="sm"
+                                disabled={toggleBlockMutation.isPending}
+                              >
+                                {user.blocked_at ? (
+                                  <><CheckCircle2 className="h-4 w-4 mr-1" />Odblokuj</>
+                                ) : (
+                                  <><Ban className="h-4 w-4 mr-1" />Zablokuj</>
+                                )}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  {user.blocked_at ? 'Odblokować konto?' : 'Zablokować konto?'}
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  {user.blocked_at
+                                    ? `Użytkownik ${user.email} znów będzie mógł się zalogować.`
+                                    : `Użytkownik ${user.email} nie będzie mógł się zalogować. Istniejąca sesja pozostanie aktywna do wygaśnięcia.`}
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Anuluj</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => toggleBlockMutation.mutate({
+                                    userId: user.user_id,
+                                    isBlocked: !!user.blocked_at,
+                                  })}
+                                >
+                                  {user.blocked_at ? 'Odblokuj' : 'Zablokuj'}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
                               <Button variant="destructive" size="sm">
                                 <Trash2 className="h-4 w-4" />
                               </Button>
+
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
