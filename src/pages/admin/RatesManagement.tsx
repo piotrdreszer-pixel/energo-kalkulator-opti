@@ -43,6 +43,7 @@ interface RateItem {
   value: number;
   zone_number: number | null;
   description: string | null;
+  is_visible: boolean;
 }
 
 interface ExtractedRate {
