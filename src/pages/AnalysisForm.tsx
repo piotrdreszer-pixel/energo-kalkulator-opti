@@ -38,6 +38,7 @@ import { ConsumptionMappingBefore } from '@/components/analysis/ConsumptionMappi
 import { ComparisonSummary } from '@/components/analysis/ComparisonSummary';
 import { useOsdOperators } from '@/hooks/useOsdOperators';
 import { useRatesResolver } from '@/hooks/useRatesResolver';
+import { useOsdTariffVisibility } from '@/hooks/useOsdTariffVisibility';
 import { cn } from '@/lib/utils';
 
 const WIZARD_STEPS = [
