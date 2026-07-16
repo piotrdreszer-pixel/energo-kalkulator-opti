@@ -692,9 +692,6 @@ export default function RatesManagement() {
               )}
             </CardHeader>
             <CardContent className="space-y-2">
-              {selectedOperator && (
-                <TariffVisibilityPanel osdId={selectedOperator} />
-              )}
               {rateCards.length === 0 && selectedOperator && (
                 <p className="text-sm text-muted-foreground text-center py-4">
                   Brak taryf dla tego operatora
