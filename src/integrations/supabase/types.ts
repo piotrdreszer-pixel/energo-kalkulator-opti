@@ -517,6 +517,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          is_visible: boolean
           rate_card_id: string
           rate_type: string
           season: string | null
@@ -529,6 +530,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_visible?: boolean
           rate_card_id: string
           rate_type: string
           season?: string | null
@@ -541,6 +543,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_visible?: boolean
           rate_card_id?: string
           rate_type?: string
           season?: string | null

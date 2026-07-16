@@ -38,7 +38,7 @@ import { ConsumptionMappingBefore } from '@/components/analysis/ConsumptionMappi
 import { ComparisonSummary } from '@/components/analysis/ComparisonSummary';
 import { useOsdOperators } from '@/hooks/useOsdOperators';
 import { useRatesResolver } from '@/hooks/useRatesResolver';
-import { useOsdTariffVisibility } from '@/hooks/useOsdTariffVisibility';
+import { useVisibleTariffsForOsd } from '@/hooks/useVisibleTariffsForOsd';
 import { cn } from '@/lib/utils';
 
 const WIZARD_STEPS = [
@@ -126,10 +126,10 @@ export default function AnalysisForm() {
   const [ratesYearAfter, setRatesYearAfter] = useState<string>('2025');
 
   const { data: osdOperators } = useOsdOperators();
-  const { isEnabled: isTariffEnabled } = useOsdTariffVisibility(formData.osd_id);
+  const { visibleCodes } = useVisibleTariffsForOsd(formData.osd_id);
   const visibleTariffs = React.useMemo(
-    () => (formData.osd_id ? TARIFF_CODES.filter(t => isTariffEnabled(t.code)) : TARIFF_CODES),
-    [formData.osd_id, isTariffEnabled]
+    () => (visibleCodes ? TARIFF_CODES.filter(t => visibleCodes.has(t.code)) : TARIFF_CODES),
+    [visibleCodes]
   );
   const { resolveRates, isLoading: isResolvingRates } = useRatesResolver();
 

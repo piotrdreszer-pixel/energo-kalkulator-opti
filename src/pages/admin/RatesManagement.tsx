@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Loader2, Plus, Pencil, Trash2, FileUp, Save, Upload, FileText, CheckCircle2, AlertTriangle, Info } from 'lucide-react';
-import { TariffVisibilityPanel } from '@/components/admin/TariffVisibilityPanel';
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -43,6 +43,7 @@ interface RateItem {
   value: number;
   zone_number: number | null;
   description: string | null;
+  is_visible: boolean;
 }
 
 interface ExtractedRate {
@@ -344,6 +345,23 @@ export default function RatesManagement() {
       toast.error('Błąd podczas usuwania stawki');
     }
   };
+
+  const handleToggleRateItemVisible = async (rateItem: RateItem, isVisible: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('rate_items')
+        .update({ is_visible: isVisible })
+        .eq('id', rateItem.id);
+      if (error) throw error;
+      setRateItems(prev => prev.map(r => r.id === rateItem.id ? { ...r, is_visible: isVisible } : r));
+      toast.success(isVisible ? 'Stawka widoczna w kalkulatorze' : 'Stawka ukryta w kalkulatorze');
+    } catch (error) {
+      console.error('Error toggling rate item visibility:', error);
+      toast.error('Nie udało się zmienić widoczności stawki');
+    }
+  };
+
+
 
   const openEditRateCard = (rateCard: RateCard) => {
     setEditingRateCard(rateCard);
@@ -691,9 +709,6 @@ export default function RatesManagement() {
               )}
             </CardHeader>
             <CardContent className="space-y-2">
-              {selectedOperator && (
-                <TariffVisibilityPanel osdId={selectedOperator} />
-              )}
               {rateCards.length === 0 && selectedOperator && (
                 <p className="text-sm text-muted-foreground text-center py-4">
                   Brak taryf dla tego operatora
@@ -1346,7 +1361,7 @@ export default function RatesManagement() {
                 {rateItems.map((item) => (
                   <div
                     key={item.id}
-                    className="p-2 rounded border text-sm flex items-center justify-between hover:bg-muted"
+                    className={`p-2 rounded border text-sm flex items-center justify-between hover:bg-muted ${item.is_visible === false ? 'opacity-60' : ''}`}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -1366,6 +1381,12 @@ export default function RatesManagement() {
                       </p>
                     </div>
                     <div className="flex items-center gap-1 ml-2">
+                      <Switch
+                        checked={item.is_visible !== false}
+                        onCheckedChange={(v) => handleToggleRateItemVisible(item, v)}
+                        aria-label="Widoczna w kalkulatorze"
+                        className="mr-1"
+                      />
                       <Button
                         variant="ghost"
                         size="icon"
