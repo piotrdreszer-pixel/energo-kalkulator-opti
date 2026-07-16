@@ -576,7 +576,7 @@ export default function AnalysisForm() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {TARIFF_CODES.map((t) => (
+                          {visibleTariffs.map((t) => (
                             <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>
                           ))}
                         </SelectContent>
@@ -621,7 +621,7 @@ export default function AnalysisForm() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {TARIFF_CODES.map((t) => (
+                          {visibleTariffs.map((t) => (
                             <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>
                           ))}
                         </SelectContent>
@@ -679,7 +679,7 @@ export default function AnalysisForm() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {TARIFF_CODES.map((t) => (
+                            {visibleTariffs.map((t) => (
                               <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>
                             ))}
                           </SelectContent>
@@ -787,7 +787,7 @@ export default function AnalysisForm() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {TARIFF_CODES.map((t) => (
+                            {visibleTariffs.map((t) => (
                               <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>
                             ))}
                           </SelectContent>
