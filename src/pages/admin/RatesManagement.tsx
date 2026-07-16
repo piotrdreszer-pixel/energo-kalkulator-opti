@@ -28,6 +28,7 @@ interface RateCard {
   valid_from: string;
   valid_to: string | null;
   source_document: string | null;
+  is_active: boolean;
 }
 
 interface RateItem {
