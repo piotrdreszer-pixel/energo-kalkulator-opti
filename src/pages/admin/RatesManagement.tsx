@@ -702,12 +702,17 @@ export default function RatesManagement() {
                     selectedRateCard === rateCard.id
                       ? 'border-primary bg-primary/5'
                       : 'hover:bg-muted'
-                  }`}
+                  } ${rateCard.is_active === false ? 'opacity-60' : ''}`}
                   onClick={() => setSelectedRateCard(rateCard.id)}
                 >
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-sm">{rateCard.name}</p>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm truncate">{rateCard.name}</p>
+                        {rateCard.is_active === false && (
+                          <Badge variant="outline" className="text-[10px]">wyłączona</Badge>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         od {rateCard.valid_from}
                         {rateCard.valid_to && ` do ${rateCard.valid_to}`}
