@@ -123,6 +123,7 @@ Deno.serve(async (req) => {
       .from('rate_cards')
       .select('*')
       .eq('osd_id', osdId)
+      .eq('is_active', true)
       .lte('valid_from', dateStr)
       .or(`valid_to.is.null,valid_to.gte.${dateStr}`)
       .order('valid_from', { ascending: false })

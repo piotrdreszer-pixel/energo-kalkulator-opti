@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Switch } from '@/components/ui/switch';
 import { Loader2, Plus, Pencil, Trash2, FileUp, Save, Upload, FileText, CheckCircle2, AlertTriangle, Info } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -28,6 +29,7 @@ interface RateCard {
   valid_from: string;
   valid_to: string | null;
   source_document: string | null;
+  is_active: boolean;
 }
 
 interface RateItem {
@@ -253,6 +255,23 @@ export default function RatesManagement() {
       toast.error('Błąd podczas usuwania taryfy');
     }
   };
+
+  const handleToggleRateCardActive = async (rateCard: RateCard, isActive: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('rate_cards')
+        .update({ is_active: isActive })
+        .eq('id', rateCard.id);
+      if (error) throw error;
+      setRateCards(prev => prev.map(r => r.id === rateCard.id ? { ...r, is_active: isActive } : r));
+      toast.success(isActive ? 'Taryfa włączona' : 'Taryfa wyłączona');
+    } catch (error) {
+      console.error('Error toggling rate card:', error);
+      toast.error('Nie udało się zmienić statusu taryfy');
+    }
+  };
+
+
 
   const handleSaveRateItem = async () => {
     if (!selectedRateCard) return;
@@ -683,18 +702,29 @@ export default function RatesManagement() {
                     selectedRateCard === rateCard.id
                       ? 'border-primary bg-primary/5'
                       : 'hover:bg-muted'
-                  }`}
+                  } ${rateCard.is_active === false ? 'opacity-60' : ''}`}
                   onClick={() => setSelectedRateCard(rateCard.id)}
                 >
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-sm">{rateCard.name}</p>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm truncate">{rateCard.name}</p>
+                        {rateCard.is_active === false && (
+                          <Badge variant="outline" className="text-[10px]">wyłączona</Badge>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         od {rateCard.valid_from}
                         {rateCard.valid_to && ` do ${rateCard.valid_to}`}
                       </p>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <Switch
+                        checked={rateCard.is_active !== false}
+                        onCheckedChange={(checked) => handleToggleRateCardActive(rateCard, checked)}
+                        aria-label="Aktywna taryfa"
+                        className="mr-1"
+                      />
                       <Button
                         variant="ghost"
                         size="icon"
