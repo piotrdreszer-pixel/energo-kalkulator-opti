@@ -1361,7 +1361,7 @@ export default function RatesManagement() {
                 {rateItems.map((item) => (
                   <div
                     key={item.id}
-                    className="p-2 rounded border text-sm flex items-center justify-between hover:bg-muted"
+                    className={`p-2 rounded border text-sm flex items-center justify-between hover:bg-muted ${item.is_visible === false ? 'opacity-60' : ''}`}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
