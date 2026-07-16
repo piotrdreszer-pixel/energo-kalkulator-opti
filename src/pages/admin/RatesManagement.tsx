@@ -346,6 +346,23 @@ export default function RatesManagement() {
     }
   };
 
+  const handleToggleRateItemVisible = async (rateItem: RateItem, isVisible: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('rate_items')
+        .update({ is_visible: isVisible })
+        .eq('id', rateItem.id);
+      if (error) throw error;
+      setRateItems(prev => prev.map(r => r.id === rateItem.id ? { ...r, is_visible: isVisible } : r));
+      toast.success(isVisible ? 'Stawka widoczna w kalkulatorze' : 'Stawka ukryta w kalkulatorze');
+    } catch (error) {
+      console.error('Error toggling rate item visibility:', error);
+      toast.error('Nie udało się zmienić widoczności stawki');
+    }
+  };
+
+
+
   const openEditRateCard = (rateCard: RateCard) => {
     setEditingRateCard(rateCard);
     setRateCardForm({
