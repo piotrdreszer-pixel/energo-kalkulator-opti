@@ -1381,6 +1381,12 @@ export default function RatesManagement() {
                       </p>
                     </div>
                     <div className="flex items-center gap-1 ml-2">
+                      <Switch
+                        checked={item.is_visible !== false}
+                        onCheckedChange={(v) => handleToggleRateItemVisible(item, v)}
+                        aria-label="Widoczna w kalkulatorze"
+                        className="mr-1"
+                      />
                       <Button
                         variant="ghost"
                         size="icon"
