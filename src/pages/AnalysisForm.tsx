@@ -38,6 +38,7 @@ import { ConsumptionMappingBefore } from '@/components/analysis/ConsumptionMappi
 import { ComparisonSummary } from '@/components/analysis/ComparisonSummary';
 import { useOsdOperators } from '@/hooks/useOsdOperators';
 import { useRatesResolver } from '@/hooks/useRatesResolver';
+import { useOsdTariffVisibility } from '@/hooks/useOsdTariffVisibility';
 import { cn } from '@/lib/utils';
 
 const WIZARD_STEPS = [
@@ -125,6 +126,11 @@ export default function AnalysisForm() {
   const [ratesYearAfter, setRatesYearAfter] = useState<string>('2025');
 
   const { data: osdOperators } = useOsdOperators();
+  const { isEnabled: isTariffEnabled } = useOsdTariffVisibility(formData.osd_id);
+  const visibleTariffs = React.useMemo(
+    () => (formData.osd_id ? TARIFF_CODES.filter(t => isTariffEnabled(t.code)) : TARIFF_CODES),
+    [formData.osd_id, isTariffEnabled]
+  );
   const { resolveRates, isLoading: isResolvingRates } = useRatesResolver();
 
   const { data: project } = useQuery({
@@ -570,7 +576,7 @@ export default function AnalysisForm() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {TARIFF_CODES.map((t) => (
+                          {visibleTariffs.map((t) => (
                             <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>
                           ))}
                         </SelectContent>
@@ -615,7 +621,7 @@ export default function AnalysisForm() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {TARIFF_CODES.map((t) => (
+                          {visibleTariffs.map((t) => (
                             <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>
                           ))}
                         </SelectContent>
@@ -673,7 +679,7 @@ export default function AnalysisForm() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {TARIFF_CODES.map((t) => (
+                            {visibleTariffs.map((t) => (
                               <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>
                             ))}
                           </SelectContent>
@@ -781,7 +787,7 @@ export default function AnalysisForm() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {TARIFF_CODES.map((t) => (
+                            {visibleTariffs.map((t) => (
                               <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>
                             ))}
                           </SelectContent>

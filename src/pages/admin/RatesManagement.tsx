@@ -12,6 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Loader2, Plus, Pencil, Trash2, FileUp, Save, Upload, FileText, CheckCircle2, AlertTriangle, Info } from 'lucide-react';
+import { TariffVisibilityPanel } from '@/components/admin/TariffVisibilityPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -690,6 +691,9 @@ export default function RatesManagement() {
               )}
             </CardHeader>
             <CardContent className="space-y-2">
+              {selectedOperator && (
+                <TariffVisibilityPanel osdId={selectedOperator} />
+              )}
               {rateCards.length === 0 && selectedOperator && (
                 <p className="text-sm text-muted-foreground text-center py-4">
                   Brak taryf dla tego operatora

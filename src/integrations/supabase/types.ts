@@ -400,6 +400,38 @@ export type Database = {
         }
         Relationships: []
       }
+      osd_tariff_visibility: {
+        Row: {
+          created_at: string
+          is_enabled: boolean
+          osd_id: string
+          tariff_code: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          is_enabled?: boolean
+          osd_id: string
+          tariff_code: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          is_enabled?: boolean
+          osd_id?: string
+          tariff_code?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "osd_tariff_visibility_osd_id_fkey"
+            columns: ["osd_id"]
+            isOneToOne: false
+            referencedRelation: "osd_operators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           blocked_at: string | null
