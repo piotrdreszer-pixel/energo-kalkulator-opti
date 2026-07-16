@@ -256,6 +256,23 @@ export default function RatesManagement() {
     }
   };
 
+  const handleToggleRateCardActive = async (rateCard: RateCard, isActive: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('rate_cards')
+        .update({ is_active: isActive })
+        .eq('id', rateCard.id);
+      if (error) throw error;
+      setRateCards(prev => prev.map(r => r.id === rateCard.id ? { ...r, is_active: isActive } : r));
+      toast.success(isActive ? 'Taryfa włączona' : 'Taryfa wyłączona');
+    } catch (error) {
+      console.error('Error toggling rate card:', error);
+      toast.error('Nie udało się zmienić statusu taryfy');
+    }
+  };
+
+
+
   const handleSaveRateItem = async () => {
     if (!selectedRateCard) return;
 
