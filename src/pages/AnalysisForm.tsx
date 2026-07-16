@@ -126,6 +126,11 @@ export default function AnalysisForm() {
   const [ratesYearAfter, setRatesYearAfter] = useState<string>('2025');
 
   const { data: osdOperators } = useOsdOperators();
+  const { isEnabled: isTariffEnabled } = useOsdTariffVisibility(formData.osd_id);
+  const visibleTariffs = React.useMemo(
+    () => (formData.osd_id ? TARIFF_CODES.filter(t => isTariffEnabled(t.code)) : TARIFF_CODES),
+    [formData.osd_id, isTariffEnabled]
+  );
   const { resolveRates, isLoading: isResolvingRates } = useRatesResolver();
 
   const { data: project } = useQuery({
