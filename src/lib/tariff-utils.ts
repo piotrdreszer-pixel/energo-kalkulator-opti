@@ -1,5 +1,7 @@
 // Tariff codes and their zone mappings - NO descriptive zone hints in labels
 export const TARIFF_CODES = [
+  // A-tariffs
+  { code: 'A23', zones: 3, minPower: 40 },
   // B-tariffs first
   { code: 'B11', zones: 1, maxPower: 40 },
   { code: 'B21', zones: 1, minPower: 40 },
@@ -9,6 +11,7 @@ export const TARIFF_CODES = [
   { code: 'C11', zones: 1, maxPower: 40 },
   { code: 'C12a', zones: 2, maxPower: 40 },
   { code: 'C12b', zones: 2, maxPower: 40 },
+  { code: 'C12w', zones: 2, maxPower: 40 },
   // C-tariffs (above 40kW)
   { code: 'C21', zones: 1, minPower: 40 },
   { code: 'C22a', zones: 2, minPower: 40 },

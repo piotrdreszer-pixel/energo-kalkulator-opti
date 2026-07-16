@@ -15,6 +15,7 @@ import { Loader2, Plus, Pencil, Trash2, FileUp, Save, Upload, FileText, CheckCir
 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { TARIFF_CODES as SUPPORTED_TARIFFS } from '@/lib/tariff-utils';
 
 interface OsdOperator {
   id: string;
@@ -76,7 +77,7 @@ const RATE_TYPES = [
   { value: 'ENERGIA_BIERNA', label: 'Energia bierna' },
 ];
 
-const TARIFF_CODES = ['A23', 'B11', 'B21', 'B22', 'B23', 'C11', 'C12a', 'C12b', 'C12w', 'C21', 'C22a', 'C22b', 'C23', 'G11', 'G12', 'G12w'];
+const TARIFF_CODES = SUPPORTED_TARIFFS.map(t => t.code);
 const SEASONS = ['ALL', 'SUMMER', 'WINTER'];
 const UNITS = ['zł/kWh', 'zł/MWh', 'zł/kW/mies', 'zł/mies', 'zł/kvarh'];
 
