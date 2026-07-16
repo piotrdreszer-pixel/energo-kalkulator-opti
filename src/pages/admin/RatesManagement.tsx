@@ -718,7 +718,13 @@ export default function RatesManagement() {
                         {rateCard.valid_to && ` do ${rateCard.valid_to}`}
                       </p>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <Switch
+                        checked={rateCard.is_active !== false}
+                        onCheckedChange={(checked) => handleToggleRateCardActive(rateCard, checked)}
+                        aria-label="Aktywna taryfa"
+                        className="mr-1"
+                      />
                       <Button
                         variant="ghost"
                         size="icon"
