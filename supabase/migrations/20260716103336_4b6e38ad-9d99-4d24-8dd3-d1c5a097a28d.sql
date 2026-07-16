@@ -1,0 +1,1 @@
+ALTER TABLE public.rate_items ADD COLUMN IF NOT EXISTS is_visible BOOLEAN NOT NULL DEFAULT true;
