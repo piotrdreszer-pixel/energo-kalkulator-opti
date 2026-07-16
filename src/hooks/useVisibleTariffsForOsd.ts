@@ -38,7 +38,7 @@ export function useVisibleTariffsForOsd(osdId: string | null | undefined) {
         .eq('is_visible', true);
 
       if (cancelled) return;
-      const codes = new Set<string>((items ?? []).map(i => i.tariff_code));
+      const codes = new Set<string>((items ?? []).map(i => (i.tariff_code || '').toUpperCase()));
       setVisibleCodes(codes.size > 0 ? codes : null);
       setLoading(false);
     }
