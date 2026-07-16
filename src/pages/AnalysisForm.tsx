@@ -128,7 +128,7 @@ export default function AnalysisForm() {
   const { data: osdOperators } = useOsdOperators();
   const { visibleCodes } = useVisibleTariffsForOsd(formData.osd_id);
   const visibleTariffs = React.useMemo(
-    () => (visibleCodes ? TARIFF_CODES.filter(t => visibleCodes.has(t.code)) : TARIFF_CODES),
+    () => (visibleCodes ? TARIFF_CODES.filter(t => visibleCodes.has(t.code.toUpperCase())) : TARIFF_CODES),
     [visibleCodes]
   );
   const { resolveRates, isLoading: isResolvingRates } = useRatesResolver();
