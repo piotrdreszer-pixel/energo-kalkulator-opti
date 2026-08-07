@@ -81,15 +81,19 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
   const zonesCountAfter = analysis.zones_count_after || 1;
   const dateStr = format(new Date(), 'd MMMM yyyy', { locale: pl });
 
+  const hidden = analysis.report_hidden_components || [];
+  const isVisible = (key: string) => !hidden.includes(key);
+
   const costRows = [
-    { label: 'Energia czynna', before: results.activeEnergyCostBefore, after: results.activeEnergyCostAfter },
-    { label: 'Składnik zmienny stawki sieciowej', before: results.distributionCostBefore, after: results.distributionCostAfter },
-    { label: `Opłata za moc umowną (${results.periodMonths} mies.)`, before: results.contractedPowerChargeBefore, after: results.contractedPowerChargeAfter },
-    { label: 'Opłata mocowa', before: results.capacityChargeBefore, after: results.capacityChargeAfter },
-    { label: 'Energia bierna', before: results.reactiveEnergyCostBefore, after: results.reactiveEnergyCostAfter },
-    { label: 'Opłata handlowa', before: results.handlingFeeBefore, after: results.handlingFeeAfter },
-    { label: 'Suma pozostałych opłat', before: Number(analysis.fixed_distribution_before_total), after: Number(analysis.fixed_distribution_after_total) },
-  ];
+    { key: 'activeEnergy', label: 'Energia czynna', before: results.activeEnergyCostBefore, after: results.activeEnergyCostAfter },
+    { key: 'distribution', label: 'Składnik zmienny stawki sieciowej', before: results.distributionCostBefore, after: results.distributionCostAfter },
+    { key: 'contractedPower', label: `Opłata za moc umowną (${results.periodMonths} mies.)`, before: results.contractedPowerChargeBefore, after: results.contractedPowerChargeAfter },
+    { key: 'capacity', label: 'Opłata mocowa', before: results.capacityChargeBefore, after: results.capacityChargeAfter },
+    { key: 'reactive', label: 'Energia bierna', before: results.reactiveEnergyCostBefore, after: results.reactiveEnergyCostAfter },
+    { key: 'handling', label: 'Opłata handlowa', before: results.handlingFeeBefore, after: results.handlingFeeAfter },
+    { key: 'fixedDistribution', label: 'Suma pozostałych opłat', before: Number(analysis.fixed_distribution_before_total), after: Number(analysis.fixed_distribution_after_total) },
+  ].filter((row) => isVisible(row.key));
+
 
   // Compute zone shares for "after" scenario (Page 3 bottom chart)
   const totalAfterMWh =
