@@ -2,8 +2,11 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { TrendingDown, TrendingUp, Minus } from 'lucide-react';
 import { formatCurrency, formatPercent } from '@/lib/calculation-utils';
+import { REPORT_COMPONENTS, type ReportComponentKey } from '@/lib/report-components';
+
 
 interface ComparisonSummaryProps {
   costBefore: number;
