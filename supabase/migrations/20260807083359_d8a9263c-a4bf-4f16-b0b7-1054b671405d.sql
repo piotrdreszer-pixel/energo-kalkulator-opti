@@ -1,0 +1,1 @@
+ALTER TABLE public.energy_analyses ADD COLUMN IF NOT EXISTS report_hidden_components text[] NOT NULL DEFAULT '{}'::text[];

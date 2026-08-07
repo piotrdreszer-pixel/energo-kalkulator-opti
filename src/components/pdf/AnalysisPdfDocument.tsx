@@ -81,15 +81,19 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
   const zonesCountAfter = analysis.zones_count_after || 1;
   const dateStr = format(new Date(), 'd MMMM yyyy', { locale: pl });
 
+  const hidden = analysis.report_hidden_components || [];
+  const isVisible = (key: string) => !hidden.includes(key);
+
   const costRows = [
-    { label: 'Energia czynna', before: results.activeEnergyCostBefore, after: results.activeEnergyCostAfter },
-    { label: 'Składnik zmienny stawki sieciowej', before: results.distributionCostBefore, after: results.distributionCostAfter },
-    { label: `Opłata za moc umowną (${results.periodMonths} mies.)`, before: results.contractedPowerChargeBefore, after: results.contractedPowerChargeAfter },
-    { label: 'Opłata mocowa', before: results.capacityChargeBefore, after: results.capacityChargeAfter },
-    { label: 'Energia bierna', before: results.reactiveEnergyCostBefore, after: results.reactiveEnergyCostAfter },
-    { label: 'Opłata handlowa', before: results.handlingFeeBefore, after: results.handlingFeeAfter },
-    { label: 'Suma pozostałych opłat', before: Number(analysis.fixed_distribution_before_total), after: Number(analysis.fixed_distribution_after_total) },
-  ];
+    { key: 'activeEnergy', label: 'Energia czynna', before: results.activeEnergyCostBefore, after: results.activeEnergyCostAfter },
+    { key: 'distribution', label: 'Składnik zmienny stawki sieciowej', before: results.distributionCostBefore, after: results.distributionCostAfter },
+    { key: 'contractedPower', label: `Opłata za moc umowną (${results.periodMonths} mies.)`, before: results.contractedPowerChargeBefore, after: results.contractedPowerChargeAfter },
+    { key: 'capacity', label: 'Opłata mocowa', before: results.capacityChargeBefore, after: results.capacityChargeAfter },
+    { key: 'reactive', label: 'Energia bierna', before: results.reactiveEnergyCostBefore, after: results.reactiveEnergyCostAfter },
+    { key: 'handling', label: 'Opłata handlowa', before: results.handlingFeeBefore, after: results.handlingFeeAfter },
+    { key: 'fixedDistribution', label: 'Suma pozostałych opłat', before: Number(analysis.fixed_distribution_before_total), after: Number(analysis.fixed_distribution_after_total) },
+  ].filter((row) => isVisible(row.key));
+
 
   // Compute zone shares for "after" scenario (Page 3 bottom chart)
   const totalAfterMWh =
@@ -372,10 +376,12 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
         {/* Cards grid */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
           {/* Moc umowna */}
-          <ParamCard icon={iconPower} title="Moc umowna">
-            <ParamRow label="PRZED" value={`${formatNumber(Number(analysis.contracted_power_before_kw))} kW × ${formatNumber(Number(analysis.contracted_power_charge_rate_before))} zł/kW/mies.`} />
-            <ParamRow label="PO" value={`${formatNumber(Number(analysis.contracted_power_after_kw))} kW × ${formatNumber(Number(analysis.contracted_power_charge_rate_after))} zł/kW/mies.`} />
-          </ParamCard>
+          {isVisible('contractedPower') && (
+            <ParamCard icon={iconPower} title="Moc umowna">
+              <ParamRow label="PRZED" value={`${formatNumber(Number(analysis.contracted_power_before_kw))} kW × ${formatNumber(Number(analysis.contracted_power_charge_rate_before))} zł/kW/mies.`} />
+              <ParamRow label="PO" value={`${formatNumber(Number(analysis.contracted_power_after_kw))} kW × ${formatNumber(Number(analysis.contracted_power_charge_rate_after))} zł/kW/mies.`} />
+            </ParamCard>
+          )}
 
           {/* Zużycie PRZED */}
           <ParamCard icon={iconEnergy} title="Zużycie energii PRZED">
@@ -392,30 +398,37 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
           </ParamCard>
 
           {/* Stawki energii */}
-          <ParamCard icon={iconChart} title="Stawki energii czynnej">
-            <ParamRow label="PRZED S1" value={`${formatNumber(Number(analysis.active_energy_price_before_zone1))} zł/MWh`} />
-            {zonesCountBefore >= 2 && <ParamRow label="PRZED S2" value={`${formatNumber(Number(analysis.active_energy_price_before_zone2))} zł/MWh`} />}
-            {zonesCountBefore >= 3 && <ParamRow label="PRZED S3" value={`${formatNumber(Number(analysis.active_energy_price_before_zone3))} zł/MWh`} />}
-            <div style={{ height: 5 }} />
-            <ParamRow label="PO S1" value={`${formatNumber(Number(analysis.active_energy_price_after_zone1))} zł/MWh`} />
-            {zonesCountAfter >= 2 && <ParamRow label="PO S2" value={`${formatNumber(Number(analysis.active_energy_price_after_zone2))} zł/MWh`} />}
-            {zonesCountAfter >= 3 && <ParamRow label="PO S3" value={`${formatNumber(Number(analysis.active_energy_price_after_zone3))} zł/MWh`} />}
-          </ParamCard>
+          {isVisible('activeEnergy') && (
+            <ParamCard icon={iconChart} title="Stawki energii czynnej">
+              <ParamRow label="PRZED S1" value={`${formatNumber(Number(analysis.active_energy_price_before_zone1))} zł/MWh`} />
+              {zonesCountBefore >= 2 && <ParamRow label="PRZED S2" value={`${formatNumber(Number(analysis.active_energy_price_before_zone2))} zł/MWh`} />}
+              {zonesCountBefore >= 3 && <ParamRow label="PRZED S3" value={`${formatNumber(Number(analysis.active_energy_price_before_zone3))} zł/MWh`} />}
+              <div style={{ height: 5 }} />
+              <ParamRow label="PO S1" value={`${formatNumber(Number(analysis.active_energy_price_after_zone1))} zł/MWh`} />
+              {zonesCountAfter >= 2 && <ParamRow label="PO S2" value={`${formatNumber(Number(analysis.active_energy_price_after_zone2))} zł/MWh`} />}
+              {zonesCountAfter >= 3 && <ParamRow label="PO S3" value={`${formatNumber(Number(analysis.active_energy_price_after_zone3))} zł/MWh`} />}
+            </ParamCard>
+          )}
 
           {/* Opłata mocowa */}
-          <ParamCard icon={iconSavings} title="Opłaty dodatkowe">
-            <ParamRow label="Opl. mocowa PRZED" value={formatCurrency(results.capacityChargeBefore)} />
-            <ParamRow label="Opl. mocowa PO" value={formatCurrency(results.capacityChargeAfter)} />
-            <div style={{ height: 5 }} />
-            <ParamRow label="Opl. handlowa PRZED" value={`${formatNumber(Number(analysis.handling_fee_before))} zł/mies.`} />
-            <ParamRow label="Opl. handlowa PO" value={`${formatNumber(Number(analysis.handling_fee_after))} zł/mies.`} />
-          </ParamCard>
+          {(isVisible('capacity') || isVisible('handling')) && (
+            <ParamCard icon={iconSavings} title="Opłaty dodatkowe">
+              {isVisible('capacity') && <ParamRow label="Opl. mocowa PRZED" value={formatCurrency(results.capacityChargeBefore)} />}
+              {isVisible('capacity') && <ParamRow label="Opl. mocowa PO" value={formatCurrency(results.capacityChargeAfter)} />}
+              {isVisible('capacity') && isVisible('handling') && <div style={{ height: 5 }} />}
+              {isVisible('handling') && <ParamRow label="Opl. handlowa PRZED" value={`${formatNumber(Number(analysis.handling_fee_before))} zł/mies.`} />}
+              {isVisible('handling') && <ParamRow label="Opl. handlowa PO" value={`${formatNumber(Number(analysis.handling_fee_after))} zł/mies.`} />}
+            </ParamCard>
+          )}
 
           {/* Energia bierna */}
-          <ParamCard icon={iconEnergy} title="Energia bierna">
-            <ParamRow label="PRZED" value={formatCurrency(results.reactiveEnergyCostBefore)} />
-            <ParamRow label="PO" value={formatCurrency(results.reactiveEnergyCostAfter)} />
-          </ParamCard>
+          {isVisible('reactive') && (
+            <ParamCard icon={iconEnergy} title="Energia bierna">
+              <ParamRow label="PRZED" value={formatCurrency(results.reactiveEnergyCostBefore)} />
+              <ParamRow label="PO" value={formatCurrency(results.reactiveEnergyCostAfter)} />
+            </ParamCard>
+          )}
+
         </div>
 
         {/* ── Bottom insight: Zone share chart (PO scenario) ── */}

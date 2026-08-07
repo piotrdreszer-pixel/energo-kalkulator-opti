@@ -878,6 +878,9 @@ export default function AnalysisForm() {
               periodMonths={periodMonths}
               consultantNotes={formData.consultant_notes || ''}
               onNotesChange={(notes) => handleInputChange('consultant_notes', notes)}
+              hiddenComponents={formData.report_hidden_components || []}
+              onHiddenComponentsChange={(keys) => handleInputChange('report_hidden_components', keys as never)}
+
               breakdown={{
                 distributionBefore: results.distributionCostBefore,
                 distributionAfter: results.distributionCostAfter,

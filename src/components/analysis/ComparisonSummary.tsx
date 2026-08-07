@@ -2,8 +2,11 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { TrendingDown, TrendingUp, Minus } from 'lucide-react';
 import { formatCurrency, formatPercent } from '@/lib/calculation-utils';
+import { REPORT_COMPONENTS, type ReportComponentKey } from '@/lib/report-components';
+
 
 interface ComparisonSummaryProps {
   costBefore: number;
@@ -11,6 +14,9 @@ interface ComparisonSummaryProps {
   periodMonths: number;
   consultantNotes: string;
   onNotesChange: (notes: string) => void;
+  hiddenComponents?: string[];
+  onHiddenComponentsChange?: (keys: string[]) => void;
+
   breakdown: {
     distributionBefore: number;
     distributionAfter: number;
@@ -36,7 +42,17 @@ export function ComparisonSummary({
   consultantNotes,
   onNotesChange,
   breakdown,
+  hiddenComponents = [],
+  onHiddenComponentsChange,
 }: ComparisonSummaryProps) {
+  const toggleComponent = (key: ReportComponentKey, visible: boolean) => {
+    if (!onHiddenComponentsChange) return;
+    const next = visible
+      ? hiddenComponents.filter((k) => k !== key)
+      : Array.from(new Set([...hiddenComponents, key]));
+    onHiddenComponentsChange(next);
+  };
+
   const delta = costAfter - costBefore;
   const savingsValue = -delta; // Positive means savings
   const savingsPercent = costBefore !== 0 ? (savingsValue / costBefore) * 100 : 0;
@@ -53,11 +69,21 @@ export function ComparisonSummary({
     return 'text-muted-foreground';
   };
 
-  const renderDeltaRow = (label: string, before: number, after: number) => {
+  const renderDeltaRow = (key: ReportComponentKey, label: string, before: number, after: number) => {
     const diff = before - after;
+    const visible = !hiddenComponents.includes(key);
     return (
       <div className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
-        <span className="text-sm text-muted-foreground">{label}</span>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id={`report-cmp-${key}`}
+            checked={visible}
+            onCheckedChange={(checked) => toggleComponent(key, checked === true)}
+          />
+          <Label htmlFor={`report-cmp-${key}`} className={`text-sm font-normal cursor-pointer ${visible ? 'text-muted-foreground' : 'text-muted-foreground/50 line-through'}`}>
+            {label}
+          </Label>
+        </div>
         <div className="flex items-center gap-4 text-sm">
           <span className="text-muted-foreground w-24 text-right">{formatCurrency(before)}</span>
           <span className="text-muted-foreground">→</span>
@@ -69,6 +95,7 @@ export function ComparisonSummary({
       </div>
     );
   };
+
 
   return (
     <div className="space-y-6">
@@ -124,7 +151,7 @@ export function ComparisonSummary({
         <CardContent>
           <div className="divide-y">
             <div className="flex items-center justify-between py-2 font-medium text-sm">
-              <span>Składnik</span>
+              <span>Składnik <span className="font-normal text-muted-foreground">(odhacz, aby ukryć w raporcie)</span></span>
               <div className="flex items-center gap-4">
                 <span className="w-24 text-right text-muted-foreground">PRZED</span>
                 <span className="w-4"></span>
@@ -132,13 +159,14 @@ export function ComparisonSummary({
                 <span className="w-24 text-right">Δ</span>
               </div>
             </div>
-            {renderDeltaRow('Energia czynna', breakdown.activeEnergyBefore, breakdown.activeEnergyAfter)}
-            {renderDeltaRow('Składnik zmienny stawki sieciowej', breakdown.distributionBefore, breakdown.distributionAfter)}
-            {renderDeltaRow('Opłata za moc umowną', breakdown.contractedPowerBefore, breakdown.contractedPowerAfter)}
-            {renderDeltaRow('Opłata mocowa', breakdown.capacityBefore, breakdown.capacityAfter)}
-            {renderDeltaRow('Energia bierna', breakdown.reactiveBefore, breakdown.reactiveAfter)}
-            {renderDeltaRow('Opłata handlowa', breakdown.handlingBefore, breakdown.handlingAfter)}
-            {renderDeltaRow('Suma pozostałych opłat', breakdown.fixedDistributionBefore, breakdown.fixedDistributionAfter)}
+            {renderDeltaRow('activeEnergy', 'Energia czynna', breakdown.activeEnergyBefore, breakdown.activeEnergyAfter)}
+            {renderDeltaRow('distribution', 'Składnik zmienny stawki sieciowej', breakdown.distributionBefore, breakdown.distributionAfter)}
+            {renderDeltaRow('contractedPower', 'Opłata za moc umowną', breakdown.contractedPowerBefore, breakdown.contractedPowerAfter)}
+            {renderDeltaRow('capacity', 'Opłata mocowa', breakdown.capacityBefore, breakdown.capacityAfter)}
+            {renderDeltaRow('reactive', 'Energia bierna', breakdown.reactiveBefore, breakdown.reactiveAfter)}
+            {renderDeltaRow('handling', 'Opłata handlowa', breakdown.handlingBefore, breakdown.handlingAfter)}
+            {renderDeltaRow('fixedDistribution', 'Suma pozostałych opłat', breakdown.fixedDistributionBefore, breakdown.fixedDistributionAfter)}
+
           </div>
           
           <div className="flex items-center justify-between py-3 mt-2 border-t-2 font-bold">
