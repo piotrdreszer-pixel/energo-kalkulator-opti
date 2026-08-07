@@ -69,11 +69,21 @@ export function ComparisonSummary({
     return 'text-muted-foreground';
   };
 
-  const renderDeltaRow = (label: string, before: number, after: number) => {
+  const renderDeltaRow = (key: ReportComponentKey, label: string, before: number, after: number) => {
     const diff = before - after;
+    const visible = !hiddenComponents.includes(key);
     return (
       <div className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
-        <span className="text-sm text-muted-foreground">{label}</span>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id={`report-cmp-${key}`}
+            checked={visible}
+            onCheckedChange={(checked) => toggleComponent(key, checked === true)}
+          />
+          <Label htmlFor={`report-cmp-${key}`} className={`text-sm font-normal cursor-pointer ${visible ? 'text-muted-foreground' : 'text-muted-foreground/50 line-through'}`}>
+            {label}
+          </Label>
+        </div>
         <div className="flex items-center gap-4 text-sm">
           <span className="text-muted-foreground w-24 text-right">{formatCurrency(before)}</span>
           <span className="text-muted-foreground">→</span>
@@ -85,6 +95,7 @@ export function ComparisonSummary({
       </div>
     );
   };
+
 
   return (
     <div className="space-y-6">
