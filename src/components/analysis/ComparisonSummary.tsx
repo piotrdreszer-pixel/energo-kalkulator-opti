@@ -14,6 +14,9 @@ interface ComparisonSummaryProps {
   periodMonths: number;
   consultantNotes: string;
   onNotesChange: (notes: string) => void;
+  hiddenComponents?: string[];
+  onHiddenComponentsChange?: (keys: string[]) => void;
+
   breakdown: {
     distributionBefore: number;
     distributionAfter: number;
