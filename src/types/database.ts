@@ -180,6 +180,10 @@ export interface EnergyAnalysis {
   
   // Consultant notes
   consultant_notes: string | null;
+
+  // Report components hidden from the final client PDF
+  report_hidden_components: string[] | null;
+
   
   created_at: string;
   updated_at: string;
