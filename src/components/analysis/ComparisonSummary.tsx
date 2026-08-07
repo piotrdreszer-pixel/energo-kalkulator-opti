@@ -151,7 +151,7 @@ export function ComparisonSummary({
         <CardContent>
           <div className="divide-y">
             <div className="flex items-center justify-between py-2 font-medium text-sm">
-              <span>Składnik</span>
+              <span>Składnik <span className="font-normal text-muted-foreground">(odhacz, aby ukryć w raporcie)</span></span>
               <div className="flex items-center gap-4">
                 <span className="w-24 text-right text-muted-foreground">PRZED</span>
                 <span className="w-4"></span>
@@ -159,13 +159,14 @@ export function ComparisonSummary({
                 <span className="w-24 text-right">Δ</span>
               </div>
             </div>
-            {renderDeltaRow('Energia czynna', breakdown.activeEnergyBefore, breakdown.activeEnergyAfter)}
-            {renderDeltaRow('Składnik zmienny stawki sieciowej', breakdown.distributionBefore, breakdown.distributionAfter)}
-            {renderDeltaRow('Opłata za moc umowną', breakdown.contractedPowerBefore, breakdown.contractedPowerAfter)}
-            {renderDeltaRow('Opłata mocowa', breakdown.capacityBefore, breakdown.capacityAfter)}
-            {renderDeltaRow('Energia bierna', breakdown.reactiveBefore, breakdown.reactiveAfter)}
-            {renderDeltaRow('Opłata handlowa', breakdown.handlingBefore, breakdown.handlingAfter)}
-            {renderDeltaRow('Suma pozostałych opłat', breakdown.fixedDistributionBefore, breakdown.fixedDistributionAfter)}
+            {renderDeltaRow('activeEnergy', 'Energia czynna', breakdown.activeEnergyBefore, breakdown.activeEnergyAfter)}
+            {renderDeltaRow('distribution', 'Składnik zmienny stawki sieciowej', breakdown.distributionBefore, breakdown.distributionAfter)}
+            {renderDeltaRow('contractedPower', 'Opłata za moc umowną', breakdown.contractedPowerBefore, breakdown.contractedPowerAfter)}
+            {renderDeltaRow('capacity', 'Opłata mocowa', breakdown.capacityBefore, breakdown.capacityAfter)}
+            {renderDeltaRow('reactive', 'Energia bierna', breakdown.reactiveBefore, breakdown.reactiveAfter)}
+            {renderDeltaRow('handling', 'Opłata handlowa', breakdown.handlingBefore, breakdown.handlingAfter)}
+            {renderDeltaRow('fixedDistribution', 'Suma pozostałych opłat', breakdown.fixedDistributionBefore, breakdown.fixedDistributionAfter)}
+
           </div>
           
           <div className="flex items-center justify-between py-3 mt-2 border-t-2 font-bold">
