@@ -42,7 +42,17 @@ export function ComparisonSummary({
   consultantNotes,
   onNotesChange,
   breakdown,
+  hiddenComponents = [],
+  onHiddenComponentsChange,
 }: ComparisonSummaryProps) {
+  const toggleComponent = (key: ReportComponentKey, visible: boolean) => {
+    if (!onHiddenComponentsChange) return;
+    const next = visible
+      ? hiddenComponents.filter((k) => k !== key)
+      : Array.from(new Set([...hiddenComponents, key]));
+    onHiddenComponentsChange(next);
+  };
+
   const delta = costAfter - costBefore;
   const savingsValue = -delta; // Positive means savings
   const savingsPercent = costBefore !== 0 ? (savingsValue / costBefore) * 100 : 0;
