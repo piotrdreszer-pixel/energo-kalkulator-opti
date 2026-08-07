@@ -217,8 +217,8 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
               ? `${format(new Date(analysis.period_from), 'd.MM.yyyy')} – ${format(new Date(analysis.period_to), 'd.MM.yyyy')}`
               : 'Nie określono'
           } />
-          <InfoRow label="Taryfa PRZED" value={analysis.tariff_code_before} />
-          <InfoRow label="Taryfa PO" value={analysis.tariff_code_after} />
+          {isVisible('distribution') && <InfoRow label="Taryfa PRZED" value={analysis.tariff_code_before} />}
+          {isVisible('distribution') && <InfoRow label="Taryfa PO" value={analysis.tariff_code_after} />}
           <InfoRow label="Liczba miesięcy" value={String(results.periodMonths)} />
         </div>
 
@@ -384,18 +384,22 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
           )}
 
           {/* Zużycie PRZED */}
-          <ParamCard icon={iconEnergy} title="Zużycie energii PRZED">
-            <ParamRow label="Strefa 1" value={`${formatNumber(Number(analysis.consumption_before_zone1_mwh), 2)} MWh`} />
-            {zonesCountBefore >= 2 && <ParamRow label="Strefa 2" value={`${formatNumber(Number(analysis.consumption_before_zone2_mwh), 2)} MWh`} />}
-            {zonesCountBefore >= 3 && <ParamRow label="Strefa 3" value={`${formatNumber(Number(analysis.consumption_before_zone3_mwh), 2)} MWh`} />}
-          </ParamCard>
+          {isVisible('distribution') && (
+            <ParamCard icon={iconEnergy} title="Zużycie energii PRZED">
+              <ParamRow label="Strefa 1" value={`${formatNumber(Number(analysis.consumption_before_zone1_mwh), 2)} MWh`} />
+              {zonesCountBefore >= 2 && <ParamRow label="Strefa 2" value={`${formatNumber(Number(analysis.consumption_before_zone2_mwh), 2)} MWh`} />}
+              {zonesCountBefore >= 3 && <ParamRow label="Strefa 3" value={`${formatNumber(Number(analysis.consumption_before_zone3_mwh), 2)} MWh`} />}
+            </ParamCard>
+          )}
 
           {/* Zużycie PO */}
-          <ParamCard icon={iconEnergy} title="Zużycie energii PO">
-            <ParamRow label="Strefa 1" value={`${formatNumber(Number(analysis.consumption_after_zone1_mwh), 2)} MWh`} />
-            {zonesCountAfter >= 2 && <ParamRow label="Strefa 2" value={`${formatNumber(Number(analysis.consumption_after_zone2_mwh), 2)} MWh`} />}
-            {zonesCountAfter >= 3 && <ParamRow label="Strefa 3" value={`${formatNumber(Number(analysis.consumption_after_zone3_mwh), 2)} MWh`} />}
-          </ParamCard>
+          {isVisible('distribution') && (
+            <ParamCard icon={iconEnergy} title="Zużycie energii PO">
+              <ParamRow label="Strefa 1" value={`${formatNumber(Number(analysis.consumption_after_zone1_mwh), 2)} MWh`} />
+              {zonesCountAfter >= 2 && <ParamRow label="Strefa 2" value={`${formatNumber(Number(analysis.consumption_after_zone2_mwh), 2)} MWh`} />}
+              {zonesCountAfter >= 3 && <ParamRow label="Strefa 3" value={`${formatNumber(Number(analysis.consumption_after_zone3_mwh), 2)} MWh`} />}
+            </ParamCard>
+          )}
 
           {/* Stawki energii */}
           {isVisible('activeEnergy') && (
@@ -432,7 +436,7 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
         </div>
 
         {/* ── Bottom insight: Zone share chart (PO scenario) ── */}
-        {totalAfterMWh > 0 && (
+        {isVisible('distribution') && totalAfterMWh > 0 && (
           <div
             style={{
               marginTop: 24,
