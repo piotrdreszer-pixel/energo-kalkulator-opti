@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useAdminRole } from '@/hooks/useAdminRole';
+import { useUserRoles } from '@/hooks/useUserRoles';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -21,7 +21,8 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const { profile, signOut } = useAuth();
-  const { isAdmin } = useAdminRole();
+  const { isAdmin, isOwner } = useUserRoles();
+
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -94,7 +95,11 @@ export function AppLayout({ children }: AppLayoutProps) {
                   <div className="px-2 py-1.5">
                     <p className="text-sm font-medium">{profile?.name}</p>
                     <p className="text-xs text-muted-foreground">{profile?.email}</p>
+                    {isOwner && (
+                      <p className="mt-1 text-xs font-semibold text-primary">Właściciel aplikacji</p>
+                    )}
                   </div>
+
                   <DropdownMenuSeparator />
                   <ChangePasswordDialog
                     trigger={

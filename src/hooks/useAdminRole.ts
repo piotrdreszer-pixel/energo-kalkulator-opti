@@ -16,19 +16,23 @@ export function useAdminRole() {
       }
 
       try {
-        const { data, error } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .eq('role', 'admin')
-          .maybeSingle();
+        const [{ data, error }, { data: ownerData }] = await Promise.all([
+          supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id)
+            .eq('role', 'admin')
+            .maybeSingle(),
+          supabase.rpc('is_app_owner'),
+        ]);
 
         if (error) {
           console.error('Error checking admin role:', error);
-          setIsAdmin(false);
+          setIsAdmin(ownerData === true);
         } else {
-          setIsAdmin(!!data);
+          setIsAdmin(!!data || ownerData === true);
         }
+
       } catch (error) {
         console.error('Error checking admin role:', error);
         setIsAdmin(false);

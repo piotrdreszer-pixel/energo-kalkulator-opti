@@ -6,6 +6,7 @@ export function useUserRoles() {
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [isManager, setIsManager] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -13,20 +14,24 @@ export function useUserRoles() {
       if (!user) {
         setIsAdmin(false);
         setIsManager(false);
+        setIsOwner(false);
         setLoading(false);
         return;
       }
-      const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id);
+      const [{ data }, { data: ownerData }] = await Promise.all([
+        supabase.from('user_roles').select('role').eq('user_id', user.id),
+        supabase.rpc('is_app_owner'),
+      ]);
       const roles = (data || []).map(r => r.role);
-      setIsAdmin(roles.includes('admin'));
-      setIsManager(roles.includes('manager'));
+      const owner = ownerData === true;
+      setIsOwner(owner);
+      setIsAdmin(owner || roles.includes('admin'));
+      setIsManager(owner || roles.includes('manager'));
       setLoading(false);
     };
     check();
   }, [user]);
 
-  return { isAdmin, isManager, loading };
+  return { isAdmin, isManager, isOwner, loading };
 }
+
