@@ -95,7 +95,11 @@ export function AppLayout({ children }: AppLayoutProps) {
                   <div className="px-2 py-1.5">
                     <p className="text-sm font-medium">{profile?.name}</p>
                     <p className="text-xs text-muted-foreground">{profile?.email}</p>
+                    {isOwner && (
+                      <p className="mt-1 text-xs font-semibold text-primary">Właściciel aplikacji</p>
+                    )}
                   </div>
+
                   <DropdownMenuSeparator />
                   <ChangePasswordDialog
                     trigger={
