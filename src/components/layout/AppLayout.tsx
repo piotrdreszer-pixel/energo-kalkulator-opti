@@ -21,7 +21,8 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const { profile, signOut } = useAuth();
-  const { isAdmin } = useAdminRole();
+  const { isAdmin, isOwner } = useUserRoles();
+
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
