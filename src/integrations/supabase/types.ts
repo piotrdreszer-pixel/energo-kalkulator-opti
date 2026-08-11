@@ -595,6 +595,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_app_owner: { Args: never; Returns: boolean }
       is_manager_of: { Args: { _managed_user_id: string }; Returns: boolean }
     }
     Enums: {
