@@ -843,6 +843,11 @@ export default function AnalysisForm() {
               <ConsumptionMapping
                 zonesBefore={zonesCountBefore}
                 zonesAfter={zonesCountAfter}
+                sameTariff={
+                  !!formData.tariff_code_before &&
+                  (formData.tariff_code_before || '').toUpperCase() ===
+                    (formData.tariff_code_after || '').toUpperCase()
+                }
                 formData={formData}
                 onInputChange={handleInputChange}
                 isAutoMode={isAutoConsumptionMode}
@@ -850,6 +855,7 @@ export default function AnalysisForm() {
                 zoneDistribution={zoneDistribution}
                 setZoneDistribution={setZoneDistribution}
               />
+
 
               <RatesInputPanel
                 prefix="after"

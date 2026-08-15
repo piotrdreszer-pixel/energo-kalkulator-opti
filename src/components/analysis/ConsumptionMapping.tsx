@@ -1,6 +1,9 @@
 import React, { forwardRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Copy } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
@@ -10,6 +13,7 @@ import type { EnergyAnalysis } from '@/types/database';
 interface ConsumptionMappingProps {
   zonesBefore: number;
   zonesAfter: number;
+  sameTariff?: boolean;
   formData: Partial<EnergyAnalysis>;
   onInputChange: (field: keyof EnergyAnalysis, value: number) => void;
   isAutoMode: boolean;
@@ -17,6 +21,7 @@ interface ConsumptionMappingProps {
   zoneDistribution: number[];
   setZoneDistribution: (value: number[]) => void;
 }
+
 
 // Track the previous zonesAfter to detect actual changes
 const usePreviousZones = (zones: number) => {
@@ -29,7 +34,7 @@ const usePreviousZones = (zones: number) => {
 
 export const ConsumptionMapping = forwardRef<HTMLDivElement, ConsumptionMappingProps>(
   function ConsumptionMapping(
-    { zonesBefore, zonesAfter, formData, onInputChange, isAutoMode, setIsAutoMode, zoneDistribution, setZoneDistribution },
+    { zonesBefore, zonesAfter, sameTariff, formData, onInputChange, isAutoMode, setIsAutoMode, zoneDistribution, setZoneDistribution },
     ref
   ) {
     const zoneLabelsAfter = getZoneLabels(zonesAfter);
@@ -109,6 +114,13 @@ export const ConsumptionMapping = forwardRef<HTMLDivElement, ConsumptionMappingP
     }
   };
 
+  const handleCopyFromBefore = () => {
+    setIsAutoMode(false);
+    onInputChange('consumption_after_zone1_mwh', Number(formData.consumption_before_zone1_mwh) || 0);
+    onInputChange('consumption_after_zone2_mwh', Number(formData.consumption_before_zone2_mwh) || 0);
+    onInputChange('consumption_after_zone3_mwh', Number(formData.consumption_before_zone3_mwh) || 0);
+  };
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -127,6 +139,18 @@ export const ConsumptionMapping = forwardRef<HTMLDivElement, ConsumptionMappingP
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {sameTariff && zonesBefore === zonesAfter && (
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="button" variant="outline" size="sm" onClick={handleCopyFromBefore}>
+              <Copy className="mr-2 h-4 w-4" />
+              Skopiuj zużycie ze stanu PRZED
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              Taryfa PO jest taka sama jak PRZED
+            </span>
+          </div>
+        )}
+
         {isAutoMode && totalConsumption > 0 && zonesAfter > 1 && zoneDistribution.length >= zonesAfter && (
           <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
             <p className="text-sm text-muted-foreground">
