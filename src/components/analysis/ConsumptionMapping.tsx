@@ -10,6 +10,7 @@ import type { EnergyAnalysis } from '@/types/database';
 interface ConsumptionMappingProps {
   zonesBefore: number;
   zonesAfter: number;
+  sameTariff?: boolean;
   formData: Partial<EnergyAnalysis>;
   onInputChange: (field: keyof EnergyAnalysis, value: number) => void;
   isAutoMode: boolean;
@@ -17,6 +18,7 @@ interface ConsumptionMappingProps {
   zoneDistribution: number[];
   setZoneDistribution: (value: number[]) => void;
 }
+
 
 // Track the previous zonesAfter to detect actual changes
 const usePreviousZones = (zones: number) => {
