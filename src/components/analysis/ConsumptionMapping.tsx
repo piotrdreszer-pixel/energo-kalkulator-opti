@@ -111,6 +111,13 @@ export const ConsumptionMapping = forwardRef<HTMLDivElement, ConsumptionMappingP
     }
   };
 
+  const handleCopyFromBefore = () => {
+    setIsAutoMode(false);
+    onInputChange('consumption_after_zone1_mwh', Number(formData.consumption_before_zone1_mwh) || 0);
+    onInputChange('consumption_after_zone2_mwh', Number(formData.consumption_before_zone2_mwh) || 0);
+    onInputChange('consumption_after_zone3_mwh', Number(formData.consumption_before_zone3_mwh) || 0);
+  };
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -129,6 +136,18 @@ export const ConsumptionMapping = forwardRef<HTMLDivElement, ConsumptionMappingP
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {sameTariff && zonesBefore === zonesAfter && (
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="button" variant="outline" size="sm" onClick={handleCopyFromBefore}>
+              <Copy className="mr-2 h-4 w-4" />
+              Skopiuj zużycie ze stanu PRZED
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              Taryfa PO jest taka sama jak PRZED
+            </span>
+          </div>
+        )}
+
         {isAutoMode && totalConsumption > 0 && zonesAfter > 1 && zoneDistribution.length >= zonesAfter && (
           <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
             <p className="text-sm text-muted-foreground">
