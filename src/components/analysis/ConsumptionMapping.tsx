@@ -31,7 +31,7 @@ const usePreviousZones = (zones: number) => {
 
 export const ConsumptionMapping = forwardRef<HTMLDivElement, ConsumptionMappingProps>(
   function ConsumptionMapping(
-    { zonesBefore, zonesAfter, formData, onInputChange, isAutoMode, setIsAutoMode, zoneDistribution, setZoneDistribution },
+    { zonesBefore, zonesAfter, sameTariff, formData, onInputChange, isAutoMode, setIsAutoMode, zoneDistribution, setZoneDistribution },
     ref
   ) {
     const zoneLabelsAfter = getZoneLabels(zonesAfter);
