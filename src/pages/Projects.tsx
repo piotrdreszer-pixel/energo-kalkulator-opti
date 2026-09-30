@@ -349,6 +349,7 @@ export default function Projects() {
                     });
                   }}
                   onClear={() => {
+                    setNipStatus(null);
                     setNewProject({
                       client_name: '',
                       client_nip: '',
