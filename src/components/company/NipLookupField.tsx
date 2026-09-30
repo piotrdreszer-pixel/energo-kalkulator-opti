@@ -262,6 +262,21 @@ export function NipLookupField({
         )}
       </div>
 
+      {/* External error/warning (e.g. duplicate NIP) */}
+      {externalError && (
+        <div className="flex items-center gap-2 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{externalError}</span>
+        </div>
+      )}
+
+      {externalSuccess && !externalError && (
+        <div className="flex items-center gap-2 text-sm text-emerald-600">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <span>{externalSuccess}</span>
+        </div>
+      )}
+
       {/* Loading state */}
       {isLoading && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
