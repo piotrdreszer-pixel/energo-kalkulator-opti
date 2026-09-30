@@ -198,6 +198,15 @@ export default function Projects() {
         pkd_main: '',
       });
       setIsCreateDialogOpen(false);
+
+      // For admins/managers: jump straight to the creator's project list
+      if (showUserGrouping && user?.id) {
+        const next = new URLSearchParams(searchParams);
+        next.set('user', user.id);
+        setSearchParams(next);
+        setSearchQuery('');
+      }
+
       refetch();
     } catch (error) {
       toast({
