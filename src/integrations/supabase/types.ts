@@ -588,6 +588,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_nip_owner: { Args: { _nip: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
