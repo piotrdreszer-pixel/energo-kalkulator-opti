@@ -24,6 +24,10 @@ interface NipLookupFieldProps {
   onRestoreGusData?: () => void;
   /** Whether form has been manually edited after GUS fetch */
   hasManualEdits?: boolean;
+  /** External error/warning shown below the fetch button (e.g. duplicate NIP) */
+  externalError?: string | null;
+  /** Extra info shown in green below the fetch button (e.g. NIP available) */
+  externalSuccess?: string | null;
 }
 
 // Check if we're in development mode
@@ -155,6 +159,8 @@ export function NipLookupField({
   className,
   onRestoreGusData,
   hasManualEdits = false,
+  externalError = null,
+  externalSuccess = null,
 }: NipLookupFieldProps) {
   const { isLoading, error, data, fetchCompany, fetchWithDebounce, reset, validateNIPFormat } = useCompanyLookup();
   const [localValue, setLocalValue] = useState(value);
