@@ -76,6 +76,7 @@ export default function Projects() {
     status_company: '',
     pkd_main: '',
   });
+  const [nipStatus, setNipStatus] = useState<{ error?: string; success?: string } | null>(null);
 
   const { user } = useAuth();
   const { toast } = useToast();
@@ -158,6 +159,36 @@ export default function Projects() {
     return !q || g.name.toLowerCase().includes(q) || g.email.toLowerCase().includes(q);
   });
 
+  const nipDuplicateMessage = (owner: string) =>
+    owner === user?.id
+      ? 'Ten NIP jest już przez Ciebie dodany.'
+      : 'Ten NIP jest już zajęty przez innego doradcę.';
+
+  const checkNipAvailability = useCallback(async (nip: string) => {
+    if (!/^\d{10}$/.test(nip.trim())) {
+      setNipStatus(null);
+      return;
+    }
+    const { data: nipOwner, error } = await supabase.rpc('get_nip_owner', { _nip: nip.trim() });
+    if (error) {
+      setNipStatus(null);
+      return;
+    }
+    if (nipOwner) {
+      setNipStatus({ error: nipDuplicateMessage(nipOwner) });
+    } else {
+      setNipStatus({ success: 'Ten NIP jest wolny — możesz dodać projekt.' });
+    }
+  }, [user?.id]);
+
+  const handleNipChange = (value: string) => {
+    setNewProject((prev) => ({ ...prev, client_nip: value }));
+    setNipStatus(null);
+    if (value.length === 10) {
+      checkNipAvailability(value);
+    }
+  };
+
   const handleCreateProject = async () => {
     if (!newProject.client_name.trim() || !newProject.client_nip.trim()) {
       toast({
@@ -178,13 +209,7 @@ export default function Projects() {
       if (nipError) throw nipError;
 
       if (nipOwner) {
-        toast({
-          variant: 'destructive',
-          title: 'Duplikat NIP',
-          description: nipOwner === user?.id
-            ? 'Ten NIP jest już przez Ciebie dodany.'
-            : 'Ten NIP jest już zajęty przez innego doradcę.',
-        });
+        setNipStatus({ error: nipDuplicateMessage(nipOwner) });
         setIsCreating(false);
         return;
       }
@@ -301,7 +326,9 @@ export default function Projects() {
                 {/* NIP with auto-lookup */}
                 <NipLookupField
                   value={newProject.client_nip}
-                  onChange={(value) => setNewProject({ ...newProject, client_nip: value })}
+                  onChange={handleNipChange}
+                  externalError={nipStatus?.error || null}
+                  externalSuccess={nipStatus?.success || null}
                   onCompanyFound={(data) => {
                     const fullAddress = [data.addressLine, data.postalCode, data.city]
                       .filter(Boolean)
@@ -322,6 +349,7 @@ export default function Projects() {
                     });
                   }}
                   onClear={() => {
+                    setNipStatus(null);
                     setNewProject({
                       client_name: '',
                       client_nip: '',
