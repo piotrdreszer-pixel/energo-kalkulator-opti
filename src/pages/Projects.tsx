@@ -171,6 +171,24 @@ export default function Projects() {
     setIsCreating(true);
 
     try {
+      // Check for duplicate NIP (own projects and other advisors' projects)
+      const { data: nipOwner, error: nipError } = await supabase
+        .rpc('get_nip_owner', { _nip: newProject.client_nip.trim() });
+
+      if (nipError) throw nipError;
+
+      if (nipOwner) {
+        toast({
+          variant: 'destructive',
+          title: 'Duplikat NIP',
+          description: nipOwner === user?.id
+            ? 'Ten NIP jest już przez Ciebie dodany.'
+            : 'Ten NIP jest już zajęty przez innego doradcę.',
+        });
+        setIsCreating(false);
+        return;
+      }
+
       const { error } = await supabase.from('client_projects').insert({
         client_name: newProject.client_name.trim(),
         client_nip: newProject.client_nip.trim(),
