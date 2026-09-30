@@ -326,7 +326,9 @@ export default function Projects() {
                 {/* NIP with auto-lookup */}
                 <NipLookupField
                   value={newProject.client_nip}
-                  onChange={(value) => setNewProject({ ...newProject, client_nip: value })}
+                  onChange={handleNipChange}
+                  externalError={nipStatus?.error || null}
+                  externalSuccess={nipStatus?.success || null}
                   onCompanyFound={(data) => {
                     const fullAddress = [data.addressLine, data.postalCode, data.city]
                       .filter(Boolean)
