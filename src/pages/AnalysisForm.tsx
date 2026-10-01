@@ -783,7 +783,7 @@ export default function AnalysisForm() {
                 overriddenFields={overriddenBefore}
                 setOverriddenFields={setOverriddenBefore}
                 ratesYear={ratesYearBefore}
-                setRatesYear={setRatesYearBefore}
+                setRatesYear={handleSetRatesYearBefore}
               />
             </div>
           )}
@@ -896,7 +896,7 @@ export default function AnalysisForm() {
                 overriddenFields={overriddenAfter}
                 setOverriddenFields={setOverriddenAfter}
                 ratesYear={ratesYearAfter}
-                setRatesYear={setRatesYearAfter}
+                setRatesYear={handleSetRatesYearAfter}
               />
             </div>
           )}
