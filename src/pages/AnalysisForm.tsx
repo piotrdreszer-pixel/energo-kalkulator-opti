@@ -41,6 +41,15 @@ import { useRatesResolver } from '@/hooks/useRatesResolver';
 import { useVisibleTariffsForOsd } from '@/hooks/useVisibleTariffsForOsd';
 import { cn } from '@/lib/utils';
 
+// Signature of the parameters rates were last fetched for (used to auto-fetch
+// only when OSD / tariff / season / rates year actually change).
+const ratesSignature = (
+  osdId: unknown,
+  tariff: unknown,
+  season: unknown,
+  year: string
+) => `${osdId ?? ''}|${String(tariff ?? '').toUpperCase()}|${season ?? 'ALL'}|${year}`;
+
 const WIZARD_STEPS = [
   { id: 'client', label: 'Klient', description: 'Dane klienta' },
   { id: 'osd', label: 'OSD', description: 'Operator i okres' },
@@ -126,6 +135,9 @@ export default function AnalysisForm() {
   const [ratesYearAfter, setRatesYearAfter] = useState<string>(() => String(new Date().getFullYear()));
   const yearTouchedBefore = React.useRef(false);
   const yearTouchedAfter = React.useRef(false);
+  const hydratedRef = React.useRef(false);
+  const lastFetchedBeforeRef = React.useRef('');
+  const lastFetchedAfterRef = React.useRef('');
 
   const { data: osdOperators } = useOsdOperators();
   const { visibleCodes } = useVisibleTariffsForOsd(formData.osd_id);
@@ -172,6 +184,23 @@ export default function AnalysisForm() {
       });
       setOverriddenBefore((analysis.rates_overridden_before as Record<string, number>) || {});
       setOverriddenAfter((analysis.rates_overridden_after as Record<string, number>) || {});
+      // Mark the stored parameters as "already fetched" so opening a saved
+      // analysis never re-triggers the auto-fetch.
+      const storedYear =
+        String(analysis.rates_date || '').slice(0, 4) || String(new Date().getFullYear());
+      lastFetchedBeforeRef.current = ratesSignature(
+        analysis.osd_id,
+        analysis.tariff_code_before,
+        analysis.season_before,
+        storedYear
+      );
+      lastFetchedAfterRef.current = ratesSignature(
+        analysis.osd_id,
+        analysis.tariff_code_after,
+        analysis.season_after,
+        storedYear
+      );
+      hydratedRef.current = true;
     }
   }, [analysis]);
 
@@ -197,6 +226,45 @@ export default function AnalysisForm() {
     yearTouchedAfter.current = true;
     setRatesYearAfter(year);
   };
+
+  // Auto-fetch rates for PRZED and PO whenever OSD, tariff, season or the
+  // rates year change — no need to press "Pobierz stawki". Skipped in manual
+  // mode and right after loading a saved analysis (params already fetched).
+  useEffect(() => {
+    if (!hydratedRef.current || !formData.osd_id) return;
+    const sigBefore = ratesSignature(
+      formData.osd_id,
+      formData.tariff_code_before,
+      formData.season_before,
+      ratesYearBefore
+    );
+    const sigAfter = ratesSignature(
+      formData.osd_id,
+      formData.tariff_code_after,
+      formData.season_after,
+      ratesYearAfter
+    );
+    if (sigBefore !== lastFetchedBeforeRef.current && !isManualModeBefore) {
+      lastFetchedBeforeRef.current = sigBefore;
+      fetchRates('before', { silent: true });
+    }
+    if (sigAfter !== lastFetchedAfterRef.current && !isManualModeAfter) {
+      lastFetchedAfterRef.current = sigAfter;
+      fetchRates('after', { silent: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    hydratedRef.current,
+    formData.osd_id,
+    formData.tariff_code_before,
+    formData.tariff_code_after,
+    formData.season_before,
+    formData.season_after,
+    ratesYearBefore,
+    ratesYearAfter,
+    isManualModeBefore,
+    isManualModeAfter,
+  ]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -281,9 +349,12 @@ export default function AnalysisForm() {
     setFormData(prev => ({ ...prev, [field]: value }));
   }, []);
 
-  const handleFetchRates = async (scenario: 'before' | 'after') => {
+  const fetchRates = async (scenario: 'before' | 'after', options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
     if (!formData.osd_id) {
-      toast({ variant: 'destructive', title: 'Błąd', description: 'Wybierz najpierw OSD.' });
+      if (!silent) {
+        toast({ variant: 'destructive', title: 'Błąd', description: 'Wybierz najpierw OSD.' });
+      }
       return;
     }
 
@@ -304,26 +375,32 @@ export default function AnalysisForm() {
     );
 
     if (result.notFound) {
-      toast({ 
-        variant: 'destructive', 
-        title: 'Taryfa niedostępna', 
-        description: `Taryfa ${tariffCode?.toUpperCase()} nie jest dostępna dla ${osdName} w roku ${ratesYear}. Wybierz inną taryfę lub wprowadź stawki ręcznie.` 
-      });
+      if (!silent) {
+        toast({
+          variant: 'destructive',
+          title: 'Taryfa niedostępna',
+          description: `Taryfa ${tariffCode?.toUpperCase()} nie jest dostępna dla ${osdName} w roku ${ratesYear}. Wybierz inną taryfę lub wprowadź stawki ręcznie.`
+        });
+      }
       return;
     }
 
     if (result.error) {
-      toast({ 
-        variant: 'destructive', 
-        title: 'Błąd', 
-        description: result.error 
-      });
+      if (!silent) {
+        toast({
+          variant: 'destructive',
+          title: 'Błąd',
+          description: result.error
+        });
+      }
       return;
     }
 
     const rates = result.rates;
     if (rates) {
+      const sig = ratesSignature(formData.osd_id, tariffCode, season, ratesYear);
       if (scenario === 'before') {
+        lastFetchedBeforeRef.current = sig;
         setResolvedRatesBefore(rates);
         // Apply rates to form
         setFormData(prev => ({
@@ -337,6 +414,7 @@ export default function AnalysisForm() {
         }));
         setOverriddenBefore({});
       } else {
+        lastFetchedAfterRef.current = sig;
         setResolvedRatesAfter(rates);
         setFormData(prev => ({
           ...prev,
@@ -349,9 +427,13 @@ export default function AnalysisForm() {
         }));
         setOverriddenAfter({});
       }
-      toast({ title: 'Pobrano stawki', description: `Stawki dla ${rates.rateCardName} zostały załadowane.` });
+      if (!silent) {
+        toast({ title: 'Pobrano stawki', description: `Stawki dla ${rates.rateCardName} zostały załadowane.` });
+      }
     }
   };
+
+  const handleFetchRates = (scenario: 'before' | 'after') => fetchRates(scenario);
 
   const handleResetRates = (scenario: 'before' | 'after') => {
     if (scenario === 'before') {
