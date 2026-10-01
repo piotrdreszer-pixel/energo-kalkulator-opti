@@ -184,6 +184,23 @@ export default function AnalysisForm() {
       });
       setOverriddenBefore((analysis.rates_overridden_before as Record<string, number>) || {});
       setOverriddenAfter((analysis.rates_overridden_after as Record<string, number>) || {});
+      // Mark the stored parameters as "already fetched" so opening a saved
+      // analysis never re-triggers the auto-fetch.
+      const storedYear =
+        String(analysis.rates_date || '').slice(0, 4) || String(new Date().getFullYear());
+      lastFetchedBeforeRef.current = ratesSignature(
+        analysis.osd_id,
+        analysis.tariff_code_before,
+        analysis.season_before,
+        storedYear
+      );
+      lastFetchedAfterRef.current = ratesSignature(
+        analysis.osd_id,
+        analysis.tariff_code_after,
+        analysis.season_after,
+        storedYear
+      );
+      hydratedRef.current = true;
     }
   }, [analysis]);
 
@@ -293,9 +310,12 @@ export default function AnalysisForm() {
     setFormData(prev => ({ ...prev, [field]: value }));
   }, []);
 
-  const handleFetchRates = async (scenario: 'before' | 'after') => {
+  const fetchRates = async (scenario: 'before' | 'after', options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
     if (!formData.osd_id) {
-      toast({ variant: 'destructive', title: 'Błąd', description: 'Wybierz najpierw OSD.' });
+      if (!silent) {
+        toast({ variant: 'destructive', title: 'Błąd', description: 'Wybierz najpierw OSD.' });
+      }
       return;
     }
 
@@ -316,26 +336,32 @@ export default function AnalysisForm() {
     );
 
     if (result.notFound) {
-      toast({ 
-        variant: 'destructive', 
-        title: 'Taryfa niedostępna', 
-        description: `Taryfa ${tariffCode?.toUpperCase()} nie jest dostępna dla ${osdName} w roku ${ratesYear}. Wybierz inną taryfę lub wprowadź stawki ręcznie.` 
-      });
+      if (!silent) {
+        toast({
+          variant: 'destructive',
+          title: 'Taryfa niedostępna',
+          description: `Taryfa ${tariffCode?.toUpperCase()} nie jest dostępna dla ${osdName} w roku ${ratesYear}. Wybierz inną taryfę lub wprowadź stawki ręcznie.`
+        });
+      }
       return;
     }
 
     if (result.error) {
-      toast({ 
-        variant: 'destructive', 
-        title: 'Błąd', 
-        description: result.error 
-      });
+      if (!silent) {
+        toast({
+          variant: 'destructive',
+          title: 'Błąd',
+          description: result.error
+        });
+      }
       return;
     }
 
     const rates = result.rates;
     if (rates) {
+      const sig = ratesSignature(formData.osd_id, tariffCode, season, ratesYear);
       if (scenario === 'before') {
+        lastFetchedBeforeRef.current = sig;
         setResolvedRatesBefore(rates);
         // Apply rates to form
         setFormData(prev => ({
@@ -349,6 +375,7 @@ export default function AnalysisForm() {
         }));
         setOverriddenBefore({});
       } else {
+        lastFetchedAfterRef.current = sig;
         setResolvedRatesAfter(rates);
         setFormData(prev => ({
           ...prev,
@@ -361,9 +388,13 @@ export default function AnalysisForm() {
         }));
         setOverriddenAfter({});
       }
-      toast({ title: 'Pobrano stawki', description: `Stawki dla ${rates.rateCardName} zostały załadowane.` });
+      if (!silent) {
+        toast({ title: 'Pobrano stawki', description: `Stawki dla ${rates.rateCardName} zostały załadowane.` });
+      }
     }
   };
+
+  const handleFetchRates = (scenario: 'before' | 'after') => fetchRates(scenario);
 
   const handleResetRates = (scenario: 'before' | 'after') => {
     if (scenario === 'before') {
