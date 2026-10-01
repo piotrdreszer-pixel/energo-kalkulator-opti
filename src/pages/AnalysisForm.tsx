@@ -122,8 +122,10 @@ export default function AnalysisForm() {
   const [isAutoConsumptionModeBefore, setIsAutoConsumptionModeBefore] = useState(true);
   const [zoneDistributionBefore, setZoneDistributionBefore] = useState<number[]>(() => getDefaultDistribution(1));
   const [totalConsumptionBefore, setTotalConsumptionBefore] = useState<number>(0);
-  const [ratesYearBefore, setRatesYearBefore] = useState<string>('2025');
-  const [ratesYearAfter, setRatesYearAfter] = useState<string>('2025');
+  const [ratesYearBefore, setRatesYearBefore] = useState<string>(() => String(new Date().getFullYear()));
+  const [ratesYearAfter, setRatesYearAfter] = useState<string>(() => String(new Date().getFullYear()));
+  const yearTouchedBefore = React.useRef(false);
+  const yearTouchedAfter = React.useRef(false);
 
   const { data: osdOperators } = useOsdOperators();
   const { visibleCodes } = useVisibleTariffsForOsd(formData.osd_id);
@@ -172,6 +174,29 @@ export default function AnalysisForm() {
       setOverriddenAfter((analysis.rates_overridden_after as Record<string, number>) || {});
     }
   }, [analysis]);
+
+  // Auto-select the rates year from the analysis period (both PRZED and PO).
+  // When the period spans two calendar years (e.g. 2025-12 → 2026-01),
+  // the year choice stays manual.
+  useEffect(() => {
+    const from = formData.period_from;
+    const to = formData.period_to;
+    if (!from || !to) return;
+    const fromYear = String(from).slice(0, 4);
+    const toYear = String(to).slice(0, 4);
+    if (fromYear !== toYear) return;
+    if (!yearTouchedBefore.current) setRatesYearBefore(fromYear);
+    if (!yearTouchedAfter.current) setRatesYearAfter(fromYear);
+  }, [formData.period_from, formData.period_to]);
+
+  const handleSetRatesYearBefore = (year: string) => {
+    yearTouchedBefore.current = true;
+    setRatesYearBefore(year);
+  };
+  const handleSetRatesYearAfter = (year: string) => {
+    yearTouchedAfter.current = true;
+    setRatesYearAfter(year);
+  };
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -758,7 +783,7 @@ export default function AnalysisForm() {
                 overriddenFields={overriddenBefore}
                 setOverriddenFields={setOverriddenBefore}
                 ratesYear={ratesYearBefore}
-                setRatesYear={setRatesYearBefore}
+                setRatesYear={handleSetRatesYearBefore}
               />
             </div>
           )}
@@ -871,7 +896,7 @@ export default function AnalysisForm() {
                 overriddenFields={overriddenAfter}
                 setOverriddenFields={setOverriddenAfter}
                 ratesYear={ratesYearAfter}
-                setRatesYear={setRatesYearAfter}
+                setRatesYear={handleSetRatesYearAfter}
               />
             </div>
           )}

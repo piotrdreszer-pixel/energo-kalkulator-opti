@@ -136,8 +136,9 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
                 <SelectValue placeholder="Rok" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="2025">2025</SelectItem>
-                <SelectItem value="2026">2026</SelectItem>
+                {Array.from({ length: new Date().getFullYear() + 1 - 2024 }, (_, i) => 2024 + i).map((y) => (
+                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Button
