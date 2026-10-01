@@ -175,6 +175,29 @@ export default function AnalysisForm() {
     }
   }, [analysis]);
 
+  // Auto-select the rates year from the analysis period (both PRZED and PO).
+  // When the period spans two calendar years (e.g. 2025-12 → 2026-01),
+  // the year choice stays manual.
+  useEffect(() => {
+    const from = formData.period_from;
+    const to = formData.period_to;
+    if (!from || !to) return;
+    const fromYear = String(from).slice(0, 4);
+    const toYear = String(to).slice(0, 4);
+    if (fromYear !== toYear) return;
+    if (!yearTouchedBefore.current) setRatesYearBefore(fromYear);
+    if (!yearTouchedAfter.current) setRatesYearAfter(fromYear);
+  }, [formData.period_from, formData.period_to]);
+
+  const handleSetRatesYearBefore = (year: string) => {
+    yearTouchedBefore.current = true;
+    setRatesYearBefore(year);
+  };
+  const handleSetRatesYearAfter = (year: string) => {
+    yearTouchedAfter.current = true;
+    setRatesYearAfter(year);
+  };
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       const dataToSave = {
