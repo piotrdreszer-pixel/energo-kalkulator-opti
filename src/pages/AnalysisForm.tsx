@@ -122,8 +122,10 @@ export default function AnalysisForm() {
   const [isAutoConsumptionModeBefore, setIsAutoConsumptionModeBefore] = useState(true);
   const [zoneDistributionBefore, setZoneDistributionBefore] = useState<number[]>(() => getDefaultDistribution(1));
   const [totalConsumptionBefore, setTotalConsumptionBefore] = useState<number>(0);
-  const [ratesYearBefore, setRatesYearBefore] = useState<string>('2025');
-  const [ratesYearAfter, setRatesYearAfter] = useState<string>('2025');
+  const [ratesYearBefore, setRatesYearBefore] = useState<string>(() => String(new Date().getFullYear()));
+  const [ratesYearAfter, setRatesYearAfter] = useState<string>(() => String(new Date().getFullYear()));
+  const yearTouchedBefore = React.useRef(false);
+  const yearTouchedAfter = React.useRef(false);
 
   const { data: osdOperators } = useOsdOperators();
   const { visibleCodes } = useVisibleTariffsForOsd(formData.osd_id);
