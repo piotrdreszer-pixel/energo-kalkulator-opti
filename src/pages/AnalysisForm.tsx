@@ -41,6 +41,15 @@ import { useRatesResolver } from '@/hooks/useRatesResolver';
 import { useVisibleTariffsForOsd } from '@/hooks/useVisibleTariffsForOsd';
 import { cn } from '@/lib/utils';
 
+// Signature of the parameters rates were last fetched for (used to auto-fetch
+// only when OSD / tariff / season / rates year actually change).
+const ratesSignature = (
+  osdId: unknown,
+  tariff: unknown,
+  season: unknown,
+  year: string
+) => `${osdId ?? ''}|${String(tariff ?? '').toUpperCase()}|${season ?? 'ALL'}|${year}`;
+
 const WIZARD_STEPS = [
   { id: 'client', label: 'Klient', description: 'Dane klienta' },
   { id: 'osd', label: 'OSD', description: 'Operator i okres' },
@@ -126,6 +135,9 @@ export default function AnalysisForm() {
   const [ratesYearAfter, setRatesYearAfter] = useState<string>(() => String(new Date().getFullYear()));
   const yearTouchedBefore = React.useRef(false);
   const yearTouchedAfter = React.useRef(false);
+  const hydratedRef = React.useRef(false);
+  const lastFetchedBeforeRef = React.useRef('');
+  const lastFetchedAfterRef = React.useRef('');
 
   const { data: osdOperators } = useOsdOperators();
   const { visibleCodes } = useVisibleTariffsForOsd(formData.osd_id);
