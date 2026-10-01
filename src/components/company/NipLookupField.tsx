@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Search, AlertCircle, CheckCircle2, X, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
+import { Loader2, Search, AlertCircle, CheckCircle2, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useCompanyLookup, CompanyData, DebugInfo, GusDebug, ProviderDebug } from '@/hooks/useCompanyLookup';
 import { cn } from '@/lib/utils';
 import {
@@ -20,10 +20,6 @@ interface NipLookupFieldProps {
   disabled?: boolean;
   autoFetch?: boolean;
   className?: string;
-  /** Called when user wants to restore GUS data after manual edits */
-  onRestoreGusData?: () => void;
-  /** Whether form has been manually edited after GUS fetch */
-  hasManualEdits?: boolean;
   /** External error/warning shown below the fetch button (e.g. duplicate NIP) */
   externalError?: string | null;
   /** Extra info shown in green below the fetch button (e.g. NIP available) */
@@ -157,8 +153,6 @@ export function NipLookupField({
   disabled = false,
   autoFetch = true,
   className,
-  onRestoreGusData,
-  hasManualEdits = false,
   externalError = null,
   externalSuccess = null,
 }: NipLookupFieldProps) {
@@ -290,35 +284,6 @@ export function NipLookupField({
         <div className="flex items-center gap-2 text-sm text-destructive">
           <AlertCircle className="h-4 w-4" />
           <span>{error.message}</span>
-        </div>
-      )}
-
-      {/* Success state with source */}
-      {data && !isLoading && !error && (
-        <div className="flex items-center gap-2 text-sm text-emerald-600 flex-wrap">
-          <CheckCircle2 className="h-4 w-4" />
-          <span>Dane pobrane pomyślnie</span>
-          <Badge variant="outline" className="text-xs">
-            Źródło: {data.source}
-          </Badge>
-          {data.debug?.cached && (
-            <Badge variant="secondary" className="text-xs">
-              Z cache
-            </Badge>
-          )}
-          {/* Show restore button if form was manually edited */}
-          {hasManualEdits && onRestoreGusData && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={onRestoreGusData}
-              className="h-6 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <RotateCcw className="h-3 w-3 mr-1" />
-              Przywróć dane z GUS
-            </Button>
-          )}
         </div>
       )}
     </div>
