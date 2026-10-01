@@ -227,6 +227,45 @@ export default function AnalysisForm() {
     setRatesYearAfter(year);
   };
 
+  // Auto-fetch rates for PRZED and PO whenever OSD, tariff, season or the
+  // rates year change — no need to press "Pobierz stawki". Skipped in manual
+  // mode and right after loading a saved analysis (params already fetched).
+  useEffect(() => {
+    if (!hydratedRef.current || !formData.osd_id) return;
+    const sigBefore = ratesSignature(
+      formData.osd_id,
+      formData.tariff_code_before,
+      formData.season_before,
+      ratesYearBefore
+    );
+    const sigAfter = ratesSignature(
+      formData.osd_id,
+      formData.tariff_code_after,
+      formData.season_after,
+      ratesYearAfter
+    );
+    if (sigBefore !== lastFetchedBeforeRef.current && !isManualModeBefore) {
+      lastFetchedBeforeRef.current = sigBefore;
+      fetchRates('before', { silent: true });
+    }
+    if (sigAfter !== lastFetchedAfterRef.current && !isManualModeAfter) {
+      lastFetchedAfterRef.current = sigAfter;
+      fetchRates('after', { silent: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    hydratedRef.current,
+    formData.osd_id,
+    formData.tariff_code_before,
+    formData.tariff_code_after,
+    formData.season_before,
+    formData.season_after,
+    ratesYearBefore,
+    ratesYearAfter,
+    isManualModeBefore,
+    isManualModeAfter,
+  ]);
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       const dataToSave = {
