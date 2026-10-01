@@ -20,10 +20,6 @@ interface NipLookupFieldProps {
   disabled?: boolean;
   autoFetch?: boolean;
   className?: string;
-  /** Called when user wants to restore GUS data after manual edits */
-  onRestoreGusData?: () => void;
-  /** Whether form has been manually edited after GUS fetch */
-  hasManualEdits?: boolean;
   /** External error/warning shown below the fetch button (e.g. duplicate NIP) */
   externalError?: string | null;
   /** Extra info shown in green below the fetch button (e.g. NIP available) */
