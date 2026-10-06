@@ -176,7 +176,7 @@ export default function ProjectDetail() {
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <Button variant="ghost" size="icon" asChild>
-            <Link to="/projects">
+            <Link to={project.created_by_user_id ? `/projects?user=${project.created_by_user_id}` : '/projects'}>
               <ArrowLeft className="h-5 w-5" />
             </Link>
           </Button>
