@@ -343,10 +343,6 @@ export default function Projects() {
                       status_company: data.status,
                       pkd_main: data.pkdMain || '',
                     });
-                    toast({
-                      title: 'Dane pobrane',
-                      description: `Źródło: ${data.source}`,
-                    });
                   }}
                   onClear={() => {
                     setNipStatus(null);
