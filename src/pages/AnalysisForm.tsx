@@ -200,6 +200,27 @@ export default function AnalysisForm() {
         analysis.season_after,
         storedYear
       );
+      // Restore saved consumption split so defaults never overwrite saved values.
+      const restoreSplit = (vals: number[], zones: number) => {
+        const v = vals.slice(0, zones).map(x => Number(x) || 0);
+        const sum = v.reduce((a, b) => a + b, 0);
+        return { sum, dist: sum > 0 ? v.map(x => (x / sum) * 100) : getDefaultDistribution(zones) };
+      };
+      const zb = analysis.zones_count_before || 1;
+      const za = analysis.zones_count_after || 1;
+      const before = restoreSplit([
+        analysis.consumption_before_zone1_mwh, analysis.consumption_before_zone2_mwh, analysis.consumption_before_zone3_mwh,
+      ], zb);
+      const after = restoreSplit([
+        analysis.consumption_after_zone1_mwh, analysis.consumption_after_zone2_mwh, analysis.consumption_after_zone3_mwh,
+      ], za);
+      setZoneDistributionBefore(before.dist);
+      if (before.sum > 0) setTotalConsumptionBefore(before.sum);
+      setZoneDistribution(after.dist);
+      if (after.sum > 0 && Math.abs(after.sum - before.sum) > 1e-6) {
+        // Manually entered values that don't match PRZED total — keep them as-is.
+        setIsAutoConsumptionMode(false);
+      }
       hydratedRef.current = true;
     }
   }, [analysis]);

@@ -37,8 +37,7 @@ export const ConsumptionMappingBefore = forwardRef<HTMLDivElement, ConsumptionMa
 
     // Reset distribution when zonesCount changes
     React.useEffect(() => {
-      const needsReset = zoneDistribution.length !== zonesCount || 
-        (previousZones !== null && previousZones !== zonesCount);
+      const needsReset = zoneDistribution.length !== zonesCount;
       if (needsReset) {
         setZoneDistribution(getDefaultDistribution(zonesCount));
       }
