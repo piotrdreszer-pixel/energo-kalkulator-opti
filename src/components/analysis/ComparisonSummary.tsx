@@ -16,6 +16,8 @@ interface ComparisonSummaryProps {
   onNotesChange: (notes: string) => void;
   hiddenComponents?: string[];
   onHiddenComponentsChange?: (keys: string[]) => void;
+  excludedComponents?: string[];
+  onExcludedComponentsChange?: (keys: string[]) => void;
 
   breakdown: {
     distributionBefore: number;
@@ -44,6 +46,8 @@ export function ComparisonSummary({
   breakdown,
   hiddenComponents = [],
   onHiddenComponentsChange,
+  excludedComponents = [],
+  onExcludedComponentsChange,
 }: ComparisonSummaryProps) {
   const toggleComponent = (key: ReportComponentKey, visible: boolean) => {
     if (!onHiddenComponentsChange) return;
@@ -69,19 +73,36 @@ export function ComparisonSummary({
     return 'text-muted-foreground';
   };
 
+  const toggleExcluded = (key: ReportComponentKey, included: boolean) => {
+    if (!onExcludedComponentsChange) return;
+    const next = included
+      ? excludedComponents.filter((k) => k !== key)
+      : Array.from(new Set([...excludedComponents, key]));
+    onExcludedComponentsChange(next);
+  };
+
   const renderDeltaRow = (key: ReportComponentKey, label: string, before: number, after: number) => {
     const diff = before - after;
     const visible = !hiddenComponents.includes(key);
+    const included = !excludedComponents.includes(key);
     return (
-      <div className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
+      <div className={`flex items-center justify-between py-2 border-b border-border/50 last:border-0 ${included ? '' : 'opacity-50'}`}>
         <div className="flex items-center gap-2">
           <Checkbox
             id={`report-cmp-${key}`}
             checked={visible}
+            disabled={!included}
+            title="Pokaż w raporcie"
             onCheckedChange={(checked) => toggleComponent(key, checked === true)}
           />
-          <Label htmlFor={`report-cmp-${key}`} className={`text-sm font-normal cursor-pointer ${visible ? 'text-muted-foreground' : 'text-muted-foreground/50 line-through'}`}>
-            {label}
+          <Checkbox
+            id={`calc-cmp-${key}`}
+            checked={included}
+            title="Uwzględnij w wyliczeniach"
+            onCheckedChange={(checked) => toggleExcluded(key, checked === true)}
+          />
+          <Label htmlFor={`report-cmp-${key}`} className={`text-sm font-normal cursor-pointer ${visible && included ? 'text-muted-foreground' : 'text-muted-foreground/50 line-through'}`}>
+            {label}{!included && ' (pominięte w wyliczeniach)'}
           </Label>
         </div>
         <div className="flex items-center gap-4 text-sm">
@@ -151,7 +172,7 @@ export function ComparisonSummary({
         <CardContent>
           <div className="divide-y">
             <div className="flex items-center justify-between py-2 font-medium text-sm">
-              <span>Składnik <span className="font-normal text-muted-foreground">(odhacz, aby ukryć w raporcie)</span></span>
+              <span>Składnik <span className="font-normal text-muted-foreground">(1. pole: widoczny w raporcie, 2. pole: uwzględniony w wyliczeniach)</span></span>
               <div className="flex items-center gap-4">
                 <span className="w-24 text-right text-muted-foreground">PRZED</span>
                 <span className="w-4"></span>
