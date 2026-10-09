@@ -48,8 +48,7 @@ export const ConsumptionMapping = forwardRef<HTMLDivElement, ConsumptionMappingP
 
     // Reset distribution when zonesAfter changes OR when length doesn't match (initial load)
     React.useEffect(() => {
-      const needsReset = zoneDistribution.length !== zonesAfter || 
-        (previousZonesAfter !== null && previousZonesAfter !== zonesAfter);
+      const needsReset = zoneDistribution.length !== zonesAfter;
       if (needsReset) {
         setZoneDistribution(getDefaultDistribution(zonesAfter));
       }
