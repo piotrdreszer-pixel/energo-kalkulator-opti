@@ -142,6 +142,7 @@ export type Database = {
           reactive_energy_cost_before: number | null
           reactive_monthly_mode_after: boolean
           reactive_monthly_mode_before: boolean
+          report_excluded_components: string[]
           report_hidden_components: string[]
           season_after: string | null
           season_before: string | null
@@ -225,6 +226,7 @@ export type Database = {
           reactive_energy_cost_before?: number | null
           reactive_monthly_mode_after?: boolean
           reactive_monthly_mode_before?: boolean
+          report_excluded_components?: string[]
           report_hidden_components?: string[]
           season_after?: string | null
           season_before?: string | null
@@ -308,6 +310,7 @@ export type Database = {
           reactive_energy_cost_before?: number | null
           reactive_monthly_mode_after?: boolean
           reactive_monthly_mode_before?: boolean
+          report_excluded_components?: string[]
           report_hidden_components?: string[]
           season_after?: string | null
           season_before?: string | null

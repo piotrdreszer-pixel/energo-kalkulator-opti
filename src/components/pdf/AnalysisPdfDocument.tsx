@@ -81,7 +81,10 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
   const zonesCountAfter = analysis.zones_count_after || 1;
   const dateStr = format(new Date(), 'd MMMM yyyy', { locale: pl });
 
-  const hidden = analysis.report_hidden_components || [];
+  const hidden = [
+    ...(analysis.report_hidden_components || []),
+    ...(analysis.report_excluded_components || []),
+  ];
   const isVisible = (key: string) => !hidden.includes(key);
 
   const costRows = [

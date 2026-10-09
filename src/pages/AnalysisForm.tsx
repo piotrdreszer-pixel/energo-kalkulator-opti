@@ -993,6 +993,8 @@ export default function AnalysisForm() {
               onNotesChange={(notes) => handleInputChange('consultant_notes', notes)}
               hiddenComponents={formData.report_hidden_components || []}
               onHiddenComponentsChange={(keys) => handleInputChange('report_hidden_components', keys as never)}
+              excludedComponents={formData.report_excluded_components || []}
+              onExcludedComponentsChange={(keys) => handleInputChange('report_excluded_components', keys as never)}
 
               breakdown={{
                 distributionBefore: results.distributionCostBefore,
