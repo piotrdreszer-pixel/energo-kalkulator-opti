@@ -184,6 +184,9 @@ export interface EnergyAnalysis {
   // Report components hidden from the final client PDF
   report_hidden_components: string[] | null;
 
+  // Components fully excluded from calculation totals
+  report_excluded_components: string[] | null;
+
   
   created_at: string;
   updated_at: string;

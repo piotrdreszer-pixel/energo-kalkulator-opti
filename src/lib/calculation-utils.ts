@@ -158,11 +158,19 @@ export function calculateEnergyCosts(analysis: Partial<EnergyAnalysis>): Calcula
   const handlingFeeBefore = (Number(analysis.handling_fee_before) || 0) * periodMonths;
   const handlingFeeAfter = (Number(analysis.handling_fee_after) || 0) * periodMonths;
 
-  // Totals - include all cost components
-  const totalCostBefore = distributionCostBefore + activeEnergyCostBefore + handlingFeeBefore + 
-                           contractedPowerChargeBefore + reactiveEnergyCostBefore + capacityBefore;
-  const totalCostAfter = distributionCostAfter + activeEnergyCostAfter + handlingFeeAfter + 
-                          contractedPowerChargeAfter + reactiveEnergyCostAfter + capacityAfter;
+  // Totals - include all cost components except those excluded from calculation
+  const excluded = (analysis.report_excluded_components || []) as string[];
+  const inc = (key: string, v: number) => (excluded.includes(key) ? 0 : v);
+  const totalCostBefore =
+    inc('distribution', distributionCostBefore - fixedDistBefore) + inc('fixedDistribution', fixedDistBefore) +
+    inc('activeEnergy', activeEnergyCostBefore) + inc('handling', handlingFeeBefore) +
+    inc('contractedPower', contractedPowerChargeBefore) + inc('reactive', reactiveEnergyCostBefore) +
+    inc('capacity', capacityBefore);
+  const totalCostAfter =
+    inc('distribution', distributionCostAfter - fixedDistAfter) + inc('fixedDistribution', fixedDistAfter) +
+    inc('activeEnergy', activeEnergyCostAfter) + inc('handling', handlingFeeAfter) +
+    inc('contractedPower', contractedPowerChargeAfter) + inc('reactive', reactiveEnergyCostAfter) +
+    inc('capacity', capacityAfter);
 
   // Savings
   const savingsValue = totalCostBefore - totalCostAfter;
