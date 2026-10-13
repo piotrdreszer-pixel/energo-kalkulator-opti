@@ -296,12 +296,12 @@ export default function Projects() {
     <AppLayout>
       <div className="content-container">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">
+            <h1 className="text-2xl font-display font-bold tracking-tight text-foreground">
               Projekty
             </h1>
-            <p className="text-muted-foreground mt-1">
+            <p className="text-sm text-muted-foreground mt-0.5">
               Zarządzaj projektami klientów i analizami oszczędności
             </p>
           </div>
@@ -502,13 +502,13 @@ export default function Projects() {
         )}
 
         {/* Search */}
-        <div className="relative mb-6">
+        <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder={showingUserList ? 'Szukaj użytkownika...' : 'Szukaj po nazwie klienta lub NIP...'}
+            placeholder={showingUserList ? 'Szukaj po imieniu, nazwisku lub e-mailu...' : 'Szukaj po nazwie klienta lub NIP...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 max-w-md"
+            className="pl-10 max-w-md bg-card"
           />
         </div>
 
@@ -532,11 +532,12 @@ export default function Projects() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {filteredUserGroups.map((g) => (
-                <Card
+                <button
+                  type="button"
                   key={g.user_id}
-                  className="card-interactive h-full cursor-pointer"
+                  className="group text-left rounded-xl border bg-card p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   onClick={() => {
                     const next = new URLSearchParams(searchParams);
                     next.set('user', g.user_id);
@@ -544,35 +545,33 @@ export default function Projects() {
                     setSearchQuery('');
                   }}
                 >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                          <UserIcon className="h-5 w-5 text-primary" />
-                        </div>
-                        <div className="min-w-0">
-                          <CardTitle className="text-base font-display truncate">
-                            {g.name}
-                          </CardTitle>
-                          {g.email && (
-                            <p className="text-xs text-muted-foreground truncate">{g.email}</p>
-                          )}
-                        </div>
-                      </div>
-                      <Badge variant="secondary">{g.count}</Badge>
+                  <div className="flex items-start gap-3">
+                    <div className="h-9 w-9 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                      <UserIcon className="h-4 w-4 text-primary" />
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Calendar className="h-3 w-3" />
-                      <span>
-                        Ostatnia aktualizacja: {format(new Date(g.lastUpdate), 'd MMM yyyy', { locale: pl })}
-                      </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-foreground truncate group-hover:text-primary transition-colors">
+                        {g.name}
+                      </p>
+                      {g.email && (
+                        <p className="text-xs text-muted-foreground truncate">{g.email}</p>
+                      )}
                     </div>
-                  </CardContent>
-                </Card>
+                    <div className="text-right shrink-0">
+                      <p className="text-base font-semibold text-foreground leading-none">{g.count}</p>
+                      <p className="text-[11px] text-muted-foreground mt-1">projekty</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Calendar className="h-3 w-3" />
+                    <span>
+                      Aktualizacja: {format(new Date(g.lastUpdate), 'd MMM yyyy', { locale: pl })}
+                    </span>
+                  </div>
+                </button>
               ))}
             </div>
+
           )
         )}
 
