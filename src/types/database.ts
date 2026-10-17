@@ -192,6 +192,8 @@ export interface EnergyAnalysis {
   ppe_address?: string | null;
   // Selected for the project-level aggregate report
   include_in_project_report?: boolean;
+  // Parent analysis (analysis_groups) this PPE belongs to
+  analysis_group_id?: string | null;
 
 
   
@@ -200,3 +202,10 @@ export interface EnergyAnalysis {
 }
 
 export interface EnergyAnalysisFormData extends Omit<EnergyAnalysis, 'id' | 'client_project_id' | 'created_at' | 'updated_at'> {}
+export interface AnalysisGroup {
+  id: string;
+  client_project_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}

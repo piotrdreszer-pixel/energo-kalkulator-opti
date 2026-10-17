@@ -14,6 +14,8 @@ import ResetPassword from "./pages/ResetPassword";
 import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
 import AnalysisForm from "./pages/AnalysisForm";
+import AnalysisGroupDetail from "./pages/AnalysisGroupDetail";
+import { LegacyProjectReportRedirect } from "./pages/LegacyRedirects";
 import AnalysisReport from "./pages/AnalysisReport";
 import ProjectReport from "./pages/ProjectReport";
 import RatesManagement from "./pages/admin/RatesManagement";
@@ -70,13 +72,23 @@ const App = () => (
               }
             />
             <Route
-              path="/projects/:projectId/report"
+              path="/projects/:projectId/analyses/:groupId"
+              element={
+                <ProtectedRoute>
+                  <AnalysisGroupDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/projects/:projectId/analyses/:groupId/report"
               element={
                 <ProtectedRoute>
                   <ProjectReport />
                 </ProtectedRoute>
               }
             />
+            {/* Legacy project-wide aggregate report: aggregates now live inside each analysis */}
+            <Route path="/projects/:projectId/report" element={<LegacyProjectReportRedirect />} />
 
 
             {/* Admin routes */}
