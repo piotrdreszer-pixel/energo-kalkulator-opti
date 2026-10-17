@@ -38,12 +38,10 @@ import {
   Printer,
   Edit,
 } from 'lucide-react';
-import type { ClientProject, EnergyAnalysis, ProjectStatus } from '@/types/database';
+import type { AnalysisGroup, ClientProject, EnergyAnalysis, ProjectStatus } from '@/types/database';
 import { calculateEnergyCosts, formatCurrency, formatPercent } from '@/lib/calculation-utils';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
-import { Checkbox } from '@/components/ui/checkbox';
-import ProjectAggregatePanel from '@/components/project/ProjectAggregatePanel';
 
 const STATUS_LABELS: Record<ProjectStatus, string> = {
   'roboczy': 'Roboczy',
@@ -78,15 +76,27 @@ export default function ProjectDetail() {
     enabled: !!projectId,
   });
 
+  const { data: groups, isLoading: groupsLoading } = useQuery({
+    queryKey: ['analysis-groups', projectId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('analysis_groups')
+        .select('*')
+        .eq('client_project_id', projectId!)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data || []) as AnalysisGroup[];
+    },
+    enabled: !!projectId,
+  });
+
   const { data: analyses, isLoading: analysesLoading } = useQuery({
     queryKey: ['analyses', projectId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('energy_analyses')
         .select('*')
-        .eq('client_project_id', projectId)
-        .order('created_at', { ascending: false });
-
+        .eq('client_project_id', projectId!);
       if (error) throw error;
       return (data || []) as EnergyAnalysis[];
     },
@@ -98,7 +108,7 @@ export default function ProjectDetail() {
       const { error } = await supabase
         .from('client_projects')
         .update({ status })
-        .eq('id', projectId);
+        .eq('id', projectId!);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -110,36 +120,43 @@ export default function ProjectDetail() {
     },
   });
 
-  const createAnalysisMutation = useMutation({
+  const creatingRef = React.useRef(false);
+  const createGroupMutation = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase
-        .from('energy_analyses')
-        .insert({
-          client_project_id: projectId,
-          name: `PPE ${(analyses?.length || 0) + 1}`,
-        })
-        .select()
+        .from('analysis_groups')
+        .insert({ client_project_id: projectId!, name: `Analiza ${(groups?.length || 0) + 1}` })
+        .select('id')
         .single();
       if (error) throw error;
       return data;
     },
     onSuccess: (data) => {
-      navigate(`/projects/${projectId}/analysis/${data.id}`);
+      queryClient.invalidateQueries({ queryKey: ['analysis-groups', projectId] });
+      navigate(`/projects/${projectId}/analyses/${data.id}`);
     },
     onError: () => {
       toast({ variant: 'destructive', title: 'Błąd', description: 'Nie udało się utworzyć analizy' });
     },
+    onSettled: () => { creatingRef.current = false; },
   });
+  const createGroup = () => {
+    if (creatingRef.current) return;
+    creatingRef.current = true;
+    createGroupMutation.mutate();
+  };
 
-  const deleteAnalysisMutation = useMutation({
-    mutationFn: async (analysisId: string) => {
+  const deleteGroupMutation = useMutation({
+    mutationFn: async (groupId: string) => {
       const { error } = await supabase
-        .from('energy_analyses')
+        .from('analysis_groups')
         .delete()
-        .eq('id', analysisId);
+        .eq('id', groupId)
+        .eq('client_project_id', projectId!);
       if (error) throw error;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['analysis-groups', projectId] });
       queryClient.invalidateQueries({ queryKey: ['analyses', projectId] });
       toast({ title: 'Analiza została usunięta' });
     },
@@ -148,23 +165,9 @@ export default function ProjectDetail() {
     },
   });
 
-  const toggleIncludeMutation = useMutation({
-    mutationFn: async ({ id, value }: { id: string; value: boolean }) => {
-      const { error } = await supabase
-        .from('energy_analyses')
-        .update({ include_in_project_report: value })
-        .eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['analyses', projectId] }),
-    onError: () => {
-      toast({ variant: 'destructive', title: 'Błąd', description: 'Nie udało się zapisać wyboru' });
-    },
-  });
+  const ppeByGroup = (groupId: string) => (analyses || []).filter((a) => a.analysis_group_id === groupId);
 
-  const selected = (analyses || []).filter((a) => a.include_in_project_report);
-
-  if (projectLoading || analysesLoading) {
+  if (projectLoading || analysesLoading || groupsLoading) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center py-20">
@@ -270,111 +273,82 @@ export default function ProjectDetail() {
         {/* Analyses Section */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
           <div>
-            <h2 className="text-xl font-display font-semibold">Punkty poboru i analizy</h2>
+            <h2 className="text-xl font-display font-semibold">Analizy oszczędności</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Dodaj osobną analizę dla każdego PPE. Zaznacz punkty, które chcesz uwzględnić w raporcie zbiorczym.
+              Każda analiza ma własną listę PPE, wynik zbiorczy i raport. Analizy nie są ze sobą sumowane.
             </p>
           </div>
-          <Button 
-            onClick={() => createAnalysisMutation.mutate()}
-            disabled={createAnalysisMutation.isPending}
-          >
-            {createAnalysisMutation.isPending ? (
+          <Button onClick={createGroup} disabled={createGroupMutation.isPending}>
+            {createGroupMutation.isPending ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <Plus className="mr-2 h-4 w-4" />
             )}
-            Dodaj PPE
+            Nowa analiza
           </Button>
         </div>
 
-        {selected.length > 0 && (
-          <ProjectAggregatePanel projectId={projectId!} analyses={selected} />
-        )}
-
-        {analyses?.length === 0 ? (
+        {groups?.length === 0 ? (
           <Card className="text-center py-12">
             <CardContent>
               <TrendingDown className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">Brak punktów poboru</h3>
+              <h3 className="text-lg font-medium mb-2">Brak analiz</h3>
               <p className="text-muted-foreground mb-4">
-                Dodaj pierwszy punkt poboru (PPE) dla tego klienta.
+                Utwórz pierwszą analizę oszczędności dla tego klienta.
               </p>
-              <Button onClick={() => createAnalysisMutation.mutate()} disabled={createAnalysisMutation.isPending}>
+              <Button onClick={createGroup} disabled={createGroupMutation.isPending}>
                 <Plus className="mr-2 h-4 w-4" />
-                Dodaj PPE
+                Nowa analiza
               </Button>
             </CardContent>
           </Card>
         ) : (
           <div className="grid gap-4">
-            {analyses?.map((analysis) => {
-              const results = calculateEnergyCosts(analysis);
+            {groups?.map((g) => {
+              const items = ppeByGroup(g.id);
+              const chosen = items.filter((a) => a.include_in_project_report);
+              const totals = items.length === 1 ? calculateEnergyCosts(items[0]) : null;
               return (
-                <Card key={analysis.id} className="card-interactive">
+                <Card key={g.id} className="card-interactive">
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-lg mb-1 break-words">{analysis.name}</h3>
-                        {(analysis.ppe_number || analysis.ppe_address) && (
-                          <p className="text-sm text-muted-foreground break-words mb-1">
-                            {analysis.ppe_number && <>PPE: <span className="font-medium text-foreground">{analysis.ppe_number}</span></>}
-                            {analysis.ppe_number && analysis.ppe_address && ' • '}
-                            {analysis.ppe_address}
-                          </p>
-                        )}
-                        <label className="flex items-center gap-2 text-sm mb-1 cursor-pointer">
-                          <Checkbox
-                            checked={!!analysis.include_in_project_report}
-                            onCheckedChange={(v) => toggleIncludeMutation.mutate({ id: analysis.id, value: v === true })}
-                          />
-                          Uwzględnij w raporcie zbiorczym
-                        </label>
-                        <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-                          {analysis.period_from && analysis.period_to && (
-                            <span>
-                              Okres: {format(new Date(analysis.period_from), 'd MMM yyyy', { locale: pl })} - {format(new Date(analysis.period_to), 'd MMM yyyy', { locale: pl })}
-                            </span>
-                          )}
-                          <span>•</span>
-                          <span>Taryfa: {analysis.tariff_code_before} → {analysis.tariff_code_after}</span>
-                        </div>
+                        <h3 className="font-semibold text-lg mb-1 break-words">{g.name}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Liczba PPE: {items.length}
+                          {items.length > 0 && <> • wybrane do raportu: {chosen.length}</>}
+                          {' • '}utworzono {format(new Date(g.created_at), 'd MMM yyyy', { locale: pl })}
+                        </p>
                       </div>
-
-                      <div className="grid grid-cols-3 gap-4 lg:gap-6 text-center">
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-1">PRZED</p>
-                          <p className="font-semibold">{formatCurrency(results.totalCostBefore)}</p>
+                      {totals && (
+                        <div className="grid grid-cols-3 gap-4 lg:gap-6 text-center">
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">PRZED</p>
+                            <p className="font-semibold">{formatCurrency(totals.totalCostBefore)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">PO</p>
+                            <p className="font-semibold">{formatCurrency(totals.totalCostAfter)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">OSZCZĘDNOŚĆ</p>
+                            <p className={`font-bold ${totals.savingsValue > 0 ? 'text-success' : totals.savingsValue < 0 ? 'text-destructive' : ''}`}>
+                              {formatCurrency(totals.savingsValue)}
+                              <span className="text-xs ml-1">({formatPercent(totals.savingsPercent)})</span>
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-1">PO</p>
-                          <p className="font-semibold">{formatCurrency(results.totalCostAfter)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-1">OSZCZĘDNOŚĆ</p>
-                          <p className={`font-bold ${results.savingsValue > 0 ? 'text-success' : results.savingsValue < 0 ? 'text-destructive' : ''}`}>
-                            {formatCurrency(results.savingsValue)}
-                            <span className="text-xs ml-1">({formatPercent(results.savingsPercent)})</span>
-                          </p>
-                        </div>
-                      </div>
-
+                      )}
                       <div className="flex items-center gap-2 lg:ml-4">
                         <Button variant="outline" size="sm" asChild>
-                          <Link to={`/projects/${projectId}/analysis/${analysis.id}`}>
+                          <Link to={`/projects/${projectId}/analyses/${g.id}`}>
                             <Edit className="h-4 w-4 mr-1" />
-                            Edytuj
-                          </Link>
-                        </Button>
-                        <Button variant="outline" size="sm" asChild>
-                          <Link to={`/projects/${projectId}/analysis/${analysis.id}/report`}>
-                            <Printer className="h-4 w-4 mr-1" />
-                            Raport
+                            Otwórz
                           </Link>
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" aria-label="Usuń analizę">
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </AlertDialogTrigger>
@@ -382,13 +356,13 @@ export default function ProjectDetail() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Usuń analizę</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Czy na pewno chcesz usunąć tę analizę? Tej operacji nie można cofnąć.
+                                Usunięcie analizy usunie też wszystkie jej PPE ({items.length}). Tej operacji nie można cofnąć.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Anuluj</AlertDialogCancel>
                               <AlertDialogAction
-                                onClick={() => deleteAnalysisMutation.mutate(analysis.id)}
+                                onClick={() => deleteGroupMutation.mutate(g.id)}
                                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                               >
                                 Usuń
