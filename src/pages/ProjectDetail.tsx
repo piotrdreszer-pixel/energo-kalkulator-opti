@@ -42,6 +42,8 @@ import type { ClientProject, EnergyAnalysis, ProjectStatus } from '@/types/datab
 import { calculateEnergyCosts, formatCurrency, formatPercent } from '@/lib/calculation-utils';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
+import { Checkbox } from '@/components/ui/checkbox';
+import ProjectAggregatePanel from '@/components/project/ProjectAggregatePanel';
 
 const STATUS_LABELS: Record<ProjectStatus, string> = {
   'roboczy': 'Roboczy',
@@ -145,6 +147,22 @@ export default function ProjectDetail() {
       toast({ variant: 'destructive', title: 'Błąd', description: 'Nie udało się usunąć analizy' });
     },
   });
+
+  const toggleIncludeMutation = useMutation({
+    mutationFn: async ({ id, value }: { id: string; value: boolean }) => {
+      const { error } = await supabase
+        .from('energy_analyses')
+        .update({ include_in_project_report: value })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['analyses', projectId] }),
+    onError: () => {
+      toast({ variant: 'destructive', title: 'Błąd', description: 'Nie udało się zapisać wyboru' });
+    },
+  });
+
+  const selected = (analyses || []).filter((a) => a.include_in_project_report);
 
   if (projectLoading || analysesLoading) {
     return (
@@ -265,6 +283,10 @@ export default function ProjectDetail() {
           </Button>
         </div>
 
+        {selected.length > 0 && (
+          <ProjectAggregatePanel projectId={projectId!} analyses={selected} />
+        )}
+
         {analyses?.length === 0 ? (
           <Card className="text-center py-12">
             <CardContent>
@@ -288,7 +310,21 @@ export default function ProjectDetail() {
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-lg mb-1">{analysis.name}</h3>
+                        <h3 className="font-semibold text-lg mb-1 break-words">{analysis.name}</h3>
+                        {(analysis.ppe_number || analysis.ppe_address) && (
+                          <p className="text-sm text-muted-foreground break-words mb-1">
+                            {analysis.ppe_number && <>PPE: <span className="font-medium text-foreground">{analysis.ppe_number}</span></>}
+                            {analysis.ppe_number && analysis.ppe_address && ' • '}
+                            {analysis.ppe_address}
+                          </p>
+                        )}
+                        <label className="flex items-center gap-2 text-sm mb-1 cursor-pointer">
+                          <Checkbox
+                            checked={!!analysis.include_in_project_report}
+                            onCheckedChange={(v) => toggleIncludeMutation.mutate({ id: analysis.id, value: v === true })}
+                          />
+                          Uwzględnij w raporcie zbiorczym
+                        </label>
                         <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
                           {analysis.period_from && analysis.period_to && (
                             <span>
