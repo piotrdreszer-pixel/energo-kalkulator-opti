@@ -506,10 +506,11 @@ function AnalysisForm() {
       } catch {
         return; // save failed — stay on the current analysis
       }
-      const { count } = await supabase
+      const { data: existing } = await supabase
         .from('energy_analyses')
-        .select('id', { count: 'exact', head: true })
+        .select('id')
         .eq('client_project_id', projectId!);
+      const count = existing?.length ?? 0;
       const { data, error } = await supabase
         .from('energy_analyses')
         .insert({ client_project_id: projectId!, name: `PPE ${(count || 0) + 1}` })
