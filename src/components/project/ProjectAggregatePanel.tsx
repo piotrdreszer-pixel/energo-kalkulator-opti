@@ -22,7 +22,7 @@ export default function ProjectAggregatePanel({ projectId, analyses }: { project
   const t = calculateProjectTotals(analyses);
   const [confirmed, setConfirmed] = useState(() => sessionStorage.getItem(NO_PPE_CONFIRM_KEY(projectId)) === '1');
   const needsConfirm = t.withoutPpeNumber > 0 && analyses.length > 1;
-  const blocked = t.duplicatePpe.length > 0 || (needsConfirm && !confirmed);
+  const blocked = t.duplicatePpe.length > 0 || t.invalid.length > 0 || (needsConfirm && !confirmed);
   const savingsClass = t.savingsValue > 0 ? 'text-success' : t.savingsValue < 0 ? 'text-destructive' : '';
 
   return (
@@ -40,7 +40,7 @@ export default function ProjectAggregatePanel({ projectId, analyses }: { project
           <Warn>Wybrane analizy mają różne okresy. Wyniki punktów pokazano osobno — ujednolić okresy, aby otrzymać sumę.</Warn>
         )}
         {t.invalid.length > 0 && (
-          <Warn>Niekompletne dane: {t.invalid.map((e) => `${e.analysis.name} (${e.missing.join(', ')})`).join('; ')}. Brakujące wartości nie są zastępowane zerem.</Warn>
+          <Warn>Niekompletne dane: {t.invalid.map((e) => `${e.analysis.name} (${e.missing.join(', ')})`).join('; ')}. Brakujące wartości nie są zastępowane zerem — uzupełnij dane lub odznacz te analizy, aby otrzymać podsumowanie i raport.</Warn>
         )}
         {!t.sameExclusions && (
           <Warn>Analizy mają różny zakres wyłączonych składników — suma obejmuje różne zakresy kosztów.</Warn>

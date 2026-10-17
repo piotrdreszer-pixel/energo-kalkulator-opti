@@ -94,6 +94,7 @@ export default function ProjectReport() {
   const blockedReason =
     selected.length === 0 ? 'Nie wybrano żadnej analizy do raportu zbiorczego.'
     : t.duplicatePpe.length ? `Wybrano kilka wariantów tego samego PPE (${t.duplicatePpe.join(', ')}).`
+    : t.invalid.length ? `Niekompletne dane w analizach: ${t.invalid.map((e) => e.analysis.name).join(', ')}. Uzupełnij je lub odznacz.`
     : needsConfirm && !confirmed ? 'Potwierdź na stronie projektu, że analizy bez numeru PPE dotyczą różnych punktów.'
     : null;
 
@@ -141,7 +142,6 @@ export default function ProjectReport() {
     const limits: string[] = [];
     if (!t.samePeriod) limits.push('Analizy mają różne okresy — wyniki pokazano osobno, bez sumy. Okresy nie są przeliczane na rok.');
     if (!t.sameExclusions) limits.push('Analizy mają różny zakres wyłączonych składników — suma obejmuje różne zakresy kosztów.');
-    if (t.invalid.length) limits.push(`Pominięto analizy z niekompletnymi danymi: ${t.invalid.map((e) => e.analysis.name).join(', ')}.`);
     limits.push('Kwoty pochodzą z kalkulatora w tej samej podstawie co raporty pojedynczych analiz. Wynik dotyczy analizowanego okresu, nie jest wartością roczną, o ile okres nie obejmuje pełnego roku.');
     b.push({ key: 'limits', kind: 'block', node: (
       <div>
