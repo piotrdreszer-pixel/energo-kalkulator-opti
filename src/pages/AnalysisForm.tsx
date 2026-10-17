@@ -614,6 +614,21 @@ export default function AnalysisForm() {
                       onChange={(e) => handleInputChange('name', e.target.value)}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label>Numer PPE (opcjonalnie)</Label>
+                    <Input
+                      value={formData.ppe_number || ''}
+                      placeholder="np. 590243..."
+                      onChange={(e) => handleInputChange('ppe_number' as any, e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Adres PPE (opcjonalnie)</Label>
+                    <Input
+                      value={formData.ppe_address || ''}
+                      onChange={(e) => handleInputChange('ppe_address' as any, e.target.value)}
+                    />
+                  </div>
                 </div>
                 <div className="p-4 bg-muted/50 rounded-lg">
                   <p className="text-sm text-muted-foreground mb-1">Klient</p>

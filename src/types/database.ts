@@ -187,6 +187,13 @@ export interface EnergyAnalysis {
   // Components fully excluded from calculation totals
   report_excluded_components: string[] | null;
 
+  // PPE identification (optional; text keeps leading zeros)
+  ppe_number?: string | null;
+  ppe_address?: string | null;
+  // Selected for the project-level aggregate report
+  include_in_project_report?: boolean;
+
+
   
   created_at: string;
   updated_at: string;

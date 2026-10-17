@@ -15,6 +15,7 @@ import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
 import AnalysisForm from "./pages/AnalysisForm";
 import AnalysisReport from "./pages/AnalysisReport";
+import ProjectReport from "./pages/ProjectReport";
 import RatesManagement from "./pages/admin/RatesManagement";
 import UsersManagement from "./pages/admin/UsersManagement";
 import ManagersManagement from "./pages/admin/ManagersManagement";
@@ -68,6 +69,15 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/projects/:projectId/report"
+              element={
+                <ProtectedRoute>
+                  <ProjectReport />
+                </ProtectedRoute>
+              }
+            />
+
 
             {/* Admin routes */}
             <Route

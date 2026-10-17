@@ -105,10 +105,13 @@ export type Database = {
           handling_fee_after: number | null
           handling_fee_before: number | null
           id: string
+          include_in_project_report: boolean
           name: string
           osd_id: string | null
           period_from: string | null
           period_to: string | null
+          ppe_address: string | null
+          ppe_number: string | null
           rate_card_id_after: string | null
           rate_card_id_before: string | null
           rates_date: string | null
@@ -189,10 +192,13 @@ export type Database = {
           handling_fee_after?: number | null
           handling_fee_before?: number | null
           id?: string
+          include_in_project_report?: boolean
           name?: string
           osd_id?: string | null
           period_from?: string | null
           period_to?: string | null
+          ppe_address?: string | null
+          ppe_number?: string | null
           rate_card_id_after?: string | null
           rate_card_id_before?: string | null
           rates_date?: string | null
@@ -273,10 +279,13 @@ export type Database = {
           handling_fee_after?: number | null
           handling_fee_before?: number | null
           id?: string
+          include_in_project_report?: boolean
           name?: string
           osd_id?: string | null
           period_from?: string | null
           period_to?: string | null
+          ppe_address?: string | null
+          ppe_number?: string | null
           rate_card_id_after?: string | null
           rate_card_id_before?: string | null
           rates_date?: string | null
