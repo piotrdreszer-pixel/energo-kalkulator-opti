@@ -118,7 +118,8 @@ export async function exportElementToPdf(container: HTMLElement, opts: PdfExport
 
   while (true) {
     const remainingDom = containerHeightDomPx - yDom;
-    if (remainingDom <= 0) break;
+    // Ignore sub-pixel leftovers from rounding (would otherwise add an empty last page)
+    if (remainingDom <= 2) break;
 
     let targetBreakDom = Math.min(yDom + pageHeightDomPx, containerHeightDomPx);
 
