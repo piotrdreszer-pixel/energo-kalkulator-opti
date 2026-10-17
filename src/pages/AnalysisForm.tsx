@@ -27,6 +27,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Check,
+  Plus,
 } from 'lucide-react';
 import type { EnergyAnalysis, ClientProject, ResolvedRates } from '@/types/database';
 import { TARIFF_CODES, getZonesCount, getZoneLabels, validateContractedPower, calculatePeriodMonths, getDefaultDistribution } from '@/lib/tariff-utils';
@@ -61,7 +62,13 @@ const WIZARD_STEPS = [
 
 type StepId = typeof WIZARD_STEPS[number]['id'];
 
-export default function AnalysisForm() {
+export default function AnalysisFormRoute() {
+  const { analysisId } = useParams<{ analysisId: string }>();
+  // Remount per analysis so a newly added PPE never inherits state from the previous one.
+  return <AnalysisForm key={analysisId} />;
+}
+
+function AnalysisForm() {
   const { projectId, analysisId } = useParams<{ projectId: string; analysisId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -479,6 +486,44 @@ export default function AnalysisForm() {
           variable_distribution_after_zone3_rate: resolvedRatesAfter.rates.variableRates[2]?.rate || 0,
         }));
       }
+    }
+  };
+
+  const addingNextRef = React.useRef(false);
+  const [isAddingNext, setIsAddingNext] = useState(false);
+  const handleSaveAndAddNext = async () => {
+    if (addingNextRef.current) return;
+    const errors = Object.values(validationErrors);
+    if (errors.length > 0) {
+      toast({ variant: 'destructive', title: 'Błąd walidacji', description: errors[0] || 'Popraw błędy w formularzu.' });
+      return;
+    }
+    addingNextRef.current = true;
+    setIsAddingNext(true);
+    try {
+      try {
+        await saveMutation.mutateAsync();
+      } catch {
+        return; // save failed — stay on the current analysis
+      }
+      const { count } = await supabase
+        .from('energy_analyses')
+        .select('id', { count: 'exact', head: true })
+        .eq('client_project_id', projectId!);
+      const { data, error } = await supabase
+        .from('energy_analyses')
+        .insert({ client_project_id: projectId!, name: `PPE ${(count || 0) + 1}` })
+        .select('id')
+        .single();
+      if (error || !data) {
+        toast({ variant: 'destructive', title: 'Błąd', description: 'Analiza zapisana, ale nie udało się dodać kolejnego PPE.' });
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: ['analyses', projectId] });
+      navigate(`/projects/${projectId}/analysis/${data.id}`);
+    } finally {
+      addingNextRef.current = false;
+      setIsAddingNext(false);
     }
   };
 
@@ -1064,6 +1109,13 @@ export default function AnalysisForm() {
           </Button>
           
           <div className="flex items-center gap-2">
+            <Button variant="outline" asChild>
+              <Link to={`/projects/${projectId}`}>Wróć do listy PPE</Link>
+            </Button>
+            <Button variant="secondary" onClick={handleSaveAndAddNext} disabled={isAddingNext || saveMutation.isPending}>
+              {isAddingNext ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+              Zapisz i dodaj kolejne PPE
+            </Button>
             {currentStep === 'summary' ? (
               <Button onClick={handleSave} disabled={saveMutation.isPending}>
                 {saveMutation.isPending ? (

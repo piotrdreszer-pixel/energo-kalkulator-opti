@@ -116,7 +116,7 @@ export default function ProjectDetail() {
         .from('energy_analyses')
         .insert({
           client_project_id: projectId,
-          name: `Analiza ${(analyses?.length || 0) + 1}`,
+          name: `PPE ${(analyses?.length || 0) + 1}`,
         })
         .select()
         .single();
@@ -269,7 +269,12 @@ export default function ProjectDetail() {
 
         {/* Analyses Section */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-          <h2 className="text-xl font-display font-semibold">Analizy oszczędności</h2>
+          <div>
+            <h2 className="text-xl font-display font-semibold">Punkty poboru i analizy</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Dodaj osobną analizę dla każdego PPE. Zaznacz punkty, które chcesz uwzględnić w raporcie zbiorczym.
+            </p>
+          </div>
           <Button 
             onClick={() => createAnalysisMutation.mutate()}
             disabled={createAnalysisMutation.isPending}
@@ -279,7 +284,7 @@ export default function ProjectDetail() {
             ) : (
               <Plus className="mr-2 h-4 w-4" />
             )}
-            Nowa analiza
+            Dodaj PPE
           </Button>
         </div>
 
@@ -291,13 +296,13 @@ export default function ProjectDetail() {
           <Card className="text-center py-12">
             <CardContent>
               <TrendingDown className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">Brak analiz</h3>
+              <h3 className="text-lg font-medium mb-2">Brak punktów poboru</h3>
               <p className="text-muted-foreground mb-4">
-                Utwórz pierwszą analizę oszczędności dla tego klienta.
+                Dodaj pierwszy punkt poboru (PPE) dla tego klienta.
               </p>
-              <Button onClick={() => createAnalysisMutation.mutate()}>
+              <Button onClick={() => createAnalysisMutation.mutate()} disabled={createAnalysisMutation.isPending}>
                 <Plus className="mr-2 h-4 w-4" />
-                Utwórz analizę
+                Dodaj PPE
               </Button>
             </CardContent>
           </Card>
