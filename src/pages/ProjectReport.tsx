@@ -32,7 +32,7 @@ const TableHead = () => (
     <colgroup>{COLS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
     <thead>
       <tr style={{ background: C.dark, color: '#fff' }}>
-        {['#', 'Analiza', 'PPE / adres', 'PRZED', 'PO', 'Oszczędność'].map((h, i) => (
+        {['#', 'Obiekt', 'PPE / adres', 'PRZED', 'PO', 'Oszczędność'].map((h, i) => (
           <th key={h} style={{ ...cell, color: '#fff', fontWeight: 600, textAlign: i >= 3 ? 'right' : 'left', borderBottom: 'none' }}>{h}</th>
         ))}
       </tr>

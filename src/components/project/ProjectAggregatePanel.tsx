@@ -63,7 +63,7 @@ export default function ProjectAggregatePanel({ scopeId, reportPath, analyses }:
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-muted-foreground">
-                <th className="py-2 pr-2">Analiza</th>
+                <th className="py-2 pr-2">Obiekt</th>
                 <th className="py-2 pr-2">PPE / adres</th>
                 <th className="py-2 pr-2">Okres</th>
                 <th className="py-2 pr-2 text-right">PRZED</th>
