@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      analysis_groups: {
+        Row: {
+          client_project_id: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          client_project_id: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          client_project_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analysis_groups_client_project_id_fkey"
+            columns: ["client_project_id"]
+            isOneToOne: false
+            referencedRelation: "client_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_projects: {
         Row: {
           client_address: string | null
@@ -82,6 +114,7 @@ export type Database = {
           active_energy_price_before_zone1: number | null
           active_energy_price_before_zone2: number | null
           active_energy_price_before_zone3: number | null
+          analysis_group_id: string | null
           capacity_charge_after: number | null
           capacity_charge_before: number | null
           client_project_id: string
@@ -169,6 +202,7 @@ export type Database = {
           active_energy_price_before_zone1?: number | null
           active_energy_price_before_zone2?: number | null
           active_energy_price_before_zone3?: number | null
+          analysis_group_id?: string | null
           capacity_charge_after?: number | null
           capacity_charge_before?: number | null
           client_project_id: string
@@ -256,6 +290,7 @@ export type Database = {
           active_energy_price_before_zone1?: number | null
           active_energy_price_before_zone2?: number | null
           active_energy_price_before_zone3?: number | null
+          analysis_group_id?: string | null
           capacity_charge_after?: number | null
           capacity_charge_before?: number | null
           client_project_id?: string
@@ -337,6 +372,13 @@ export type Database = {
           zones_count_before?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "energy_analyses_analysis_group_id_fkey"
+            columns: ["analysis_group_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_groups"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "energy_analyses_client_project_id_fkey"
             columns: ["client_project_id"]
