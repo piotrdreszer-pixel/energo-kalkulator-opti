@@ -660,16 +660,18 @@ function AnalysisForm() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Numer PPE (opcjonalnie)</Label>
+                    <Label htmlFor="ppe_number">Numer PPE (opcjonalnie)</Label>
                     <Input
+                      id="ppe_number"
                       value={formData.ppe_number || ''}
                       placeholder="np. 590243..."
                       onChange={(e) => handleInputChange('ppe_number' as any, e.target.value)}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Adres PPE (opcjonalnie)</Label>
+                    <Label htmlFor="ppe_address">Adres PPE (opcjonalnie)</Label>
                     <Input
+                      id="ppe_address"
                       value={formData.ppe_address || ''}
                       onChange={(e) => handleInputChange('ppe_address' as any, e.target.value)}
                     />
