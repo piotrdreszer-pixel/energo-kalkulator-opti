@@ -61,7 +61,7 @@ const H2 = ({ children }: { children: React.ReactNode }) => (
 );
 
 export default function ProjectReport() {
-  const { projectId } = useParams<{ projectId: string }>();
+  const { projectId, groupId } = useParams<{ projectId: string; groupId: string }>();
   const { profile, user } = useAuth();
   const pdfRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
@@ -78,36 +78,46 @@ export default function ProjectReport() {
     enabled: !!projectId,
   });
   const { data: analyses, isLoading: l2 } = useQuery({
-    queryKey: ['analyses', projectId],
+    queryKey: ['group-ppe', groupId],
     queryFn: async () => {
-      const { data, error } = await supabase.from('energy_analyses').select('*').eq('client_project_id', projectId).order('created_at', { ascending: true });
+      const { data, error } = await supabase.from('energy_analyses').select('*').eq('client_project_id', projectId!).eq('analysis_group_id', groupId!).order('created_at', { ascending: true });
       if (error) throw error;
       return (data || []) as EnergyAnalysis[];
     },
-    enabled: !!projectId,
+    enabled: !!projectId && !!groupId,
+  });
+  const { data: group, isLoading: l3 } = useQuery({
+    queryKey: ['analysis-group', groupId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('analysis_groups').select('*').eq('id', groupId!).eq('client_project_id', projectId!).maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!projectId && !!groupId,
   });
 
   const selected = useMemo(() => (analyses || []).filter((a) => a.include_in_project_report), [analyses]);
   const t = useMemo(() => calculateProjectTotals(selected), [selected]);
-  const confirmed = projectId ? sessionStorage.getItem(NO_PPE_CONFIRM_KEY(projectId)) === '1' : false;
+  const confirmed = groupId ? sessionStorage.getItem(NO_PPE_CONFIRM_KEY(groupId!)) === '1' : false;
   const needsConfirm = t.withoutPpeNumber > 0 && selected.length > 1;
   const blockedReason =
-    selected.length === 0 ? 'Nie wybrano żadnej analizy do raportu zbiorczego.'
+    selected.length === 0 ? 'Nie wybrano żadnego PPE do raportu tej analizy.'
     : t.duplicatePpe.length ? `Wybrano kilka wariantów tego samego PPE (${t.duplicatePpe.join(', ')}).`
-    : t.invalid.length ? `Niekompletne dane w analizach: ${t.invalid.map((e) => e.analysis.name).join(', ')}. Uzupełnij je lub odznacz.`
-    : needsConfirm && !confirmed ? 'Potwierdź na stronie projektu, że analizy bez numeru PPE dotyczą różnych punktów.'
+    : t.invalid.length ? `Niekompletne dane w PPE: ${t.invalid.map((e) => e.analysis.name).join(', ')}. Uzupełnij je lub odznacz.`
+    : needsConfirm && !confirmed ? 'Potwierdź na stronie analizy, że pozycje bez numeru PPE dotyczą różnych punktów.'
     : null;
 
   const preparer = profile?.name || user?.email || '';
   const shown = [...t.entries];
 
   const blocks: Block[] = useMemo(() => {
-    if (!project) return [];
+    if (!project || !group) return [];
     const b: Block[] = [];
     b.push({ key: 'title', kind: 'block', node: (
       <div style={{ borderBottom: `3px solid ${C.dark}`, paddingBottom: 12, marginBottom: 6 }}>
         <img src={logo} alt="Optienergia" style={{ height: 34, marginBottom: 10 }} />
-        <h1 style={{ fontSize: 22, margin: 0, color: C.dark }}>Raport zbiorczy — porównanie kosztów energii</h1>
+        <h1 style={{ fontSize: 22, margin: 0, color: C.dark }}>Porównanie kosztów energii</h1>
+        <p style={{ fontSize: 14, margin: '4px 0 0', color: C.dark, fontWeight: 600, wordBreak: 'break-word' }}>Analiza: {group?.name}</p>
         <p style={{ fontSize: 11, margin: '6px 0 0', color: C.muted, wordBreak: 'break-word' }}>
           {project.client_name} • NIP: {project.client_nip}{project.client_address ? ` • ${project.client_address}` : ''}
         </p>
@@ -201,15 +211,15 @@ export default function ProjectReport() {
     setPages(out);
   }, [blocks]);
 
-  if (l1 || l2) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
-  if (!project) return <div className="min-h-screen flex items-center justify-center"><Button asChild><Link to="/projects">Wróć do projektów</Link></Button></div>;
+  if (l1 || l2 || l3) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  if (!project || !group) return <div className="min-h-screen flex items-center justify-center"><Button asChild><Link to="/projects">Wróć do projektów</Link></Button></div>;
 
   const download = async () => {
     if (!pdfRef.current) return;
     setBusy(true);
     try {
       await exportElementToPdf(pdfRef.current, {
-        filename: `NIP: ${project.client_nip}_raport zbiorczy Optienergia_${preparer}`.replace(/[\\/:*?"<>|]+/g, ' '),
+        filename: `NIP: ${project.client_nip}_${group.name}_Optienergia_${preparer}`.replace(/[\\/:*?"<>|]+/g, ' '),
         marginMm: 0, scale: 2, avoidBreakSelector: '.print-avoid-break', minSliceDomPx: 200,
       });
     } finally { setBusy(false); }
@@ -222,7 +232,7 @@ export default function ProjectReport() {
       <div className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <Button variant="ghost" size="sm" asChild>
-            <Link to={`/projects/${projectId}`}><ArrowLeft className="h-4 w-4 mr-2" />Wróć do projektu</Link>
+            <Link to={`/projects/${projectId}/analyses/${groupId}`}><ArrowLeft className="h-4 w-4 mr-2" />Wróć do analizy</Link>
           </Button>
           <Button onClick={download} disabled={busy || !!blockedReason || !pages}>
             {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}Pobierz PDF

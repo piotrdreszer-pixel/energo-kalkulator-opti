@@ -15,12 +15,12 @@ export const excludedLabels = (a: Partial<EnergyAnalysis>) =>
     .map((k) => REPORT_COMPONENTS.find((c) => c.key === k)?.label || k)
     .join(', ');
 
-export const NO_PPE_CONFIRM_KEY = (projectId: string) => `ppe-confirm-${projectId}`;
+export const NO_PPE_CONFIRM_KEY = (scopeId: string) => `ppe-confirm-${scopeId}`;
 
-export default function ProjectAggregatePanel({ projectId, analyses }: { projectId: string; analyses: EnergyAnalysis[] }) {
+export default function ProjectAggregatePanel({ scopeId, reportPath, analyses }: { scopeId: string; reportPath: string; analyses: EnergyAnalysis[] }) {
   const navigate = useNavigate();
   const t = calculateProjectTotals(analyses);
-  const [confirmed, setConfirmed] = useState(() => sessionStorage.getItem(NO_PPE_CONFIRM_KEY(projectId)) === '1');
+  const [confirmed, setConfirmed] = useState(() => sessionStorage.getItem(NO_PPE_CONFIRM_KEY(scopeId)) === '1');
   const needsConfirm = t.withoutPpeNumber > 0 && analyses.length > 1;
   const blocked = t.duplicatePpe.length > 0 || t.invalid.length > 0 || (needsConfirm && !confirmed);
   const savingsClass = t.savingsValue > 0 ? 'text-success' : t.savingsValue < 0 ? 'text-destructive' : '';
@@ -37,13 +37,13 @@ export default function ProjectAggregatePanel({ projectId, analyses }: { project
           <Warn>Wybrano kilka wariantów tego samego PPE ({t.duplicatePpe.join(', ')}). Do zestawienia można wliczyć tylko jeden wariant danego punktu — odznacz pozostałe.</Warn>
         )}
         {!t.samePeriod && (
-          <Warn>Wybrane analizy mają różne okresy. Wyniki punktów pokazano osobno — ujednolić okresy, aby otrzymać sumę.</Warn>
+          <Warn>Wybrane PPE mają różne okresy. Wyniki punktów pokazano osobno — ujednolić okresy, aby otrzymać sumę.</Warn>
         )}
         {t.invalid.length > 0 && (
-          <Warn>Niekompletne dane: {t.invalid.map((e) => `${e.analysis.name} (${e.missing.join(', ')})`).join('; ')}. Brakujące wartości nie są zastępowane zerem — uzupełnij dane lub odznacz te analizy, aby otrzymać podsumowanie i raport.</Warn>
+          <Warn>Niekompletne dane: {t.invalid.map((e) => `${e.analysis.name} (${e.missing.join(', ')})`).join('; ')}. Brakujące wartości nie są zastępowane zerem — uzupełnij dane lub odznacz te PPE, aby otrzymać podsumowanie i raport.</Warn>
         )}
         {!t.sameExclusions && (
-          <Warn>Analizy mają różny zakres wyłączonych składników — suma obejmuje różne zakresy kosztów.</Warn>
+          <Warn>Wybrane PPE mają różny zakres wyłączonych składników — suma obejmuje różne zakresy kosztów.</Warn>
         )}
         {needsConfirm && (
           <label className="flex items-start gap-2 text-sm cursor-pointer">
@@ -52,10 +52,10 @@ export default function ProjectAggregatePanel({ projectId, analyses }: { project
               onCheckedChange={(v) => {
                 const on = v === true;
                 setConfirmed(on);
-                sessionStorage.setItem(NO_PPE_CONFIRM_KEY(projectId), on ? '1' : '0');
+                sessionStorage.setItem(NO_PPE_CONFIRM_KEY(scopeId), on ? '1' : '0');
               }}
             />
-            <span>Część analiz nie ma numeru PPE. Potwierdzam, że wybrane analizy dotyczą różnych punktów poboru.</span>
+            <span>Część punktów nie ma numeru PPE. Potwierdzam, że wybrane pozycje dotyczą różnych punktów poboru.</span>
           </label>
         )}
 
@@ -106,8 +106,8 @@ export default function ProjectAggregatePanel({ projectId, analyses }: { project
           </div>
         )}
 
-        <Button disabled={blocked} onClick={() => navigate(`/projects/${projectId}/report`)}>
-          Generuj raport zbiorczy
+        <Button disabled={blocked} onClick={() => navigate(reportPath)}>
+          Generuj raport analizy
         </Button>
       </CardContent>
     </Card>
