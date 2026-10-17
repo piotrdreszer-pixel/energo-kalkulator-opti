@@ -183,7 +183,7 @@ export default function ProjectReport() {
     });
     return b;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project, t, preparer]);
+  }, [project, group, t, preparer]);
 
   // Dynamic pagination: measure every block, pack into A4 pages, repeat table header.
   useLayoutEffect(() => {
