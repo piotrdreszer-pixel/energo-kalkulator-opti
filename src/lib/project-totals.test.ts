@@ -58,4 +58,19 @@ describe('calculateProjectTotals', () => {
     const t = calculateProjectTotals([base('a'), base('b', { report_excluded_components: ['reactive'] })]);
     expect(t.sameExclusions).toBe(false);
   });
+
+  it('treats a valid zero as data, not as missing', () => {
+    const t = calculateProjectTotals([base('a', { consumption_after_zone1_mwh: 0 })]);
+    expect(t.invalid).toHaveLength(0);
+  });
+
+  it('hidden components do not change totals; excluded components do', () => {
+    const r = { reactive_energy_cost_before: 1000, reactive_energy_cost_after: 0 };
+    const plain = calculateProjectTotals([base('a', r)]);
+    const hidden = calculateProjectTotals([base('a', { ...r, report_hidden_components: ['reactive'] })]);
+    const excluded = calculateProjectTotals([base('a', { ...r, report_excluded_components: ['reactive'] })]);
+    expect(hidden.totalBefore).toBe(plain.totalBefore);
+    expect(plain.totalBefore).toBe(6000);
+    expect(excluded.totalBefore).toBe(5000);
+  });
 });
