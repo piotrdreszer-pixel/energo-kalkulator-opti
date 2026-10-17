@@ -310,6 +310,7 @@ function AnalysisForm() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['analysis', analysisId] });
       queryClient.invalidateQueries({ queryKey: ['analyses', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['group-ppe'] });
       toast({ title: 'Zapisano', description: 'Analiza została zapisana.' });
     },
     onError: () => {
@@ -506,14 +507,20 @@ function AnalysisForm() {
       } catch {
         return; // save failed — stay on the current analysis
       }
+      const groupId = formData.analysis_group_id;
+      if (!groupId) {
+        toast({ variant: 'destructive', title: 'Błąd', description: 'Nie można ustalić analizy, do której należy ten punkt.' });
+        return;
+      }
       const { data: existing } = await supabase
         .from('energy_analyses')
         .select('id')
-        .eq('client_project_id', projectId!);
+        .eq('client_project_id', projectId!)
+        .eq('analysis_group_id', groupId);
       const count = existing?.length ?? 0;
       const { data, error } = await supabase
         .from('energy_analyses')
-        .insert({ client_project_id: projectId!, name: `PPE ${(count || 0) + 1}` })
+        .insert({ client_project_id: projectId!, analysis_group_id: groupId, name: `PPE ${(count || 0) + 1}` })
         .select('id')
         .single();
       if (error || !data) {
@@ -521,6 +528,7 @@ function AnalysisForm() {
         return;
       }
       queryClient.invalidateQueries({ queryKey: ['analyses', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['group-ppe', groupId] });
       navigate(`/projects/${projectId}/analysis/${data.id}`);
     } finally {
       addingNextRef.current = false;
@@ -550,6 +558,9 @@ function AnalysisForm() {
   const goPrev = () => canGoPrev && setCurrentStep(WIZARD_STEPS[currentStepIndex - 1].id);
 
   const results = calculateEnergyCosts(formData);
+  const groupPath = formData.analysis_group_id
+    ? `/projects/${projectId}/analyses/${formData.analysis_group_id}`
+    : `/projects/${projectId}`;
   const zonesCountBefore = formData.zones_count_before || 1;
   const zonesCountAfter = formData.zones_count_after || 1;
   const zoneLabelsBefore = getZoneLabels(zonesCountBefore);
@@ -572,8 +583,8 @@ function AnalysisForm() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" asChild>
-              <Link to={`/projects/${projectId}`}>
+            <Button variant="ghost" size="icon" asChild aria-label="Wróć do listy PPE">
+              <Link to={groupPath}>
                 <ArrowLeft className="h-5 w-5" />
               </Link>
             </Button>
@@ -581,7 +592,11 @@ function AnalysisForm() {
               <h1 className="text-xl sm:text-2xl font-display font-bold text-foreground">
                 {formData.name || 'Analiza'}
               </h1>
-              <p className="text-muted-foreground text-sm">{project?.client_name}</p>
+              <p className="text-muted-foreground text-sm">
+                <Link to={`/projects/${projectId}`} className="hover:underline">{project?.client_name}</Link>
+                {' › '}
+                <Link to={groupPath} className="hover:underline">Lista PPE</Link>
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -1113,7 +1128,7 @@ function AnalysisForm() {
           
           <div className="flex items-center gap-2">
             <Button variant="outline" asChild>
-              <Link to={`/projects/${projectId}`}>Wróć do listy PPE</Link>
+              <Link to={groupPath}>Wróć do listy PPE</Link>
             </Button>
             <Button variant="secondary" onClick={handleSaveAndAddNext} disabled={isAddingNext || saveMutation.isPending}>
               {isAddingNext ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
