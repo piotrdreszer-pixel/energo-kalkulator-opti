@@ -669,7 +669,7 @@ function AnalysisForm() {
               <CardContent className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2 sm:col-span-2">
-                    <Label>Nazwa analizy</Label>
+                    <Label>Nazwa obiektu (PPE)</Label>
                     <Input
                       value={formData.name || ''}
                       onChange={(e) => handleInputChange('name', e.target.value)}
