@@ -14,6 +14,74 @@ export type Database = {
   }
   public: {
     Tables: {
+      analysis_documents: {
+        Row: {
+          analysis_group_id: string
+          buyer_nip: string | null
+          corrected_document_number: string | null
+          created_at: string
+          created_by: string | null
+          doc_type: string | null
+          document_number: string | null
+          error: string | null
+          extracted: Json | null
+          file_hash: string | null
+          file_name: string
+          file_path: string
+          id: string
+          issuer: string | null
+          mime_type: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          analysis_group_id: string
+          buyer_nip?: string | null
+          corrected_document_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          doc_type?: string | null
+          document_number?: string | null
+          error?: string | null
+          extracted?: Json | null
+          file_hash?: string | null
+          file_name: string
+          file_path: string
+          id?: string
+          issuer?: string | null
+          mime_type?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          analysis_group_id?: string
+          buyer_nip?: string | null
+          corrected_document_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          doc_type?: string | null
+          document_number?: string | null
+          error?: string | null
+          extracted?: Json | null
+          file_hash?: string | null
+          file_name?: string
+          file_path?: string
+          id?: string
+          issuer?: string | null
+          mime_type?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analysis_documents_analysis_group_id_fkey"
+            columns: ["analysis_group_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       analysis_groups: {
         Row: {
           client_project_id: string
@@ -81,6 +149,153 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      document_line_items: {
+        Row: {
+          category: string | null
+          created_at: string
+          document_id: string
+          gross_value: number | null
+          id: string
+          name: string
+          net_value: number | null
+          page: number | null
+          ppe_record_id: string | null
+          quantity: number | null
+          rate: number | null
+          unit: string | null
+          vat_rate: number | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          document_id: string
+          gross_value?: number | null
+          id?: string
+          name: string
+          net_value?: number | null
+          page?: number | null
+          ppe_record_id?: string | null
+          quantity?: number | null
+          rate?: number | null
+          unit?: string | null
+          vat_rate?: number | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          document_id?: string
+          gross_value?: number | null
+          id?: string
+          name?: string
+          net_value?: number | null
+          page?: number | null
+          ppe_record_id?: string | null
+          quantity?: number | null
+          rate?: number | null
+          unit?: string | null
+          vat_rate?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_line_items_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_line_items_ppe_record_id_fkey"
+            columns: ["ppe_record_id"]
+            isOneToOne: false
+            referencedRelation: "document_ppe_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_ppe_records: {
+        Row: {
+          applied_at: string | null
+          applied_fields: Json
+          consumption: Json | null
+          contracted_power_kw: number | null
+          created_at: string
+          document_id: string
+          id: string
+          match_status: string
+          matched_analysis_id: string | null
+          max_power_kw: number | null
+          osd_name: string | null
+          other_charges: Json | null
+          period_from: string | null
+          period_to: string | null
+          power_exceedances: Json | null
+          ppe_address: string | null
+          ppe_number: string | null
+          reactive: Json | null
+          source_pages: Json | null
+          tariff_code: string | null
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_fields?: Json
+          consumption?: Json | null
+          contracted_power_kw?: number | null
+          created_at?: string
+          document_id: string
+          id?: string
+          match_status?: string
+          matched_analysis_id?: string | null
+          max_power_kw?: number | null
+          osd_name?: string | null
+          other_charges?: Json | null
+          period_from?: string | null
+          period_to?: string | null
+          power_exceedances?: Json | null
+          ppe_address?: string | null
+          ppe_number?: string | null
+          reactive?: Json | null
+          source_pages?: Json | null
+          tariff_code?: string | null
+        }
+        Update: {
+          applied_at?: string | null
+          applied_fields?: Json
+          consumption?: Json | null
+          contracted_power_kw?: number | null
+          created_at?: string
+          document_id?: string
+          id?: string
+          match_status?: string
+          matched_analysis_id?: string | null
+          max_power_kw?: number | null
+          osd_name?: string | null
+          other_charges?: Json | null
+          period_from?: string | null
+          period_to?: string | null
+          power_exceedances?: Json | null
+          ppe_address?: string | null
+          ppe_number?: string | null
+          reactive?: Json | null
+          source_pages?: Json | null
+          tariff_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_ppe_records_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_ppe_records_matched_analysis_id_fkey"
+            columns: ["matched_analysis_id"]
+            isOneToOne: false
+            referencedRelation: "energy_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       email_verification_tokens: {
         Row: {
@@ -669,6 +884,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_analysis_group: {
+        Args: { _group_id: string }
+        Returns: boolean
+      }
       get_nip_owner: { Args: { _nip: string }; Returns: string }
       has_role: {
         Args: {

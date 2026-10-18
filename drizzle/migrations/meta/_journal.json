@@ -36,6 +36,13 @@
       "when": 1792353853270,
       "tag": "0004_value_sources_and_periods_model",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792354721852,
+      "tag": "0005_invoice_import_tables",
+      "breakpoints": true
     }
   ]
 }
