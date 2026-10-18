@@ -85,6 +85,7 @@ export default function ProjectReport() {
       await exportElementToPdf(pdfRef.current, {
         filename: `NIP: ${project.client_nip}_${safe(project.client_name)}_${safe(group.name)}_raport Optienergia_${safe(preparerName)}`,
         marginMm: 0, scale: single ? 3 : 2, avoidBreakSelector: '.print-avoid-break', minSliceDomPx: 200,
+        ...(single ? {} : { pageSelector: '.print-avoid-break' }),
       });
     } finally { setBusy(false); }
   };

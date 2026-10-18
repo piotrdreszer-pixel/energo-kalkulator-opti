@@ -7,6 +7,8 @@ type PdfExportOptions = {
   scale?: number;
   avoidBreakSelector?: string;
   minSliceDomPx?: number;
+  /** Render each matching child as its own A4 page (avoids the browser canvas height limit on long reports). */
+  pageSelector?: string;
 };
 
 type AvoidBlock = {
@@ -49,6 +51,7 @@ function findBlockContainingY(blocks: AvoidBlock[], yDomPx: number) {
 }
 
 export async function exportElementToPdf(container: HTMLElement, opts: PdfExportOptions) {
+  if (opts.pageSelector) return exportPagesToPdf(container, opts);
   const margin = opts.marginMm ?? 10;
   const scale = opts.scale ?? 2;
   const avoidBreakSelector = opts.avoidBreakSelector ?? '.print-avoid-break';
@@ -168,5 +171,20 @@ export async function exportElementToPdf(container: HTMLElement, opts: PdfExport
     }
   }
 
+  pdf.save(`${opts.filename}.pdf`);
+}
+
+async function exportPagesToPdf(container: HTMLElement, opts: PdfExportOptions) {
+  const pages = Array.from(container.querySelectorAll<HTMLElement>(opts.pageSelector!)).filter((el) => el.parentElement === container.firstElementChild || el.parentElement === container);
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+  const w = pdf.internal.pageSize.getWidth();
+  const h = pdf.internal.pageSize.getHeight();
+  for (let i = 0; i < pages.length; i++) {
+    const canvas = await html2canvas(pages[i], {
+      scale: Math.max(opts.scale ?? 2, 2), useCORS: true, logging: false, backgroundColor: '#ffffff', imageTimeout: 15000,
+    });
+    if (i > 0) pdf.addPage();
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.85), 'JPEG', 0, 0, w, h);
+  }
   pdf.save(`${opts.filename}.pdf`);
 }
