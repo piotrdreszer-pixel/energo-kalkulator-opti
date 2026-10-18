@@ -39,7 +39,8 @@ import {
   Edit,
 } from 'lucide-react';
 import type { AnalysisGroup, ClientProject, EnergyAnalysis, ProjectStatus } from '@/types/database';
-import { calculateEnergyCosts, formatCurrency, formatPercent } from '@/lib/calculation-utils';
+import { formatCurrency, formatPercent } from '@/lib/calculation-utils';
+import { summarizeGroupCard } from '@/lib/project-totals';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
