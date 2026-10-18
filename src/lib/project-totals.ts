@@ -93,3 +93,22 @@ export function calculateProjectTotals(analyses: (Partial<EnergyAnalysis> & { id
     canAggregate: all.length > 0 && samePeriod && duplicatePpe.length === 0 && invalid.length === 0,
   };
 }
+
+export type GroupCardSummary =
+  | { kind: 'result'; label: string; totals: ProjectTotals }
+  | { kind: 'message'; message: string };
+
+/** Card summary for one analysis group. Never sums across groups. */
+export function summarizeGroupCard(items: (Partial<EnergyAnalysis> & { id: string; name: string })[]): GroupCardSummary {
+  if (items.length === 0) return { kind: 'message', message: 'Dodaj PPE' };
+  const chosen = items.filter((a) => a.include_in_project_report);
+  // Legacy / single-PPE analyses: show the only point regardless of selection.
+  const set = items.length === 1 ? items : chosen;
+  if (set.length === 0) return { kind: 'message', message: 'Wybierz PPE do zestawienia' };
+  const t = calculateProjectTotals(set);
+  if (t.invalid.length > 0) return { kind: 'message', message: 'Uzupełnij dane PPE' };
+  if (!t.samePeriod) return { kind: 'message', message: 'Różne okresy — brak wspólnego wyniku' };
+  if (t.duplicatePpe.length > 0) return { kind: 'message', message: 'Ten sam numer PPE wybrany kilka razy' };
+  const label = items.length === 1 ? 'Wynik 1 PPE' : `Wynik ${set.length} z ${items.length} PPE wybranych do raportu`;
+  return { kind: 'result', label, totals: t };
+}
