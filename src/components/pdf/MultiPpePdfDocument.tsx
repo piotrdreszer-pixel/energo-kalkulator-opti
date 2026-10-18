@@ -53,7 +53,7 @@ const PageHeader = ({ title, icon }: { title: string; icon: string }) => (
 );
 
 /* ── PPE list table (fixed layout, so split rows keep column widths) ── */
-const COLS = ['5%', '33%', '13%', '13%', '13%', '13%', '10%'];
+const COLS = ['4%', '30%', '12%', '15%', '15%', '15%', '9%'];
 const tcell: React.CSSProperties = { ...tdStyle, padding: '8px 8px', fontSize: 11, verticalAlign: 'top', wordBreak: 'break-word', overflowWrap: 'anywhere' };
 const Cols = () => <colgroup>{COLS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>;
 
@@ -83,8 +83,8 @@ const PpeRow = ({ i, e, showTariff }: { i: number; e: PpeEntry; showTariff: bool
             <div style={{ fontSize: 10, color: '#666', marginTop: 2 }}>PPE: {a.ppe_number || '—'}</div>
           </td>
           <td style={tcell}>{showTariff ? `${a.tariff_code_before} → ${a.tariff_code_after}` : '—'}</td>
-          <td style={{ ...tcell, textAlign: 'right' }}>{formatCurrency(r.totalCostBefore)}</td>
-          <td style={{ ...tcell, textAlign: 'right' }}>{formatCurrency(r.totalCostAfter)}</td>
+          <td style={{ ...tcell, textAlign: 'right', whiteSpace: 'nowrap', wordBreak: 'normal' }}>{formatCurrency(r.totalCostBefore)}</td>
+          <td style={{ ...tcell, textAlign: 'right', whiteSpace: 'nowrap', wordBreak: 'normal' }}>{formatCurrency(r.totalCostAfter)}</td>
           <td style={{ ...tcell, textAlign: 'right', fontWeight: 600, color: signColor(r.savingsValue) }}>{formatCurrency(Math.abs(r.savingsValue))}</td>
           <td style={{ ...tcell, textAlign: 'right', color: signColor(r.savingsValue) }}>{r.totalCostBefore ? formatPercent(Math.abs(r.savingsPercent)) : 'n/d'}</td>
         </tr>
@@ -178,8 +178,8 @@ export default function MultiPpePdfDocument({ project, groupName, totals: t, osd
           <tbody>
             <tr style={{ background: '#e8f5f0', fontWeight: 700 }}>
               <td style={tcell} colSpan={3}>RAZEM ({entries.length} PPE)</td>
-              <td style={{ ...tcell, textAlign: 'right' }}>{formatCurrency(t.totalBefore)}</td>
-              <td style={{ ...tcell, textAlign: 'right' }}>{formatCurrency(t.totalAfter)}</td>
+              <td style={{ ...tcell, textAlign: 'right', whiteSpace: 'nowrap', wordBreak: 'normal' }}>{formatCurrency(t.totalBefore)}</td>
+              <td style={{ ...tcell, textAlign: 'right', whiteSpace: 'nowrap', wordBreak: 'normal' }}>{formatCurrency(t.totalAfter)}</td>
               <td style={{ ...tcell, textAlign: 'right', color: signColor(t.savingsValue) }}>{formatCurrency(Math.abs(t.savingsValue))}</td>
               <td style={{ ...tcell, textAlign: 'right', color: signColor(t.savingsValue) }}>{t.savingsPercent === null ? 'n/d' : formatPercent(Math.abs(t.savingsPercent))}</td>
             </tr>
@@ -241,18 +241,6 @@ export default function MultiPpePdfDocument({ project, groupName, totals: t, osd
       }
     });
 
-    b.push({ key: 'end', section: 'end', kind: 'block', node: (
-      <div style={{ marginTop: 28, borderTop: `2px solid ${DARK}`, paddingTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <img src={logo} alt="Optienergia" style={{ height: 28 }} />
-          <span style={{ fontSize: 12, color: '#777' }}>• {dateStr}</span>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <p style={{ fontSize: 11, color: '#999', margin: 0 }}>Niniejszy dokument ma charakter informacyjny i nie stanowi oferty handlowej.</p>
-          <p style={{ fontSize: 11, margin: '2px 0 0', color: '#1a6b5a' }}>www.optienergia.pl</p>
-        </div>
-      </div>
-    )});
     return b;
   }, [entries, agg, t, groupName, osdNames, dateStr]);
 
@@ -260,7 +248,7 @@ export default function MultiPpePdfDocument({ project, groupName, totals: t, osd
   useLayoutEffect(() => {
     const root = measureRef.current;
     if (!root) return;
-    const avail = PAGE_H - PAD_TOP - PAD_BOTTOM;
+    const avail = PAGE_H - PAD_TOP - PAD_BOTTOM - 16;
     const q = (k: string) => (root.querySelector(`[data-m="${k}"]`) as HTMLElement | null)?.offsetHeight || 0;
     const pageHeadH = q('pagehead') || HEADER_H_GUESS;
     const tblHeadH = q('tblhead');
@@ -382,6 +370,18 @@ export default function MultiPpePdfDocument({ project, groupName, totals: t, osd
             </div>
             <p style={{ fontSize: 10.5, color: '#888', margin: '6px 0 0' }}>Numery odpowiadają pozycjom w zestawieniu punktów.</p>
           </div>
+          <div style={{ position: 'absolute', left: 40, right: 40, bottom: 68 }}>
+      <div style={{ borderTop: `2px solid ${DARK}`, paddingTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <img src={logo} alt="Optienergia" style={{ height: 28 }} />
+          <span style={{ fontSize: 12, color: '#777' }}>• {dateStr}</span>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <p style={{ fontSize: 11, color: '#999', margin: 0 }}>Niniejszy dokument ma charakter informacyjny i nie stanowi oferty handlowej.</p>
+          <p style={{ fontSize: 11, margin: '2px 0 0', color: '#1a6b5a' }}>www.optienergia.pl</p>
+        </div>
+      </div>
+    </div>
           <RodoFooter />
         </div>
       )}
