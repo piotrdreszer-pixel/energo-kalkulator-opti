@@ -307,7 +307,7 @@ export default function ProjectDetail() {
             {groups?.map((g) => {
               const items = ppeByGroup(g.id);
               const chosen = items.filter((a) => a.include_in_project_report);
-              const totals = items.length === 1 ? calculateEnergyCosts(items[0]) : null;
+              const summary = summarizeGroupCard(items);
               return (
                 <Card key={g.id} className="card-interactive">
                   <CardContent className="p-4 sm:p-6">
@@ -320,24 +320,31 @@ export default function ProjectDetail() {
                           {' • '}utworzono {format(new Date(g.created_at), 'd MMM yyyy', { locale: pl })}
                         </p>
                       </div>
-                      {totals && (
-                        <div className="grid grid-cols-3 gap-4 lg:gap-6 text-center">
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-1">PRZED</p>
-                            <p className="font-semibold">{formatCurrency(totals.totalCostBefore)}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-1">PO</p>
-                            <p className="font-semibold">{formatCurrency(totals.totalCostAfter)}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-1">OSZCZĘDNOŚĆ</p>
-                            <p className={`font-bold ${totals.savingsValue > 0 ? 'text-success' : totals.savingsValue < 0 ? 'text-destructive' : ''}`}>
-                              {formatCurrency(totals.savingsValue)}
-                              <span className="text-xs ml-1">({formatPercent(totals.savingsPercent)})</span>
-                            </p>
+                      {summary.kind === 'result' ? (
+                        <div className="w-full lg:w-auto">
+                          <p className="text-xs text-muted-foreground mb-2 text-center lg:text-right">{summary.label}</p>
+                          <div className="grid grid-cols-3 gap-2 sm:gap-4 lg:gap-6 text-center">
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">PRZED</p>
+                              <p className="font-semibold text-sm sm:text-base">{formatCurrency(summary.totals.totalBefore)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">PO</p>
+                              <p className="font-semibold text-sm sm:text-base">{formatCurrency(summary.totals.totalAfter)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">OSZCZĘDNOŚĆ</p>
+                              <p className={`font-bold text-sm sm:text-base ${summary.totals.savingsValue > 0 ? 'text-success' : summary.totals.savingsValue < 0 ? 'text-destructive' : ''}`}>
+                                {formatCurrency(summary.totals.savingsValue)}
+                                <span className="text-xs ml-1 block sm:inline">
+                                  ({summary.totals.savingsPercent === null ? 'nie dotyczy' : formatPercent(summary.totals.savingsPercent)})
+                                </span>
+                              </p>
+                            </div>
                           </div>
                         </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground lg:text-right">{summary.message}</p>
                       )}
                       <div className="flex items-center gap-2 lg:ml-4">
                         <Button variant="outline" size="sm" asChild>
