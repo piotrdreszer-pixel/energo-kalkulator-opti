@@ -41,6 +41,7 @@ import { useOsdOperators } from '@/hooks/useOsdOperators';
 import { useRatesResolver } from '@/hooks/useRatesResolver';
 import { useVisibleTariffsForOsd } from '@/hooks/useVisibleTariffsForOsd';
 import { cn } from '@/lib/utils';
+import { initialRatesYear, canAutoApplyRates, markSources, rateBaseFields, type ValueSources, type RatesSourceSnapshot } from '@/lib/value-sources';
 
 // Signature of the parameters rates were last fetched for (used to auto-fetch
 // only when OSD / tariff / season / rates year actually change).
@@ -145,6 +146,8 @@ function AnalysisForm() {
   const hydratedRef = React.useRef(false);
   const lastFetchedBeforeRef = React.useRef('');
   const lastFetchedAfterRef = React.useRef('');
+  const [pendingRatesBefore, setPendingRatesBefore] = useState(false);
+  const [pendingRatesAfter, setPendingRatesAfter] = useState(false);
 
   const { data: osdOperators } = useOsdOperators();
   const { visibleCodes } = useVisibleTariffsForOsd(formData.osd_id);
@@ -193,19 +196,21 @@ function AnalysisForm() {
       setOverriddenAfter((analysis.rates_overridden_after as Record<string, number>) || {});
       // Mark the stored parameters as "already fetched" so opening a saved
       // analysis never re-triggers the auto-fetch.
-      const storedYear =
-        String(analysis.rates_date || '').slice(0, 4) || String(new Date().getFullYear());
+      const yb = initialRatesYear(analysis.rates_year_before, analysis.rates_date);
+      const ya = initialRatesYear(analysis.rates_year_after, analysis.rates_date);
+      if (yb.fromSaved) { yearTouchedBefore.current = true; setRatesYearBefore(yb.year); }
+      if (ya.fromSaved) { yearTouchedAfter.current = true; setRatesYearAfter(ya.year); }
       lastFetchedBeforeRef.current = ratesSignature(
         analysis.osd_id,
         analysis.tariff_code_before,
         analysis.season_before,
-        storedYear
+        yb.year
       );
       lastFetchedAfterRef.current = ratesSignature(
         analysis.osd_id,
         analysis.tariff_code_after,
         analysis.season_after,
-        storedYear
+        ya.year
       );
       // Restore saved consumption split so defaults never overwrite saved values.
       const restoreSplit = (vals: number[], zones: number) => {
@@ -272,13 +277,22 @@ function AnalysisForm() {
       formData.season_after,
       ratesYearAfter
     );
-    if (sigBefore !== lastFetchedBeforeRef.current && !isManualModeBefore) {
-      lastFetchedBeforeRef.current = sigBefore;
-      fetchRates('before', { silent: true });
+    const sources = (formData.value_sources || {}) as ValueSources;
+    if (sigBefore !== lastFetchedBeforeRef.current) {
+      if (canAutoApplyRates({ manualMode: isManualModeBefore, overriddenCount: Object.keys(overriddenBefore).length, sources, prefix: 'before' })) {
+        lastFetchedBeforeRef.current = sigBefore;
+        fetchRates('before', { silent: true });
+      } else {
+        setPendingRatesBefore(true);
+      }
     }
-    if (sigAfter !== lastFetchedAfterRef.current && !isManualModeAfter) {
-      lastFetchedAfterRef.current = sigAfter;
-      fetchRates('after', { silent: true });
+    if (sigAfter !== lastFetchedAfterRef.current) {
+      if (canAutoApplyRates({ manualMode: isManualModeAfter, overriddenCount: Object.keys(overriddenAfter).length, sources, prefix: 'after' })) {
+        lastFetchedAfterRef.current = sigAfter;
+        fetchRates('after', { silent: true });
+      } else {
+        setPendingRatesAfter(true);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -298,12 +312,14 @@ function AnalysisForm() {
     mutationFn: async () => {
       const dataToSave = {
         ...formData,
+        rates_year_before: Number(ratesYearBefore) || null,
+        rates_year_after: Number(ratesYearAfter) || null,
         rates_overridden_before: overriddenBefore,
         rates_overridden_after: overriddenAfter,
       };
       const { error } = await supabase
         .from('energy_analyses')
-        .update(dataToSave)
+        .update(dataToSave as never)
         .eq('id', analysisId);
       if (error) throw error;
     },
@@ -440,8 +456,19 @@ function AnalysisForm() {
           variable_distribution_before_zone3_rate: rates.rates.variableRates[2]?.rate || 0,
           capacity_charge_before: rates.rates.capacityFee || 0,
           rate_card_id_before: rates.rateCardId,
+          rates_year_before: Number(ratesYear),
+          rates_source_before: {
+            rate_card_id: rates.rateCardId,
+            rate_card_name: rates.rateCardName,
+            valid_from: rates.validFrom,
+            valid_to: rates.validTo,
+            year: Number(ratesYear),
+            applied_at: new Date().toISOString(),
+          } satisfies RatesSourceSnapshot,
+          value_sources: markSources((prev.value_sources || {}) as ValueSources, rateBaseFields('before'), { source: 'rate_base', rate_card_id: rates.rateCardId }),
         }));
         setOverriddenBefore({});
+        setPendingRatesBefore(false);
       } else {
         lastFetchedAfterRef.current = sig;
         setResolvedRatesAfter(rates);
@@ -453,8 +480,19 @@ function AnalysisForm() {
           variable_distribution_after_zone3_rate: rates.rates.variableRates[2]?.rate || 0,
           capacity_charge_after: rates.rates.capacityFee || 0,
           rate_card_id_after: rates.rateCardId,
+          rates_year_after: Number(ratesYear),
+          rates_source_after: {
+            rate_card_id: rates.rateCardId,
+            rate_card_name: rates.rateCardName,
+            valid_from: rates.validFrom,
+            valid_to: rates.validTo,
+            year: Number(ratesYear),
+            applied_at: new Date().toISOString(),
+          } satisfies RatesSourceSnapshot,
+          value_sources: markSources((prev.value_sources || {}) as ValueSources, rateBaseFields('after'), { source: 'rate_base', rate_card_id: rates.rateCardId }),
         }));
         setOverriddenAfter({});
+        setPendingRatesAfter(false);
       }
       if (!silent) {
         toast({ title: 'Pobrano stawki', description: `Stawki dla ${rates.rateCardName} zostały załadowane.` });
@@ -462,7 +500,28 @@ function AnalysisForm() {
     }
   };
 
-  const handleFetchRates = (scenario: 'before' | 'after') => fetchRates(scenario);
+  const handleFetchRates = (scenario: 'before' | 'after') => {
+    const overridden = scenario === 'before' ? overriddenBefore : overriddenAfter;
+    const sources = (formData.value_sources || {}) as ValueSources;
+    const protectedCount = Object.keys(overridden).length + rateBaseFields(scenario).filter(f => {
+      const src = sources[f]?.source;
+      return (src === 'manual' || src === 'document') && !(f in overridden);
+    }).length;
+    if (protectedCount > 0 && !window.confirm(
+      'Zastosowanie stawek z bazy zastąpi ręczne korekty (lub wartości z dokumentów) w tym wariancie. Kontynuować?'
+    )) return;
+    fetchRates(scenario);
+  };
+
+  const handleRatesPanelInput = (field: keyof EnergyAnalysis, value: number | boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value,
+      value_sources: typeof value === 'number'
+        ? markSources((prev.value_sources || {}) as ValueSources, [String(field)], { source: 'manual' })
+        : prev.value_sources,
+    }));
+  };
 
   const handleResetRates = (scenario: 'before' | 'after') => {
     if (scenario === 'before') {
@@ -953,7 +1012,9 @@ function AnalysisForm() {
               <RatesInputPanel
                 prefix="before"
                 formData={formData}
-                onInputChange={handleInputChange}
+                onInputChange={handleRatesPanelInput}
+                ratesSource={(formData.rates_source_before as RatesSourceSnapshot | null) ?? null}
+                pendingReapply={pendingRatesBefore}
                 zonesCount={zonesCountBefore}
                 resolvedRates={resolvedRatesBefore}
                 onFetchRates={() => handleFetchRates('before')}
@@ -1066,7 +1127,9 @@ function AnalysisForm() {
               <RatesInputPanel
                 prefix="after"
                 formData={formData}
-                onInputChange={handleInputChange}
+                onInputChange={handleRatesPanelInput}
+                ratesSource={(formData.rates_source_after as RatesSourceSnapshot | null) ?? null}
+                pendingReapply={pendingRatesAfter}
                 zonesCount={zonesCountAfter}
                 resolvedRates={resolvedRatesAfter}
                 onFetchRates={() => handleFetchRates('after')}

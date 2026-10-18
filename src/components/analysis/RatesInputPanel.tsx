@@ -16,6 +16,7 @@ import { Loader2, Download, RotateCcw } from 'lucide-react';
 import { getZoneLabels } from '@/lib/tariff-utils';
 import { ReactiveEnergySection } from './ReactiveEnergySection';
 import type { EnergyAnalysis, ResolvedRates } from '@/types/database';
+import type { RatesSourceSnapshot } from '@/lib/value-sources';
 
 type ScenarioPrefix = 'before' | 'after';
 
@@ -34,6 +35,8 @@ interface RatesInputPanelProps {
   setOverriddenFields: (fields: Record<string, number>) => void;
   ratesYear: string;
   setRatesYear: (year: string) => void;
+  ratesSource?: RatesSourceSnapshot | null;
+  pendingReapply?: boolean;
 }
 
 export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
@@ -53,6 +56,8 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
       setOverriddenFields,
       ratesYear,
       setRatesYear,
+      ratesSource,
+      pendingReapply,
     },
     ref
   ) {
@@ -156,10 +161,27 @@ export const RatesInputPanel = forwardRef<HTMLDivElement, RatesInputPanelProps>(
             </Button>
           </div>
         </div>
-        {resolvedRates && (
-          <p className="text-xs text-muted-foreground mt-1">
-            Źródło: {resolvedRates.rateCardName} ({resolvedRates.validFrom} - {resolvedRates.validTo || 'aktualnie'})
-          </p>
+        <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+          <p>Rok stawek: <span className="font-medium text-foreground">{ratesYear}</span></p>
+          {resolvedRates ? (
+            <p>Źródło: baza stawek — {resolvedRates.rateCardName} ({resolvedRates.validFrom} – {resolvedRates.validTo || 'aktualnie'})</p>
+          ) : ratesSource ? (
+            <p>Źródło: baza stawek — {ratesSource.rate_card_name} ({ratesSource.valid_from} – {ratesSource.valid_to || 'aktualnie'}), rok {ratesSource.year}</p>
+          ) : (
+            <p>Źródło stawek: brak informacji (analiza zapisana przed wprowadzeniem oznaczania źródeł lub stawki wpisane ręcznie)</p>
+          )}
+          {Object.keys(overriddenFields).length > 0 && (
+            <p>Ręczne korekty: {Object.keys(overriddenFields).length} {Object.keys(overriddenFields).length === 1 ? 'pole' : 'pól'}</p>
+          )}
+          {!isAfter && <p>Sposób liczenia PRZED: według stawek</p>}
+        </div>
+        {pendingReapply && (
+          <div className="mt-2 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs flex flex-wrap items-center justify-between gap-2">
+            <span>Zmieniono operatora, taryfę, sezon lub rok, ale stawki z bazy nie zostały zastosowane automatycznie, aby nie nadpisać ręcznych korekt.</span>
+            <Button variant="outline" size="sm" onClick={onFetchRates} disabled={isFetching}>
+              Zastosuj ponownie stawki z bazy
+            </Button>
+          </div>
         )}
       </CardHeader>
       <CardContent className="space-y-4">

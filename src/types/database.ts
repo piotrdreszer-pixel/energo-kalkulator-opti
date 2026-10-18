@@ -195,6 +195,19 @@ export interface EnergyAnalysis {
   // Parent analysis (analysis_groups) this PPE belongs to
   analysis_group_id?: string | null;
 
+  // Provenance & periods model (stage 1). NULL / missing = unknown (legacy).
+  rates_year_before?: number | null;
+  rates_year_after?: number | null;
+  rates_source_before?: unknown;
+  rates_source_after?: unknown;
+  value_sources?: unknown;
+  // 'rates' = według stawek (only working mode); 'invoice_actual' reserved
+  cost_mode_before?: string;
+  // Optional target simulation period (no forecasting yet)
+  simulation_period_from?: string | null;
+  simulation_period_to?: string | null;
+  simulation_consumption_method?: string | null;
+
 
   
   created_at: string;
