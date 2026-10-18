@@ -19,7 +19,7 @@ import {
 /* Same spacing as the single-analysis report pages */
 const PAD_TOP = 40;
 const PAD_X = 40;
-const PAD_BOTTOM = 70; // room for the absolute RODO footer
+const PAD_BOTTOM = 76; // room for the absolute RODO footer
 const CONTENT_W = PAGE_W - 2 * PAD_X;
 const HEADER_H_GUESS = 52;
 const H_FONT = "'Plus Jakarta Sans', system-ui, sans-serif";
@@ -53,7 +53,7 @@ const PageHeader = ({ title, icon }: { title: string; icon: string }) => (
 );
 
 /* ── PPE list table (fixed layout, so split rows keep column widths) ── */
-const COLS = ['4%', '30%', '12%', '15%', '15%', '15%', '9%'];
+const COLS = ['5%', '29%', '12%', '15%', '15%', '15%', '9%'];
 const tcell: React.CSSProperties = { ...tdStyle, padding: '8px 8px', fontSize: 11, verticalAlign: 'top', wordBreak: 'break-word', overflowWrap: 'anywhere' };
 const Cols = () => <colgroup>{COLS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>;
 
@@ -206,7 +206,7 @@ export default function MultiPpePdfDocument({ project, groupName, totals: t, osd
       ].filter(Boolean).join('  •  ');
       b.push({ key: `det-${a.id}`, section: 'details', kind: 'block', node: (
         <div style={{ paddingTop: i === 0 ? 0 : 10 }}>
-          <div style={{ background: 'linear-gradient(135deg, #0d4a42, #1a6b5a)', borderRadius: 14, padding: '16px 22px', color: '#fff', marginBottom: 16 }}>
+          <div style={{ background: 'linear-gradient(135deg, #0d4a42, #1a6b5a)', borderRadius: 14, padding: '14px 22px', color: '#fff', marginBottom: 12 }}>
             <p style={{ fontSize: 10, margin: 0, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>Punkt {i + 1} z {entries.length}</p>
             <p style={{ fontFamily: H_FONT, fontSize: 17, fontWeight: 700, margin: '4px 0 2px', wordBreak: 'break-word' }}>{a.name}</p>
             <p style={{ fontSize: 12, margin: 0, color: 'rgba(255,255,255,0.85)', wordBreak: 'break-word' }}>
@@ -218,7 +218,7 @@ export default function MultiPpePdfDocument({ project, groupName, totals: t, osd
         </div>
       )});
       b.push({ key: `cost-${a.id}`, section: 'details', kind: 'block', node: (
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 12 }}>
           <CostTable rows={buildCostRows(a, r).filter((row) => isVisible(row.key))} totalBefore={r.totalCostBefore} totalAfter={r.totalCostAfter} compact />
           <div style={{ marginTop: 10, background: 'linear-gradient(135deg, #e8f5f0, #dff0ea)', border: '1px solid #c8e6d8', borderRadius: 12, padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
             <img src={iconSavings} alt="" style={{ width: 24, height: 24, opacity: 0.7 }} />
@@ -248,7 +248,7 @@ export default function MultiPpePdfDocument({ project, groupName, totals: t, osd
   useLayoutEffect(() => {
     const root = measureRef.current;
     if (!root) return;
-    const avail = PAGE_H - PAD_TOP - PAD_BOTTOM - 16;
+    const avail = PAGE_H - PAD_TOP - PAD_BOTTOM;
     const q = (k: string) => (root.querySelector(`[data-m="${k}"]`) as HTMLElement | null)?.offsetHeight || 0;
     const pageHeadH = q('pagehead') || HEADER_H_GUESS;
     const tblHeadH = q('tblhead');
