@@ -132,6 +132,7 @@ export type Database = {
           contracted_power_before_kw: number | null
           contracted_power_charge_rate_after: number | null
           contracted_power_charge_rate_before: number | null
+          cost_mode_before: string
           created_at: string
           fixed_distribution_after_total: number | null
           fixed_distribution_before_total: number | null
@@ -150,6 +151,10 @@ export type Database = {
           rates_date: string | null
           rates_overridden_after: Json | null
           rates_overridden_before: Json | null
+          rates_source_after: Json | null
+          rates_source_before: Json | null
+          rates_year_after: number | null
+          rates_year_before: number | null
           reactive_energy_after_month_1: number | null
           reactive_energy_after_month_10: number | null
           reactive_energy_after_month_11: number | null
@@ -183,9 +188,13 @@ export type Database = {
           season_after: string | null
           season_before: string | null
           shared_power_mode: boolean | null
+          simulation_consumption_method: string | null
+          simulation_period_from: string | null
+          simulation_period_to: string | null
           tariff_code_after: string
           tariff_code_before: string
           updated_at: string
+          value_sources: Json
           variable_distribution_after_zone1_rate: number | null
           variable_distribution_after_zone2_rate: number | null
           variable_distribution_after_zone3_rate: number | null
@@ -220,6 +229,7 @@ export type Database = {
           contracted_power_before_kw?: number | null
           contracted_power_charge_rate_after?: number | null
           contracted_power_charge_rate_before?: number | null
+          cost_mode_before?: string
           created_at?: string
           fixed_distribution_after_total?: number | null
           fixed_distribution_before_total?: number | null
@@ -238,6 +248,10 @@ export type Database = {
           rates_date?: string | null
           rates_overridden_after?: Json | null
           rates_overridden_before?: Json | null
+          rates_source_after?: Json | null
+          rates_source_before?: Json | null
+          rates_year_after?: number | null
+          rates_year_before?: number | null
           reactive_energy_after_month_1?: number | null
           reactive_energy_after_month_10?: number | null
           reactive_energy_after_month_11?: number | null
@@ -271,9 +285,13 @@ export type Database = {
           season_after?: string | null
           season_before?: string | null
           shared_power_mode?: boolean | null
+          simulation_consumption_method?: string | null
+          simulation_period_from?: string | null
+          simulation_period_to?: string | null
           tariff_code_after?: string
           tariff_code_before?: string
           updated_at?: string
+          value_sources?: Json
           variable_distribution_after_zone1_rate?: number | null
           variable_distribution_after_zone2_rate?: number | null
           variable_distribution_after_zone3_rate?: number | null
@@ -308,6 +326,7 @@ export type Database = {
           contracted_power_before_kw?: number | null
           contracted_power_charge_rate_after?: number | null
           contracted_power_charge_rate_before?: number | null
+          cost_mode_before?: string
           created_at?: string
           fixed_distribution_after_total?: number | null
           fixed_distribution_before_total?: number | null
@@ -326,6 +345,10 @@ export type Database = {
           rates_date?: string | null
           rates_overridden_after?: Json | null
           rates_overridden_before?: Json | null
+          rates_source_after?: Json | null
+          rates_source_before?: Json | null
+          rates_year_after?: number | null
+          rates_year_before?: number | null
           reactive_energy_after_month_1?: number | null
           reactive_energy_after_month_10?: number | null
           reactive_energy_after_month_11?: number | null
@@ -359,9 +382,13 @@ export type Database = {
           season_after?: string | null
           season_before?: string | null
           shared_power_mode?: boolean | null
+          simulation_consumption_method?: string | null
+          simulation_period_from?: string | null
+          simulation_period_to?: string | null
           tariff_code_after?: string
           tariff_code_before?: string
           updated_at?: string
+          value_sources?: Json
           variable_distribution_after_zone1_rate?: number | null
           variable_distribution_after_zone2_rate?: number | null
           variable_distribution_after_zone3_rate?: number | null
