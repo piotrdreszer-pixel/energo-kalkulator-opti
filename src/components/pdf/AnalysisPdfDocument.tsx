@@ -14,13 +14,13 @@ import iconSavings from '@/assets/pdf/icon-savings.svg';
    Stałe wymiarowe – fixed A4 layout (mm→px @96dpi ≈ 3.78)
    210mm ≈ 794px, 297mm ≈ 1123px
    ──────────────────────────────────────────── */
-const PAGE_W = 794;
-const PAGE_H = 1123;
-const RODO_TEXT =
+export const PAGE_W = 794;
+export const PAGE_H = 1123;
+export const RODO_TEXT =
   'Administratorem Pani/Pana danych osobowych jest Optienergia Sp. z o.o., ul. Chwaszczyńska 135C, 81-571 Gdynia Polska, KRS: 0001141761, NIP: 5862412424, nr REGON: 540335113. Może się Pani/Pan skontaktować z Administratorem danych, wysyłając wiadomość e-mail na adres biuro@optienergia.pl. Więcej informacji na www.optienergia.pl/rodo';
 
 /* ── Shared helpers ── */
-const pageBase: React.CSSProperties = {
+export const pageBase: React.CSSProperties = {
   width: '210mm',
   height: '297mm',
   position: 'relative',
@@ -30,12 +30,12 @@ const pageBase: React.CSSProperties = {
   background: '#ffffff',
 };
 
-const pageBreak: React.CSSProperties = {
+export const pageBreak: React.CSSProperties = {
   pageBreakAfter: 'always',
   breakAfter: 'page',
 };
 
-const RodoFooter = () => (
+export const RodoFooter = () => (
   <div
     style={{
       position: 'absolute',
@@ -610,7 +610,7 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
 
 /* ── Sub-components ── */
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+export function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ marginBottom: 10 }}>
       <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', margin: 0 }}>{label}</p>
@@ -619,7 +619,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ParamCard({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
+export function ParamCard({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
   return (
     <div
       style={{
@@ -638,7 +638,7 @@ function ParamCard({ icon, title, children }: { icon: string; title: string; chi
   );
 }
 
-function ParamRow({ label, value }: { label: string; value: string }) {
+export function ParamRow({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
       <span style={{ fontSize: 11, color: '#888' }}>{label}</span>
@@ -647,7 +647,7 @@ function ParamRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function CostBar({ label, value, max, color, gradientTo }: { label: string; value: number; max: number; color: string; gradientTo: string }) {
+export function CostBar({ label, value, max, color, gradientTo }: { label: string; value: number; max: number; color: string; gradientTo: string }) {
   const pct = max > 0 ? (value / max) * 100 : 0;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
@@ -674,7 +674,7 @@ function CostBar({ label, value, max, color, gradientTo }: { label: string; valu
   );
 }
 
-function ResultTile({
+export function ResultTile({
   label, value, subtitle, bg, textColor, iconSrc, iconFilter,
 }: {
   label: string; value: string; subtitle: string; bg: string;
@@ -711,7 +711,7 @@ function ResultTile({
 }
 
 /* ── Table cell styles ── */
-const thStyle: React.CSSProperties = {
+export const thStyle: React.CSSProperties = {
   padding: '12px 14px',
   color: '#ffffff',
   fontWeight: 600,
@@ -719,7 +719,7 @@ const thStyle: React.CSSProperties = {
   borderBottom: 'none',
 };
 
-const tdStyle: React.CSSProperties = {
+export const tdStyle: React.CSSProperties = {
   padding: '10px 14px',
   borderBottom: '1px solid #eef0f3',
   color: '#333',
