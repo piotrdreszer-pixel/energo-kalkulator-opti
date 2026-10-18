@@ -319,7 +319,7 @@ function AnalysisForm() {
       };
       const { error } = await supabase
         .from('energy_analyses')
-        .update(dataToSave)
+        .update(dataToSave as never)
         .eq('id', analysisId);
       if (error) throw error;
     },
