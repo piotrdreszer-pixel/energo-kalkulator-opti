@@ -91,7 +91,6 @@ export function recordToBeforeFields(
   const out: Partial<Record<ImportableField, string | number>> = {};
   if (record.ppe_number) out.ppe_number = record.ppe_number;
   if (record.ppe_address) out.ppe_address = record.ppe_address;
-  if (record.tariff_code_before) out.tariff_code_before = record.tariff_code_before;
   if (record.tariff_code) out.tariff_code_before = record.tariff_code;
   if (record.contracted_power_kw != null) out.contracted_power_before_kw = record.contracted_power_kw;
   if (record.period_from) out.period_from = record.period_from;
