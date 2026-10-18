@@ -283,9 +283,11 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose }: {
       let analysisId = choice;
       if (choice === '__new__') {
         const name = rec.ppe_number ? `PPE ${rec.ppe_number}` : `PPE ${ppes.length + 1}`;
+        const vs: Record<string, unknown> = {};
+        for (const f of fields) vs[f] = { source: 'document', document_id: doc.id };
         const { data, error } = await supabase
           .from('energy_analyses')
-          .insert({ client_project_id: projectId, analysis_group_id: groupId, name, ...update } as never)
+          .insert({ client_project_id: projectId, analysis_group_id: groupId, name, ...update, value_sources: vs } as never)
           .select('id').single();
         if (error) throw error;
         analysisId = data.id;
