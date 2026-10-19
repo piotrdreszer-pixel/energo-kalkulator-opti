@@ -409,3 +409,21 @@ export function settlementProposals(s: Settlement): SettlementProposal[] {
   if (s.handling?.monthly != null) out.push({ field: 'handling_fee_before', label: 'Opłata handlowa PRZED (zł/mies.)', value: s.handling.monthly, note: s.handling.note || undefined });
   return out;
 }
+
+/** Real storage scale (decimal places) of energy_analyses numeric columns written from settlement. */
+export const storageScale = (field: string): number =>
+  /^consumption_.*_mwh$/.test(field) ? 4 : 2;
+
+/** Value as the database will store it (numeric(p,scale) rounds half away from zero). */
+export const toStored = (field: string, v: number): number => {
+  const f = 10 ** storageScale(field);
+  return Math.sign(v) * Math.round(Math.abs(v) * f + 1e-9) / f;
+};
+
+/** Compares written vs read-back value at the column's storage precision. */
+export const matchesStored = (field: string, written: number | null, read: unknown): boolean => {
+  if (written == null) return read == null;
+  if (read == null || read === '') return false;
+  const r = Number(read);
+  return Number.isFinite(r) && Math.abs(toStored(field, written) - r) < 10 ** -(storageScale(field) + 2);
+};
