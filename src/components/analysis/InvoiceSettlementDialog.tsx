@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AlertTriangle, ClipboardList, Loader2 } from 'lucide-react';
 import type { EnergyAnalysis } from '@/types/database';
 import type { InvoicePpeRecord } from '@/lib/invoice-import';
-import { buildSettlement, settlementProposals, type Component, type SettlementDoc, type SettlementItem } from '@/lib/invoice-settlement';
+import { buildSettlement, settlementProposals, matchesStored, type Component, type SettlementDoc, type SettlementItem } from '@/lib/invoice-settlement';
 import { sameValue } from '@/lib/invoice-reedit';
 import type { ValueSources } from '@/lib/value-sources';
 import { formatCurrency } from '@/lib/calculation-utils';
@@ -196,9 +196,16 @@ function PpeSettlement({ analysis, s, onOpenReview, onApplied }: {
     if (error) { setBusy(false); toast({ variant: 'destructive', title: 'Błąd', description: 'Nie udało się zapisać wartości.' }); return; }
     const { data: back } = await supabase.from('energy_analyses').select(Object.keys(write).join(',')).eq('id', analysis.id).maybeSingle();
     setBusy(false);
-    const bad = Object.entries(write).filter(([f, v]) => !sameValue((back as unknown as Record<string, unknown> | null)?.[f], v));
-    if (bad.length) toast({ variant: 'destructive', title: 'Odczyt kontrolny niezgodny', description: bad.map(([f]) => f).join(', ') });
-    else toast({ title: 'Zastosowano zestawienie do PRZED', description: `Zapisano ${Object.keys(write).length} pól. Wariant PO bez zmian.` });
+    const rb = (back as unknown as Record<string, unknown> | null) ?? {};
+    const bad = Object.entries(write).filter(([f, v]) => !matchesStored(f, v as number | null, rb[f]));
+    const label = (f: string) => rows.find((r) => r.field === f)?.label ?? f;
+    const unit = (f: string) => (/_mwh$/.test(f) ? ' MWh' : '');
+    if (bad.length) toast({
+      variant: 'destructive', title: 'Odczyt kontrolny niezgodny',
+      description: bad.map(([f, v]) => `${label(f)}: próbowano zapisać ${fmt(v as number, 6)}${unit(f)}, odczytano ${rb[f] == null ? 'brak' : fmt(Number(rb[f]), 6)}${unit(f)}`).join('; ')
+        + '. Zapis został wykonany — sprawdź wartości w formularzu. Ponowne zastosowanie nadpisze je (nie doda).',
+    });
+    else toast({ title: 'Zastosowano zestawienie do PRZED', description: `Zapisano ${Object.keys(write).length} pól (zużycie z dokładnością 0,0001 MWh, kwoty 0,01 zł). Wariant PO bez zmian.` });
     setShowApply(false);
     onApplied();
   };
