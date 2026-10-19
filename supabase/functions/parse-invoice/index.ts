@@ -159,6 +159,8 @@ Deno.serve(async (req) => {
 
     await supabaseAdmin.from('analysis_documents').update({ status: 'processing', error: null }).eq('id', documentId)
 
+    // Odczyt AI trwa często > 150 s — wykonujemy go w tle, klient odpytuje status dokumentu.
+    const work = (async () => { try {
     const { data: fileData, error: downloadError } = await supabaseAdmin.storage
       .from('invoice-documents').download(doc.file_path)
     if (downloadError || !fileData) {
@@ -178,7 +180,7 @@ Deno.serve(async (req) => {
 
     console.log(`[parse-invoice] doc=${documentId} file=${doc.file_name} size=${arrayBuffer.byteLength}`)
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const callAi = () => fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${lovableApiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -198,15 +200,25 @@ Deno.serve(async (req) => {
       }),
     })
 
+    // Ograniczone ponowienie tylko dla 429/5xx (maks. 2 próby, z odstępem).
+    let aiResponse = await callAi()
+    if (aiResponse.status === 429 || aiResponse.status >= 500) {
+      console.warn('[parse-invoice] transient AI error, retrying once:', aiResponse.status)
+      await aiResponse.text()
+      const ra = Number(aiResponse.headers.get('Retry-After'))
+      await new Promise((r) => setTimeout(r, (ra > 0 && ra < 30 ? ra : 5 + Math.random() * 5) * 1000))
+      aiResponse = await callAi()
+    }
+
     if (!aiResponse.ok) {
       const errText = await aiResponse.text()
       console.error('[parse-invoice] AI error:', aiResponse.status, errText)
       let msg = 'Błąd podczas analizy AI'
       if (aiResponse.status === 429) msg = 'Przekroczono limit zapytań AI. Spróbuj ponownie za chwilę.'
       if (aiResponse.status === 402) msg = 'Brak środków na AI. Doładuj konto.'
+      if (aiResponse.status >= 500) msg = 'Usługa AI chwilowo niedostępna. Spróbuj ponownie za kilka minut.'
       await supabaseAdmin.from('analysis_documents').update({ status: 'error', error: msg }).eq('id', documentId)
-      return new Response(JSON.stringify({ success: false, error: msg }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      return
     }
 
     const aiData = await aiResponse.json()
