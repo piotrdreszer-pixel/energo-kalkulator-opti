@@ -140,3 +140,23 @@ describe('strefa opłaty wg nazwy', () => {
     expect(maps.map((m) => m.target)).toEqual(['variable_distribution_before_zone1_rate', 'variable_distribution_before_zone2_rate']);
   });
 });
+
+import { selectionProblems } from './invoice-line-mapping';
+describe('Suma pozostałych opłat — pełny scenariusz 100 + 25,50 + 74,50', () => {
+  const mk = (id: string, v: number | null, target: string | null = 'fixed_distribution_before_total'): LineMapping => ({ item: { id, name: id, quantity: null, unit: null, rate: null, net_value: v, vat_rate: null, gross_value: null, category: null, page: 1 }, kind: 'other', target, allowedTargets: [], status: 'mapped', converted: v, convertedUnit: 'zł', reason: null, warnings: [], info: [] } as unknown as LineMapping);
+  const maps = [mk('a', 100), mk('b', 25.5), mk('c', 74.5)];
+  const plan = (sel: string[], current: number, previous: ReturnType<typeof planOtherCharges>['breakdown'] | null) =>
+    planOtherCharges({ maps, selected: new Set(sel), documentId: 'D', period: { from: null, to: null }, current, previous, mode: null });
+  it('suma 200,00 → odznaczenie 25,50 daje 174,50 → ponowny zapis nie zwiększa', () => {
+    const first = plan(['a', 'b', 'c'], 0, null);
+    expect(first.result).toBe(200);
+    const second = plan(['a', 'c'], 200, first.breakdown);
+    expect(second.result).toBe(174.5);
+    const third = plan(['a', 'c'], 174.5, second.breakdown);
+    expect(third.result).toBe(174.5);
+  });
+  it('zaznaczona pozycja bez pola lub kwoty ma podaną przyczynę', () => {
+    const p = selectionProblems([mk('x', null), mk('y', 10, null), mk('z', 5)], new Set(['x', 'y', 'z']));
+    expect(p.map((x) => x.name)).toEqual(['x', 'y']);
+  });
+});

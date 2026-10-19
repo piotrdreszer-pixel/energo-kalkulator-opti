@@ -383,3 +383,18 @@ export function capacityBlockReason(m: LineMapping): string | null {
   if (m.target === CAPACITY_TARGET && m.converted == null) return m.warnings[0] || 'Brak przeliczenia.';
   return null;
 }
+
+/** Zaznaczone pozycje, których nie da się zastosować — z konkretną przyczyną (nic nie pomijamy po cichu). */
+export function selectionProblems(maps: LineMapping[], selected: Set<string>): { name: string; reason: string }[] {
+  return maps
+    .filter((m) => selected.has(m.item.id))
+    .filter((m) => !(m.status === 'mapped' && m.target && m.converted != null && (!SUMMED_TARGETS.includes(m.target) || m.item.net_value != null)))
+    .map((m) => ({
+      name: m.item.name,
+      reason: m.status === 'unsupported' ? (m.reason || 'pozycja nie dotyczy kalkulatora')
+        : !m.target ? 'nie wybrano pola kalkulatora'
+        : m.item.net_value == null && SUMMED_TARGETS.includes(m.target) ? 'brak kwoty netto'
+        : m.reason || m.warnings[0] || 'brak przeliczenia',
+    }));
+}
+

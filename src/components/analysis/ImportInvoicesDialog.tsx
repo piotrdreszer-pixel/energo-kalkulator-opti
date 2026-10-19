@@ -24,7 +24,7 @@ import { formatCurrency } from '@/lib/calculation-utils';
 import { getZonesCount, getZoneLabels, TARIFF_CODES } from '@/lib/tariff-utils';
 import { planReapply, type ReviewState } from '@/lib/invoice-reedit';
 import {
-  mapLineItems, isCleanMapping, LINE_TARGET_LABELS, planOtherCharges, OTHER_SUM_TARGET, CAPACITY_TARGET, capacityGroup, capacityBlockReason, PO_ONLY_WARNING, type OtherContribution, type OtherSumMode, type OtherSumPlan, type LineMapping, type LineTarget, type LineItemInput,
+  mapLineItems, isCleanMapping, LINE_TARGET_LABELS, planOtherCharges, OTHER_SUM_TARGET, CAPACITY_TARGET, capacityGroup, capacityBlockReason, selectionProblems, PO_ONLY_WARNING, type OtherContribution, type OtherSumMode, type OtherSumPlan, type LineMapping, type LineTarget, type LineItemInput,
 } from '@/lib/invoice-line-mapping';
 
 const fmtNum = (v: number, max = 6) => new Intl.NumberFormat('pl-PL', { maximumFractionDigits: max }).format(v);
@@ -572,6 +572,11 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
         toast({ variant: 'destructive', title: 'Okres się różni', description: `${label}: okres faktury różni się od okresu analizy — potwierdź pod tabelą opłat lub odznacz pozycje sumy.` });
         return;
       }
+      const blocked = selectionProblems(p.maps, p.selLines);
+      if (blocked.length) {
+        toast({ variant: 'destructive', title: 'Nie wszystkie zaznaczone pozycje da się zastosować', description: `${label}: ${blocked.map((b) => `${b.name} — ${b.reason}`).join('; ')}. Odznacz je lub przypisz pole.` });
+        return;
+      }
       if (!editing && !Object.keys(p.reapply.write).length) {
         toast({ variant: 'destructive', title: 'Brak wybranych pól', description: `${label}: zaznacz pola do zastosowania.` });
         return;
@@ -580,7 +585,22 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
     setApplying(true);
     try {
       const ids: string[] = editing ? [] : records.filter((r) => !canApplyRecord(r) && r.matched_analysis_id).map((r) => r.matched_analysis_id!);
-      for (const rec of pending) ids.push(await applyRecord(rec));
+      for (const rec of pending) {
+        const id = await applyRecord(rec);
+        ids.push(id);
+        // Kontrola zapisu: pola sum muszą mieć w bazie dokładnie wyliczoną wartość.
+        const w = planFor(rec).reapply.write;
+        const sums = SUM_FIELDS.filter((f) => f in w);
+        if (sums.length) {
+          const { data: back, error: bErr } = await supabase.from('energy_analyses').select(sums.join(',')).eq('id', id).single();
+          if (bErr) throw bErr;
+          for (const f of sums) {
+            if (Math.abs(Number((back as unknown as Record<string, unknown>)[f]) - Number(w[f])) > 0.005) {
+              throw new Error(`${fieldLabel(f)}: zapisano ${showVal((back as unknown as Record<string, unknown>)[f])} zamiast ${showVal(w[f])}`);
+            }
+          }
+        }
+      }
       if (!editing) {
         const { error } = await supabase.from('analysis_documents').update({ status: 'approved' } as never).eq('id', doc.id);
         if (error) throw error;
@@ -818,7 +838,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
                   applied={locked}
                   target={target}
                   onToggle={(id) => toggleLine(rec.id, id, maps)}
-                  onSelectClean={() => setLineSelected((p) => ({ ...p, [rec.id]: new Set(maps.filter(isCleanMapping).map((m) => m.item.id)) }))}
+                  onSelectClean={() => setLineSelected((p) => ({ ...p, [rec.id]: new Set([...(p[rec.id] ?? selLines), ...maps.filter(isCleanMapping).map((m) => m.item.id)]) }))}
                   onAssign={(id, t) => setLineOverrides((p) => ({ ...p, [rec.id]: { ...(p[rec.id] || {}), [id]: t } }))}
                 />
               )}
@@ -1013,6 +1033,7 @@ function OtherSumSummary({ plan, mode, onMode, periodMismatch, invoicePeriod, an
         ))}
       </ul>
       <p>Okres pozycji: {per(invoicePeriod)}</p>
+      <p>Wybrano pozycji: {plan.items.length}</p>
       <p className="font-medium">Łącznie netto: {formatCurrency(plan.total)}</p>
       <p>Obecna wartość pola: {formatCurrency(plan.current)}
         {plan.previousSameDoc > 0 && ` (w tym ${formatCurrency(plan.previousSameDoc)} z wcześniejszego importu tego dokumentu)`}</p>
