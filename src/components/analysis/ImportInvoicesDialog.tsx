@@ -17,11 +17,12 @@ import { useToast } from '@/hooks/use-toast';
 import { FileUp, Loader2, RefreshCw, AlertTriangle, CheckCircle2, FileText } from 'lucide-react';
 import type { EnergyAnalysis } from '@/types/database';
 import {
-  proposeMatch, diffAgainstAnalysis, canApplyRecord,
+  proposeMatch, diffAgainstAnalysis, canApplyRecord, normalizeTariffCode, tariffConflict, mapConsumptionZones,
   type InvoicePpeRecord, type ImportableField, IMPORT_FIELD_LABELS,
 } from '@/lib/invoice-import';
 import { formatCurrency } from '@/lib/calculation-utils';
-import { getZonesCount } from '@/lib/tariff-utils';
+import { getZonesCount, getZoneLabels, TARIFF_CODES } from '@/lib/tariff-utils';
+import { planReapply, type ReviewState } from '@/lib/invoice-reedit';
 import {
   mapLineItems, isCleanMapping, LINE_TARGET_LABELS, planOtherCharges, OTHER_SUM_TARGET, CAPACITY_TARGET, capacityGroup, capacityBlockReason, PO_ONLY_WARNING, type OtherContribution, type OtherSumMode, type OtherSumPlan, type LineMapping, type LineTarget, type LineItemInput,
 } from '@/lib/invoice-line-mapping';
@@ -97,6 +98,7 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['analysis-documents', groupId] }),
       queryClient.invalidateQueries({ queryKey: ['document-ppe', docId] }),
+      queryClient.invalidateQueries({ queryKey: ['group-ppe-records', groupId] }),
       ...analysisIds.map((id) => queryClient.invalidateQueries({ queryKey: ['analysis', id] })),
     ]);
     onApplied();
@@ -242,6 +244,9 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
                 {d.status === 'needs_review' && (
                   <Button size="sm" onClick={() => setReviewDocId(d.id)}>Sprawdź i zatwierdź</Button>
                 )}
+                {d.status === 'approved' && (
+                  <Button size="sm" variant="outline" onClick={() => setReviewDocId(d.id)}>Przejrzyj i zmień</Button>
+                )}
                 {d.status === 'error' && (
                   <Button size="sm" variant="outline" onClick={() => retryMutation.mutate(d.id)} disabled={retryMutation.isPending}>
                     <RefreshCw className="h-4 w-4 mr-1" /> Ponów
@@ -256,6 +261,7 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
 
         {reviewDoc && (
           <InvoiceReview
+            key={reviewDoc.id}
             document={reviewDoc}
             ppes={ppes}
             projectId={projectId}
@@ -269,6 +275,13 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
   );
 }
 
+const NOT_NULL_FIELDS = new Set(['tariff_code_before', 'zones_count_before']);
+const SUM_FIELDS = [OTHER_SUM_TARGET as string, CAPACITY_TARGET as string];
+const fieldLabel = (f: string) =>
+  (IMPORT_FIELD_LABELS as Record<string, string>)[f] || (LINE_TARGET_LABELS as Record<string, string>)[f] ||
+  (f === 'osd_id' ? 'Operator sieci (OSD)' : f === 'zones_count_before' ? 'Liczba stref PRZED' : f);
+const showVal = (v: unknown) => (v == null || v === '' ? '—' : typeof v === 'number' ? fmtNum(v) : String(v));
+
 function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApplied }: {
   document: AnalysisDocument;
   ppes: EnergyAnalysis[];
@@ -278,6 +291,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
   onApplied: (analysisIds: string[]) => void;
 }) {
   const { toast } = useToast();
+  const editing = doc.status === 'approved';
   const { data: osdOperators = [] } = useOsdOperators();
   const [selectedFields, setSelectedFields] = useState<Record<string, Set<ImportableField>>>({});
   const [matchChoice, setMatchChoice] = useState<Record<string, string>>({});
@@ -288,31 +302,9 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
   const [lineSelected, setLineSelected] = useState<Record<string, Set<string>>>({});
   const [otherMode, setOtherMode] = useState<Record<string, OtherSumMode>>({});
   const [periodAck, setPeriodAck] = useState<Record<string, boolean>>({});
-
-  /** OSD: '' = wymagany wybór, '__keep__' = nie zmieniaj, id = operator. */
-  const osdStateFor = (rec: InvoicePpeRecord, target: EnergyAnalysis | null) => {
-    const m = matchOsd(rec.osd_name, osdOperators);
-    const choice = osdChoice[rec.id] ?? (m.status === 'matched' ? m.osdId! : '');
-    const apply = osdApply[rec.id] ?? (m.status === 'matched' && (!target || target.osd_id !== m.osdId));
-    const current = target?.osd_id || null;
-    const conflict = !!current && !!choice && choice !== '__keep__' && choice !== current;
-    return { match: m, choice, apply, current, conflict };
-  };
-  const osdName = (id: string | null) => osdOperators.find((o) => o.id === id)?.name || '—';
-
-  const mappingsFor = (rec: InvoicePpeRecord, target: EnergyAnalysis | null): LineMapping[] => {
-    const recItems = items.filter((li: { ppe_record_id?: string }) => li.ppe_record_id === rec.id) as unknown as LineItemInput[];
-    return mapLineItems(recItems, rec, target, lineOverrides[rec.id] || {});
-  };
-  const selectedLinesFor = (recId: string, maps: LineMapping[]) =>
-    lineSelected[recId] ?? new Set(maps.filter(isCleanMapping).map((m) => m.item.id));
-  const toggleLine = (recId: string, itemId: string, maps: LineMapping[]) => {
-    setLineSelected((prev) => {
-      const cur = new Set(prev[recId] ?? selectedLinesFor(recId, maps));
-      if (cur.has(itemId)) cur.delete(itemId); else cur.add(itemId);
-      return { ...prev, [recId]: cur };
-    });
-  };
+  const [tariffChoice, setTariffChoice] = useState<Record<string, string>>({});
+  const [replaceManual, setReplaceManual] = useState<Record<string, Set<string>>>({});
+  const [hydrated, setHydrated] = useState(false);
 
   const recordsQuery = useQuery({
     queryKey: ['document-ppe', doc.id],
@@ -326,15 +318,85 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
       return { records: (records || []) as unknown as InvoicePpeRecord[], items: items || [] };
     },
   });
+  // Rekordy wszystkich faktur tej analizy — wykrywanie różnych taryf jednego PPE.
+  const groupRecordsQuery = useQuery({
+    queryKey: ['group-ppe-records', groupId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('document_ppe_records')
+        .select('ppe_number,tariff_code,period_from,period_to,document_id,analysis_documents!inner(analysis_group_id)')
+        .eq('analysis_documents.analysis_group_id', groupId);
+      if (error) throw error;
+      return (data || []) as unknown as Pick<InvoicePpeRecord, 'ppe_number' | 'tariff_code' | 'period_from' | 'period_to'>[];
+    },
+  });
 
   const records = recordsQuery.data?.records || [];
   const items = recordsQuery.data?.items || [];
+
+  // Przywrócenie zapisanych wyborów (bez ponownego odczytu AI).
+  useEffect(() => {
+    if (hydrated || !recordsQuery.data) return;
+    const sf: Record<string, Set<ImportableField>> = {}, mc: Record<string, string> = {}, oc: Record<string, string> = {};
+    const oa: Record<string, boolean> = {}, lo: Record<string, Record<string, LineTarget | null>> = {}, ls: Record<string, Set<string>> = {};
+    const om: Record<string, OtherSumMode> = {}, pa: Record<string, boolean> = {}, tc: Record<string, string> = {};
+    for (const r of recordsQuery.data.records) {
+      const st = r.review_state as ReviewState | null | undefined;
+      if (!st) continue;
+      if (st.selectedFields) sf[r.id] = new Set(st.selectedFields as ImportableField[]);
+      if (st.choice) mc[r.id] = st.choice;
+      if (st.osdChoice != null) oc[r.id] = st.osdChoice;
+      if (st.osdApply != null) oa[r.id] = st.osdApply;
+      if (st.lineOverrides) lo[r.id] = st.lineOverrides as Record<string, LineTarget | null>;
+      if (st.lineSelected) ls[r.id] = new Set(st.lineSelected);
+      if (st.otherMode) om[r.id] = st.otherMode;
+      if (st.periodAck) pa[r.id] = true;
+      if (st.tariffChoice) tc[r.id] = st.tariffChoice;
+    }
+    setSelectedFields(sf); setMatchChoice(mc); setOsdChoice(oc); setOsdApply(oa);
+    setLineOverrides(lo); setLineSelected(ls); setOtherMode(om); setPeriodAck(pa); setTariffChoice(tc);
+    setHydrated(true);
+  }, [recordsQuery.data, hydrated]);
 
   const proposals = useMemo(() => {
     const map: Record<string, ReturnType<typeof proposeMatch>> = {};
     for (const r of records) map[r.id] = proposeMatch(r, ppes);
     return map;
   }, [records, ppes]);
+
+  /** Taryfa: dopasowanie ze słownika; konflikt między fakturami lub brak dopasowania = wybór ręczny. */
+  const tariffStateFor = (rec: InvoicePpeRecord) => {
+    const match = normalizeTariffCode(rec.tariff_code);
+    const conflict = tariffConflict(rec.ppe_number, groupRecordsQuery.data || []);
+    const chosen = tariffChoice[rec.id];
+    const code = chosen ?? (conflict ? null : match.code);
+    return { match, conflict, code };
+  };
+
+  /** OSD: '' = wymagany wybór, '__keep__' = nie zmieniaj, id = operator. */
+  const osdStateFor = (rec: InvoicePpeRecord, target: EnergyAnalysis | null) => {
+    const m = matchOsd(rec.osd_name, osdOperators);
+    const choice = osdChoice[rec.id] ?? (m.status === 'matched' ? m.osdId! : '');
+    const apply = osdApply[rec.id] ?? (m.status === 'matched' && (!target || target.osd_id !== m.osdId));
+    const current = target?.osd_id || null;
+    const conflict = !!current && !!choice && choice !== '__keep__' && choice !== current;
+    return { match: m, choice, apply, current, conflict };
+  };
+  const osdName = (id: string | null) => osdOperators.find((o) => o.id === id)?.name || '—';
+
+  const mappingsFor = (rec: InvoicePpeRecord, target: EnergyAnalysis | null, tariff: string | null): LineMapping[] => {
+    const recItems = items.filter((li: { ppe_record_id?: string }) => li.ppe_record_id === rec.id) as unknown as LineItemInput[];
+    return mapLineItems(recItems, { ...rec, tariff_code: tariff ?? target?.tariff_code_before ?? null }, target, lineOverrides[rec.id] || {});
+  };
+  const selectedLinesFor = (recId: string, maps: LineMapping[]) =>
+    lineSelected[recId] ?? new Set(maps.filter(isCleanMapping).map((m) => m.item.id));
+  const toggleLine = (recId: string, itemId: string, maps: LineMapping[]) => {
+    setLineSelected((prev) => {
+      const cur = new Set(prev[recId] ?? selectedLinesFor(recId, maps));
+      if (cur.has(itemId)) cur.delete(itemId); else cur.add(itemId);
+      return { ...prev, [recId]: cur };
+    });
+  };
 
   const toggleField = (recId: string, field: ImportableField, defaults: Set<ImportableField>) => {
     setSelectedFields((prev) => {
@@ -348,53 +410,101 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
   const [newIds] = useState<Record<string, string>>({});
   const newIdFor = (recId: string) => (newIds[recId] ??= crypto.randomUUID());
 
-  const planFor = (rec: InvoicePpeRecord) => {
+  const choiceFor = (rec: InvoicePpeRecord) => {
+    if (rec.applied_at && rec.matched_analysis_id) return rec.matched_analysis_id; // zatwierdzony: punkt stały
     const proposal = proposals[rec.id];
-    const choice = matchChoice[rec.id] ?? (proposal.status === 'matched' ? proposal.analysisId! : proposal.status === 'new' ? '__new__' : '');
+    return matchChoice[rec.id] ?? (proposal.status === 'matched' ? proposal.analysisId! : proposal.status === 'new' ? '__new__' : '');
+  };
+
+  const planFor = (rec: InvoicePpeRecord) => {
+    const choice = choiceFor(rec);
     const target = choice && choice !== '__new__' ? ppes.find((p) => p.id === choice) || null : null;
-    const diffs = diffAgainstAnalysis(rec, target);
-    const defaults = new Set(diffs.filter((d) => d.changed).map((d) => d.field));
+    const tariff = tariffStateFor(rec);
+    const diffs = diffAgainstAnalysis(rec, target, tariff.code);
+    const prevState = (rec.review_state as ReviewState | null | undefined) || null;
+    const defaults = new Set(diffs.filter((d) => d.changed || (prevState?.applied && d.field in prevState.applied)).map((d) => d.field));
     const fields = selectedFields[rec.id] ?? defaults;
-    const maps = mappingsFor(rec, target);
+    const consumption = mapConsumptionZones(rec.consumption, getZonesCount(tariff.code || target?.tariff_code_before || 'C11'));
+    const maps = mappingsFor(rec, target, tariff.code);
     const selLines = selectedLinesFor(rec.id, maps);
     const lines = maps.filter((m) => selLines.has(m.item.id) && m.status === 'mapped' && m.target && m.target !== OTHER_SUM_TARGET && m.target !== CAPACITY_TARGET && m.converted != null);
     const osd = osdStateFor(rec, target);
     const osdId = osd.apply && osd.choice && osd.choice !== '__keep__' ? osd.choice : null;
-    const prevVs = (target?.value_sources as Record<string, { breakdown?: OtherContribution[] }> | undefined)?.[OTHER_SUM_TARGET];
+    const vsAll = (target?.value_sources as Record<string, { breakdown?: OtherContribution[] }> | undefined) || {};
     const other = planOtherCharges({
       maps, selected: selLines, documentId: doc.id,
       period: { from: rec.period_from, to: rec.period_to },
-      current: target?.fixed_distribution_before_total, previous: prevVs?.breakdown, mode: otherMode[rec.id] ?? null,
+      current: target?.fixed_distribution_before_total, previous: vsAll[OTHER_SUM_TARGET]?.breakdown, mode: otherMode[rec.id] ?? null,
     });
+    const capPrev = vsAll[CAPACITY_TARGET]?.breakdown;
     const capacity = planOtherCharges({
       maps, selected: selLines, documentId: doc.id, period: { from: rec.period_from, to: rec.period_to },
-      current: target?.capacity_charge_before, previous: null, mode: 'replace', target: CAPACITY_TARGET,
+      current: target?.capacity_charge_before, previous: capPrev,
+      mode: (capPrev || []).some((p) => p.document_id === doc.id) ? 'add' : 'replace', target: CAPACITY_TARGET,
     });
     const analysisFrom = fields.has('period_from') ? rec.period_from : target?.period_from ?? null;
     const analysisTo = fields.has('period_to') ? rec.period_to : target?.period_to ?? null;
     const periodMismatch = other.items.length > 0 && (analysisFrom !== rec.period_from || analysisTo !== rec.period_to);
-    return { choice, target, diffs, fields, lines, osd, osdId, other, capacity, periodMismatch, analysisFrom, analysisTo };
+
+    const desired: Record<string, unknown> = {};
+    for (const d of diffs) if (fields.has(d.field)) desired[d.field] = d.incoming;
+    if (typeof desired.tariff_code_before === 'string') desired.zones_count_before = getZonesCount(desired.tariff_code_before) || 1;
+    if (osdId) desired.osd_id = osdId;
+    for (const m of lines) desired[m.target!] = m.converted;
+    if (other.result != null) desired[OTHER_SUM_TARGET] = other.result;
+    if (capacity.result != null) desired[CAPACITY_TARGET] = capacity.result;
+    const reapply = planReapply({
+      desired,
+      current: (target as unknown as Record<string, unknown>) || {},
+      currentSources: vsAll as Record<string, unknown>,
+      previous: prevState?.applied,
+      additive: SUM_FIELDS,
+      replaceManual: replaceManual[rec.id],
+    });
+    // Pola NOT NULL nie wracają do pustej wartości (nowy PPE) — zostają.
+    for (const f of NOT_NULL_FIELDS) if (f in reapply.write && reapply.write[f] == null) delete reapply.write[f];
+    return { choice, target, tariff, diffs, defaults, fields, consumption, maps, selLines, lines, osd, osdId, other, capacity, periodMismatch, analysisFrom, analysisTo, reapply, prevState };
   };
 
-  /** Zapis jednego rekordu. Zwraca id PPE zwrócone przez zapis. Rzuca wyjątek przy błędzie. */
+  /** Zapis jednego rekordu. Zwraca id PPE. Rzuca wyjątek przy błędzie. */
   const applyRecord = async (rec: InvoicePpeRecord): Promise<string> => {
-    const { choice, diffs, fields, lines, osdId, other, capacity } = planFor(rec);
-    const update: Record<string, unknown> = {};
-    for (const d of diffs) if (fields.has(d.field)) update[d.field] = d.incoming;
-    if (typeof update.tariff_code_before === 'string') update.zones_count_before = getZonesCount(update.tariff_code_before) || 1;
-    if (osdId) update.osd_id = osdId;
-    for (const m of lines) update[m.target!] = m.converted;
-    if (other.result != null) update[OTHER_SUM_TARGET] = other.result;
-    if (capacity.result != null) update[CAPACITY_TARGET] = capacity.result;
+    const p = planFor(rec);
+    const { choice, fields, lines, osdId, other, capacity, reapply } = p;
+    const update = reapply.write;
     const docSources = (vs: Record<string, unknown>) => {
-      for (const f of fields) vs[f] = { source: 'document', document_id: doc.id, page: rec.source_pages?.[0] ?? null };
-      if (osdId) vs.osd_id = { source: 'document', document_id: doc.id, page: rec.source_pages?.[0] ?? null };
-      for (const m of lines) vs[m.target!] = { source: 'document', document_id: doc.id, page: m.item.page, item_ref: m.item.id };
-      if (capacity.result != null) vs[CAPACITY_TARGET] = { source: 'document', document_id: doc.id, breakdown: capacity.breakdown };
-      if (other.result != null) vs[OTHER_SUM_TARGET] = { source: 'document', document_id: doc.id, breakdown: other.breakdown };
+      const page = rec.source_pages?.[0] ?? null;
+      for (const f of Object.keys(update)) {
+        if (reapply.restored.includes(f)) {
+          const before = p.prevState?.applied?.[f]?.beforeSource;
+          if (before) vs[f] = before; else delete vs[f];
+          continue;
+        }
+        vs[f] = { source: 'document', document_id: doc.id, page };
+      }
+      for (const m of lines) if (m.target! in update) vs[m.target!] = { source: 'document', document_id: doc.id, page: m.item.page, item_ref: m.item.id };
+      if (CAPACITY_TARGET in update) vs[CAPACITY_TARGET] = { source: 'document', document_id: doc.id, breakdown: capacity.breakdown };
+      if (OTHER_SUM_TARGET in update) vs[OTHER_SUM_TARGET] = { source: 'document', document_id: doc.id, breakdown: other.breakdown };
       return vs;
     };
-    const appliedList = [...Array.from(fields), ...(osdId ? ['osd_id'] : []), ...lines.map((m) => `line:${m.item.id}->${m.target}`), ...other.items.map((i) => `line:${i.item_ref}->${OTHER_SUM_TARGET}`), ...capacity.items.map((i) => `line:${i.item_ref}->${CAPACITY_TARGET}`)];
+    const appliedList = [...Object.keys(update).filter((f) => !reapply.restored.includes(f))];
+    const reviewState: ReviewState = {
+      version: 1,
+      choice,
+      selectedFields: Array.from(fields),
+      lineOverrides: lineOverrides[rec.id] || {},
+      lineSelected: Array.from(p.selLines),
+      otherMode: otherMode[rec.id] ?? null,
+      osdChoice: p.osd.choice,
+      osdApply: p.osd.apply,
+      tariffChoice: tariffChoice[rec.id] ?? null,
+      periodAck: !!periodAck[rec.id],
+      // Migawka: pola zasilane teraz przez ten dokument (+ sumy jako wkład).
+      applied: {
+        ...reapply.applied,
+        ...Object.fromEntries(reapply.manual.filter((m) => m.incoming !== undefined && p.prevState?.applied?.[m.field])
+          .map((m) => [m.field, p.prevState!.applied![m.field]])),
+      },
+    };
 
     let analysisId = choice;
     if (choice === '__new__') {
@@ -411,7 +521,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
       } else {
         analysisId = exists.id;
       }
-    } else {
+    } else if (Object.keys(update).length) {
       const { data: cur, error: curErr } = await supabase.from('energy_analyses').select('value_sources').eq('id', choice).single();
       if (curErr) throw curErr;
       const vs = docSources({ ...((cur?.value_sources as Record<string, unknown>) || {}) });
@@ -419,23 +529,26 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
       if (error) throw error;
     }
 
-    const { error: recError } = await supabase
+    let q = supabase
       .from('document_ppe_records')
       .update({
         matched_analysis_id: analysisId,
-        match_status: choice === '__new__' ? 'new' : 'matched',
+        match_status: rec.applied_at ? rec.match_status : choice === '__new__' ? 'new' : 'matched',
         applied_fields: appliedList,
         applied_at: new Date().toISOString(),
+        review_state: reviewState,
       } as never)
-      .eq('id', rec.id)
-      .is('applied_at', null);
+      .eq('id', rec.id);
+    // Idempotencja: pierwszy zapis tylko gdy nie zastosowano; edycja tylko gdy nikt nie zapisał w międzyczasie.
+    q = rec.applied_at ? q.eq('applied_at', rec.applied_at) : q.is('applied_at', null);
+    const { error: recError } = await q;
     if (recError) throw recError;
     return analysisId;
   };
 
   const applyAll = async () => {
     if (applying) return;
-    const pending = records.filter(canApplyRecord);
+    const pending = editing ? records.filter((r) => r.applied_at) : records.filter(canApplyRecord);
     for (const rec of pending) {
       const p = planFor(rec);
       const label = rec.ppe_number || 'PPE bez numeru';
@@ -447,6 +560,10 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
         toast({ variant: 'destructive', title: 'Wybierz operatora (OSD)', description: `${label}: operator nie został jednoznacznie rozpoznany — wybierz go lub „Nie zmieniaj”.` });
         return;
       }
+      if (p.fields.has('tariff_code_before' as ImportableField) && !p.tariff.code) {
+        toast({ variant: 'destructive', title: 'Wybierz taryfę', description: `${label}: taryfa nie została jednoznacznie dopasowana — wybierz ją z listy.` });
+        return;
+      }
       if (p.other.items.length && p.other.result == null) {
         toast({ variant: 'destructive', title: 'Suma pozostałych opłat', description: `${label}: pole ma już kwotę — wybierz „Zastąp obecną wartość” lub „Dodaj do obecnej wartości”.` });
         return;
@@ -455,20 +572,22 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
         toast({ variant: 'destructive', title: 'Okres się różni', description: `${label}: okres faktury różni się od okresu analizy — potwierdź pod tabelą opłat lub odznacz pozycje sumy.` });
         return;
       }
-      if (!p.fields.size && !p.lines.length && !p.osdId && !p.other.items.length && !p.capacity.items.length) {
+      if (!editing && !Object.keys(p.reapply.write).length) {
         toast({ variant: 'destructive', title: 'Brak wybranych pól', description: `${label}: zaznacz pola do zastosowania.` });
         return;
       }
     }
     setApplying(true);
     try {
-      const ids: string[] = records.filter((r) => !canApplyRecord(r) && r.matched_analysis_id).map((r) => r.matched_analysis_id!);
+      const ids: string[] = editing ? [] : records.filter((r) => !canApplyRecord(r) && r.matched_analysis_id).map((r) => r.matched_analysis_id!);
       for (const rec of pending) ids.push(await applyRecord(rec));
-      const { error } = await supabase.from('analysis_documents').update({ status: 'approved' } as never).eq('id', doc.id);
-      if (error) throw error;
+      if (!editing) {
+        const { error } = await supabase.from('analysis_documents').update({ status: 'approved' } as never).eq('id', doc.id);
+        if (error) throw error;
+      }
       onApplied(Array.from(new Set(ids)));
     } catch (e) {
-      await recordsQuery.refetch(); // zapisane rekordy są oznaczone — ponowienie ich nie zdubluje
+      await recordsQuery.refetch();
       toast({ variant: 'destructive', title: 'Błąd zapisu', description: `${e instanceof Error ? e.message : 'Nieznany błąd'}. Twoje wybory zostały zachowane — spróbuj ponownie.` });
       setApplying(false);
     }
@@ -479,9 +598,14 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
   return (
     <div className="mt-4 border-t pt-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold">Podgląd: {doc.file_name}</h3>
-        <Button variant="ghost" size="sm" onClick={onClose}>Zamknij podgląd</Button>
+        <h3 className="font-semibold">{editing ? 'Edycja importu' : 'Podgląd'}: {doc.file_name}</h3>
+        <Button variant="ghost" size="sm" onClick={onClose}>{editing ? 'Anuluj' : 'Zamknij podgląd'}</Button>
       </div>
+      {editing && (
+        <p className="text-xs text-muted-foreground">
+          Zapisane wybory zostały przywrócone. „Zapisz zmiany i zastosuj” przelicza wkład tej faktury — wartości nie są dodawane drugi raz, a wkład innych faktur zostaje. Anulowanie niczego nie zmienia.
+        </p>
+      )}
 
       {warnings.length > 0 && (
         <div className="rounded-md border border-warning/50 bg-warning/10 p-3 space-y-1">
@@ -496,7 +620,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
         <p className="text-sm text-muted-foreground">Korekta faktury: {doc.corrected_document_number}</p>
       )}
 
-      {recordsQuery.isLoading ? (
+      {recordsQuery.isLoading || !hydrated ? (
         <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
       ) : records.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nie rozpoznano żadnego punktu PPE w tym dokumencie.</p>
@@ -504,15 +628,11 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
         records.map((rec) => {
           const proposal = proposals[rec.id];
           const applied = !canApplyRecord(rec);
-          const choice = matchChoice[rec.id] ?? (proposal.status === 'matched' ? proposal.analysisId! : proposal.status === 'new' ? '__new__' : '');
-          const target = choice && choice !== '__new__' ? ppes.find((p) => p.id === choice) || null : null;
-          const diffs = diffAgainstAnalysis(rec, target);
-          const defaults = new Set(diffs.filter((d) => d.changed).map((d) => d.field));
-          const fields = selectedFields[rec.id] ?? defaults;
-          const maps = mappingsFor(rec, target);
-          const selLines = selectedLinesFor(rec.id, maps);
-          const selCount = maps.filter((m) => selLines.has(m.item.id) && m.status === 'mapped' && m.converted != null).length;
+          const locked = applied && !editing;
           const plan = planFor(rec);
+          const { choice, target, diffs, defaults, fields, maps, selLines, consumption, tariff } = plan;
+          const selCount = maps.filter((m) => selLines.has(m.item.id) && m.status === 'mapped' && m.converted != null).length;
+          const zoneLabels = getZoneLabels(consumption.zones);
 
           return (
             <div key={rec.id} className="rounded-md border p-4 space-y-3">
@@ -544,8 +664,36 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
                   )}
                 </div>
               )}
+              {applied && editing && (
+                <p className="text-sm text-muted-foreground">Punkt: <span className="font-medium text-foreground">{target?.name || '—'}</span></p>
+              )}
 
-              {!applied && diffs.length > 0 && (
+              {!locked && (
+                <div className="space-y-1 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span>Taryfa z faktury:</span>
+                    <span className="font-medium">{tariff.match.original || 'nie odczytano'}</span>
+                    <span className="text-muted-foreground">→</span>
+                    <Select value={tariff.code ?? ''} onValueChange={(v) => setTariffChoice((p) => ({ ...p, [rec.id]: v }))}>
+                      <SelectTrigger className="w-40 h-8"><SelectValue placeholder="Wybierz taryfę" /></SelectTrigger>
+                      <SelectContent>
+                        {TARIFF_CODES.map((t) => <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {tariff.code && <span className="text-xs text-muted-foreground">{getZonesCount(tariff.code)} strefy/a: {getZoneLabels(getZonesCount(tariff.code)).join(', ')}</span>}
+                  </div>
+                  {tariff.match.original && !tariff.match.code && (
+                    <p className="text-xs text-warning flex items-start gap-1"><AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />Kodu „{tariff.match.original}” nie ma w słowniku kalkulatora — wybierz taryfę ręcznie.</p>
+                  )}
+                  {tariff.conflict && (
+                    <p className="text-xs text-warning flex items-start gap-1"><AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                      Konflikt: faktury tego PPE podają różne taryfy — {tariff.conflict.map((c) => `${c.code} (${c.period_from || '?'} – ${c.period_to || '?'})`).join(', ')}. Wybierz właściwą.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {!locked && diffs.length > 0 && (
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-muted-foreground">
@@ -566,16 +714,43 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
                           />
                         </td>
                         <td className="py-1 pr-2">{d.label}</td>
-                        <td className="py-1 pr-2">{d.current ?? '—'}</td>
-                        <td className="py-1 font-medium">{String(d.incoming)}</td>
+                        <td className="py-1 pr-2">{showVal(d.current)}</td>
+                        <td className="py-1 font-medium">{showVal(d.incoming)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               )}
 
-              {!applied && (() => {
-                const o = osdStateFor(rec, target);
+              {!locked && consumption.rows.length > 0 && (
+                <div className="rounded-md border bg-muted/40 p-3 space-y-1 text-xs">
+                  <p className="text-sm font-medium">Zużycie energii czynnej z faktury → strefy PRZED</p>
+                  <table className="w-full">
+                    <thead><tr className="text-left text-muted-foreground"><th className="pr-2">Strefa na fakturze</th><th className="pr-2">Odczytano</th><th className="pr-2">MWh</th><th>Pole kalkulatora</th></tr></thead>
+                    <tbody>
+                      {consumption.rows.map((r, i) => (
+                        <tr key={i} className="align-top">
+                          <td className="pr-2">{r.zone_name || '—'}</td>
+                          <td className="pr-2">{r.value != null ? `${fmtNum(r.value)} ${r.unit || ''}` : '—'}</td>
+                          <td className="pr-2">{r.mwh != null ? fmtNum(r.mwh, 9) : '—'}</td>
+                          <td>
+                            {r.zone === 'total' ? 'Zużycie łączne (kontrola)' : typeof r.zone === 'number' && r.zone <= consumption.zones ? `Strefa ${r.zone} — ${zoneLabels[r.zone - 1]}` : '—'}
+                            {r.note && <span className="block text-warning">{r.note}</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {consumption.missing.length > 0 && <p className="text-warning">Brak odczytu dla strefy {consumption.missing.join(', ')} — pole zostaje bez zmian (brak danych, nie zero).</p>}
+                  {consumption.conflicts.length > 0 && <p className="text-warning">Strefa {consumption.conflicts.join(', ')}: różne wartości w tym samym okresie — nie zsumowano, wpisz ręcznie.</p>}
+                  {consumption.mismatch && consumption.totalMwh != null && (
+                    <p className="text-warning">Suma stref ({fmtNum(Object.values(consumption.values).reduce((s, v) => s + (v || 0), 0), 9)} MWh) różni się od zużycia łącznego z faktury ({fmtNum(consumption.totalMwh, 9)} MWh).</p>
+                  )}
+                </div>
+              )}
+
+              {!locked && (() => {
+                const o = plan.osd;
                 return (
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -615,7 +790,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
                 );
               })()}
 
-              {!applied && capacityGroup(maps).length > 0 && (
+              {!locked && capacityGroup(maps).length > 0 && (
                 <CapacityGroup
                   maps={capacityGroup(maps)}
                   selected={selLines}
@@ -640,7 +815,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
                 <LineItemsTable
                   maps={maps}
                   selected={selLines}
-                  applied={applied}
+                  applied={locked}
                   target={target}
                   onToggle={(id) => toggleLine(rec.id, id, maps)}
                   onSelectClean={() => setLineSelected((p) => ({ ...p, [rec.id]: new Set(maps.filter(isCleanMapping).map((m) => m.item.id)) }))}
@@ -648,7 +823,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
                 />
               )}
 
-              {!applied && plan.other.items.length > 0 && (
+              {!locked && (plan.other.items.length > 0 || plan.other.previousSameDoc > 0) && (
                 <OtherSumSummary
                   plan={plan.other}
                   mode={otherMode[rec.id] ?? null}
@@ -661,20 +836,57 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
                 />
               )}
 
-              {!applied && (
+              {!locked && plan.reapply.manual.length > 0 && (
+                <div className="rounded-md border border-warning/50 bg-warning/10 p-3 space-y-2 text-xs">
+                  <p className="text-sm font-medium flex items-center gap-1"><AlertTriangle className="h-4 w-4 text-warning" />Ręczne zmiany po imporcie</p>
+                  <p>Te pola zmieniono w kalkulatorze po zatwierdzeniu faktury. Domyślnie zostają bez zmian.</p>
+                  {plan.reapply.manual.map((m) => {
+                    const on = !!replaceManual[rec.id]?.has(m.field);
+                    return (
+                      <label key={m.field} className="flex items-start gap-2 cursor-pointer">
+                        <Checkbox
+                          checked={on}
+                          onCheckedChange={(v) => setReplaceManual((p) => {
+                            const cur = new Set(p[rec.id] || []);
+                            if (v === true) cur.add(m.field); else cur.delete(m.field);
+                            return { ...p, [rec.id]: cur };
+                          })}
+                          aria-label={`Zastąp ręczną zmianę: ${fieldLabel(m.field)}`}
+                        />
+                        <span>
+                          <span className="font-medium">{fieldLabel(m.field)}</span>: z faktury zapisano {showVal(m.applied)}, obecnie {showVal(m.current)}
+                          {m.incoming === undefined
+                            ? ' — pozycja odznaczona. Zaznacz, aby przywrócić wartość sprzed importu.'
+                            : ` — zaznacz, aby zastąpić wartością z faktury ${showVal(m.incoming)}.`}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              {!locked && editing && plan.reapply.restored.length > 0 && (
                 <p className="text-xs text-muted-foreground">
-                  Do zastosowania: {fields.size} pól PPE{osdStateFor(rec, target).apply && osdStateFor(rec, target).choice && osdStateFor(rec, target).choice !== '__keep__' ? ', operator OSD' : ''}, {selCount} stawek i opłat.
+                  Po zapisie wrócą wartości sprzed importu: {plan.reapply.restored.map(fieldLabel).join(', ')}.
+                </p>
+              )}
+
+              {!locked && (
+                <p className="text-xs text-muted-foreground">
+                  Do zastosowania: {fields.size} pól PPE{plan.osdId ? ', operator OSD' : ''}, {selCount} stawek i opłat.
                 </p>
               )}
             </div>
           );
         })
       )}
-      {records.some(canApplyRecord) && (
-        <Button onClick={applyAll} disabled={applying}>
-          {applying && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-          {applying ? 'Zapisywanie…' : 'Zatwierdź i zastosuj'}
-        </Button>
+      {(editing ? records.some((r) => r.applied_at) : records.some(canApplyRecord)) && (
+        <div className="flex gap-2">
+          <Button onClick={applyAll} disabled={applying || !hydrated}>
+            {applying && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+            {applying ? 'Zapisywanie…' : editing ? 'Zapisz zmiany i zastosuj' : 'Zatwierdź i zastosuj'}
+          </Button>
+          {editing && <Button variant="outline" onClick={onClose} disabled={applying}>Anuluj</Button>}
+        </div>
       )}
     </div>
   );
