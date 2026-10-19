@@ -146,3 +146,18 @@ describe('buildSettlement', () => {
     expect(coverageGaps([{ from: '2025-01-01', to: '2025-01-31' }, { from: '2025-03-01', to: '2025-03-31' }])).toEqual([{ from: '2025-02-01', to: '2025-02-28' }]);
   });
 });
+
+import { toStored, matchesStored } from './invoice-settlement';
+describe('storage precision check', () => {
+  it('6344.172 kWh -> 6.344172 MWh stored as 6.3442 matches', () => {
+    expect(toStored('consumption_before_zone1_mwh', 6.344172)).toBe(6.3442);
+    expect(matchesStored('consumption_before_zone1_mwh', 6.344172, '6.3442')).toBe(true);
+  });
+  it('unit error (x1000) still fails', () => {
+    expect(matchesStored('consumption_before_zone1_mwh', 6.344172, '6344.172')).toBe(false);
+  });
+  it('zero vs null distinguished', () => {
+    expect(matchesStored('capacity_charge_before', 0, '0.00')).toBe(true);
+    expect(matchesStored('capacity_charge_before', 0, null)).toBe(false);
+  });
+});
