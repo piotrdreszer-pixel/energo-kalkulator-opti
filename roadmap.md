@@ -1,5 +1,10 @@
 # Roadmap
 
+## Regresje uprawnień
+- [ ] Odtworzenie i naprawa transakcyjnego usuwania z kolejką sprzątania plików.
+- [ ] Ukrycie niedostępnych akcji i sprawdzenie egzekwowania aktualnych flag.
+- [ ] Sesje testowe, cztery kombinacje, odebranie dostępu i nieuprawnione żądania.
+
 ## Dostęp do funkcji
 - [x] Trwałe uprawnienia, historia zmian i zabezpieczenia operacji.
 - [x] Przełączniki administratora oraz ograniczenia importu i wielu PPE.
