@@ -256,6 +256,7 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
             projectId={projectId}
             groupId={groupId}
             onClose={() => { setReviewDocId(null); invalidateDocs(); onApplied(); }}
+            onApplied={(ids) => handleDocApplied(reviewDoc.id, ids)}
           />
         )}
       </DialogContent>
@@ -263,19 +264,34 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
   );
 }
 
-function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose }: {
+function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApplied }: {
   document: AnalysisDocument;
   ppes: EnergyAnalysis[];
   projectId: string;
   groupId: string;
   onClose: () => void;
+  onApplied: (analysisIds: string[]) => void;
 }) {
   const { toast } = useToast();
+  const { data: osdOperators = [] } = useOsdOperators();
   const [selectedFields, setSelectedFields] = useState<Record<string, Set<ImportableField>>>({});
   const [matchChoice, setMatchChoice] = useState<Record<string, string>>({});
+  const [osdChoice, setOsdChoice] = useState<Record<string, string>>({});
+  const [osdApply, setOsdApply] = useState<Record<string, boolean>>({});
   const [applying, setApplying] = useState(false);
   const [lineOverrides, setLineOverrides] = useState<Record<string, Record<string, LineTarget | null>>>({});
   const [lineSelected, setLineSelected] = useState<Record<string, Set<string>>>({});
+
+  /** OSD: '' = wymagany wybór, '__keep__' = nie zmieniaj, id = operator. */
+  const osdStateFor = (rec: InvoicePpeRecord, target: EnergyAnalysis | null) => {
+    const m = matchOsd(rec.osd_name, osdOperators);
+    const choice = osdChoice[rec.id] ?? (m.status === 'matched' ? m.osdId! : '');
+    const apply = osdApply[rec.id] ?? (m.status === 'matched' && (!target || target.osd_id !== m.osdId));
+    const current = target?.osd_id || null;
+    const conflict = !!current && !!choice && choice !== '__keep__' && choice !== current;
+    return { match: m, choice, apply, current, conflict };
+  };
+  const osdName = (id: string | null) => osdOperators.find((o) => o.id === id)?.name || '—';
 
   const mappingsFor = (rec: InvoicePpeRecord, target: EnergyAnalysis | null): LineMapping[] => {
     const recItems = items.filter((li: { ppe_record_id?: string }) => li.ppe_record_id === rec.id) as unknown as LineItemInput[];
