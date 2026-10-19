@@ -209,22 +209,22 @@ export default function AnalysisGroupDetail() {
         {access.readOnly && <p role="status" className="mb-4 border-l-4 border-primary pl-3 text-muted-foreground">{MULTI_PPE_LOCK_MESSAGE}</p>}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
           <div>
-            <h2 className="text-xl font-display font-semibold">Punkty poboru (PPE)</h2>
-            <p className="text-sm text-muted-foreground mt-1">
+            <h2 className="text-xl font-display font-semibold">{access.multiPpe ? 'Punkty poboru (PPE)' : 'Punkt poboru (PPE)'}</h2>
+            {access.multiPpe && <p className="text-sm text-muted-foreground mt-1">
               Dodaj każdy punkt poboru tej analizy. Zaznacz punkty, które chcesz uwzględnić w raporcie analizy.
-            </p>
+            </p>}
           </div>
           <div className="flex gap-2">
-            <ImportInvoicesDialog projectId={projectId!} groupId={groupId!} ppes={ppes || []} onApplied={invalidate} />
-            <InvoiceSettlementDialog projectId={projectId!} groupId={groupId!} ppes={ppes || []} onApplied={invalidate} />
-            <Button onClick={addPpe} disabled={addPpeMutation.isPending || !access.canAddPpe}>
+            {access.canImport && <ImportInvoicesDialog projectId={projectId!} groupId={groupId!} ppes={ppes || []} onApplied={invalidate} />}
+            {access.canImport && <InvoiceSettlementDialog projectId={projectId!} groupId={groupId!} ppes={ppes || []} onApplied={invalidate} />}
+            {access.canAddPpe && (ppes?.length ?? 0) > 0 && <Button onClick={addPpe} disabled={addPpeMutation.isPending}>
               {addPpeMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
               Dodaj PPE
-            </Button>
+            </Button>}
           </div>
         </div>
 
-        {selected.length > 0 && (
+        {access.multiPpe && selected.length > 0 && (
           <ProjectAggregatePanel
             scopeId={groupId!}
             reportPath={`/projects/${projectId}/analyses/${groupId}/report`}
@@ -239,10 +239,10 @@ export default function AnalysisGroupDetail() {
               <TrendingDown className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-medium mb-2">Brak punktów poboru</h3>
               <p className="text-muted-foreground mb-4">Dodaj pierwszy punkt poboru (PPE) do tej analizy.</p>
-              <Button onClick={addPpe} disabled={addPpeMutation.isPending || !access.canAddPpe}>
+              {access.canAddPpe && <Button onClick={addPpe} disabled={addPpeMutation.isPending}>
                 <Plus className="mr-2 h-4 w-4" />
                 Dodaj PPE
-              </Button>
+              </Button>}
             </CardContent>
           </Card>
         ) : (
@@ -265,14 +265,14 @@ export default function AnalysisGroupDetail() {
                             {a.ppe_address}
                           </p>
                         )}
-                        <label className="flex items-center gap-2 text-sm mb-1 cursor-pointer">
+                        {access.multiPpe && <label className="flex items-center gap-2 text-sm mb-1 cursor-pointer">
                           <Checkbox
                             disabled={access.readOnly}
                             checked={!!a.include_in_project_report}
                             onCheckedChange={(v) => toggleIncludeMutation.mutate({ id: a.id, value: v === true })}
                           />
                           Uwzględnij w raporcie analizy
-                        </label>
+                        </label>}
                         <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
                           {a.period_from && a.period_to && (
                             <span>
@@ -312,7 +312,7 @@ export default function AnalysisGroupDetail() {
                         <Button variant="outline" size="sm" asChild>
                           <Link to={`/projects/${projectId}/analysis/${a.id}/report`}>
                             <Printer className="h-4 w-4 mr-1" />
-                            Raport PPE
+                            {!access.multiPpe && ppes?.length === 1 ? 'Raport analizy' : 'Raport PPE'}
                           </Link>
                         </Button>
                         <AlertDialog>
