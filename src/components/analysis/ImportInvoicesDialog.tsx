@@ -742,7 +742,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
                 </div>
               )}
 
-              {!locked && diffs.length > 0 && (
+              {diffs.length > 0 && (
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-muted-foreground">
@@ -757,6 +757,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
                       <tr key={d.field} className={d.changed ? '' : 'opacity-60'}>
                         <td className="py-1 pr-2">
                           <Checkbox
+                            disabled={locked}
                             checked={fields.has(d.field)}
                             onCheckedChange={() => toggleField(rec.id, d.field, defaults)}
                             aria-label={`Zastosuj ${d.label}`}
@@ -771,7 +772,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
                 </table>
               )}
 
-              {!locked && consumption.rows.length > 0 && (
+              {consumption.rows.length > 0 && (
                 <div className="rounded-md border bg-muted/40 p-3 space-y-1 text-xs">
                   <p className="text-sm font-medium">Zużycie energii czynnej z faktury → strefy PRZED</p>
                   <table className="w-full">
