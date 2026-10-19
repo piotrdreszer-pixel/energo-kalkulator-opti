@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import type { EnergyAnalysis, ClientProject, ResolvedRates } from '@/types/database';
 import { TARIFF_CODES, getZonesCount, getZoneLabels, validateContractedPower, calculatePeriodMonths, getDefaultDistribution } from '@/lib/tariff-utils';
+import { normalizeTariffCode } from '@/lib/invoice-import';
 import { calculateEnergyCosts, formatCurrency, formatPercent, formatNumber } from '@/lib/calculation-utils';
 import { ReactiveEnergyInput } from '@/components/analysis/ReactiveEnergyInput';
 import { RatesInputPanel } from '@/components/analysis/RatesInputPanel';
