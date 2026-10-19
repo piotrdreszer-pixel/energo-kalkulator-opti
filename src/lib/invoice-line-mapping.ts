@@ -352,15 +352,21 @@ export function planOtherCharges(args: {
   const prev = args.previous || [];
   const prevSame = prev.filter((p) => p.document_id === args.documentId);
   const previousSameDoc = round2(prevSame.reduce((s, i) => s + i.net_value, 0));
-  const needsMode = items.length > 0 && current !== 0;
+  // Ponowna edycja: wkład tego dokumentu jest przeliczany (domyślnie „Dodaj” = podmiana własnego wkładu).
+  const mode = args.mode ?? (previousSameDoc > 0 ? 'add' : null);
+  const needsMode = items.length > 0 && current !== 0 && previousSameDoc === 0;
   let result: number | null = null;
   let breakdown: OtherContribution[] = items;
   if (items.length) {
-    if (!needsMode || args.mode === 'replace') result = total;
-    else if (args.mode === 'add') {
+    if ((!needsMode && previousSameDoc === 0) || mode === 'replace') result = total;
+    else if (mode === 'add') {
       result = round2(current - previousSameDoc + total);
       breakdown = [...prev.filter((p) => p.document_id !== args.documentId), ...items];
     }
+  } else if (previousSameDoc > 0) {
+    // Wszystkie pozycje odznaczone — dokument przestaje zasilać pole, wkład innych faktur zostaje.
+    result = round2(current - previousSameDoc);
+    breakdown = prev.filter((p) => p.document_id !== args.documentId);
   }
   return { items, total, current, previousSameDoc, needsMode, result, breakdown };
 }
