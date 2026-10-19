@@ -47,7 +47,11 @@ export const LINE_TARGET_LABELS: Record<LineTarget, string> = {
 
 export type LineKind =
   | 'active' | 'variable_network' | 'fixed_network' | 'handling'
-  | 'capacity' | 'subscription' | 'reactive' | 'quality_oze_chp' | 'other';
+  | 'capacity' | 'subscription' | 'reactive' | 'quality_oze_chp' | 'other' | 'balance';
+
+/** Pole zbiorcze: kwoty netto pozycji są sumowane (nie stawki). */
+export const OTHER_SUM_TARGET: LineTarget = 'fixed_distribution_before_total';
+export const PO_ONLY_WARNING = 'Ujęcie tego kosztu tylko w PRZED może zawyżyć oszczędność, jeśli ten koszt pozostaje także w PO.';
 
 export interface LineMapping {
   item: LineItemInput;
@@ -71,6 +75,7 @@ const lc = (s: string | null | undefined) => (s || '').toLowerCase();
 export function classifyItem(item: LineItemInput): LineKind {
   const n = lc(item.name);
   const c = lc(item.category);
+  if (/saldo|zaległ|zaleg|nadpłat|nadplat|do zapłaty|do zaplaty|podsumow|razem|ogółem|ogolem|wartość faktury|należność|naleznosc/.test(n)) return 'balance';
   if (c === 'energia_czynna') return 'active';
   if (c === 'handlowa') return 'handling';
   if (c === 'mocowa' || n.includes('mocow')) return 'capacity';
@@ -111,11 +116,12 @@ const ALLOWED: Record<LineKind, LineTarget[]> = {
   variable_network: zonesFor('variable'),
   fixed_network: ['contracted_power_charge_rate_before'],
   handling: ['handling_fee_before'],
-  capacity: ['capacity_charge_before'],
+  capacity: ['capacity_charge_before', 'fixed_distribution_before_total'],
   subscription: ['fixed_distribution_before_total'],
-  reactive: ['reactive_energy_cost_before'],
-  quality_oze_chp: [],
-  other: [],
+  reactive: ['reactive_energy_cost_before', 'fixed_distribution_before_total'],
+  quality_oze_chp: ['fixed_distribution_before_total'],
+  other: ['fixed_distribution_before_total'],
+  balance: [],
 };
 
 /** Przeliczenie wartości pozycji do jednostki pola docelowego. null = niemożliwe. */
@@ -188,12 +194,15 @@ export function mapLineItems(
     let reason: string | null = null;
     let status: LineMapping['status'] = 'needs_assignment';
 
-    if (kind === 'quality_oze_chp') {
+    if (kind === 'balance') {
       status = 'unsupported';
-      reason = 'Kalkulator nie ma osobnego pola na tę opłatę, a stawki PO jej nie zawierają. Dopisanie tylko do PRZED zawyżyłoby oszczędność.';
-    } else if (kind === 'other') {
-      status = 'unsupported';
-      reason = 'Brak zgodnego pola w kalkulatorze.';
+      reason = 'Saldo, zaległość, nadpłata lub podsumowanie — nie jest kosztem do analizy.';
+    } else if (kind === 'quality_oze_chp' || kind === 'other' || kind === 'subscription') {
+      // Sugestia: „Suma pozostałych opłat” (kwota netto za okres). Zastosowanie tylko po zaznaczeniu.
+      target = OTHER_SUM_TARGET;
+      status = 'mapped';
+      reason = 'Brak dedykowanego pola — sugerowane „Suma pozostałych opłat PRZED” (kwota netto za okres).';
+      warnings.push(PO_ONLY_WARNING);
     } else if (kind === 'active' || kind === 'variable_network') {
       const same = items.filter((i) => classifyItem(i) === kind);
       if (same.length === 1 && zones === 1) target = allowed[0];
@@ -233,9 +242,7 @@ export function mapLineItems(
           ? 'W kalkulatorze opłata mocowa to kwota za cały okres analizy. Faktura podaje stawkę z własną podstawą naliczenia' +
             (item.quantity != null ? ` (${item.quantity} ${item.unit || ''})` : '') +
             ' — nie stosuję jej do całego zużycia. Możesz przenieść kwotę tylko, jeśli okres faktury = okres analizy.'
-          : kind === 'subscription'
-            ? 'Kalkulator nie ma pola abonamentu; jedyne zgodne pole to „Suma pozostałych opłat” (kwota za okres). Tę samą opłatę trzeba wpisać też w PO.'
-            : 'W kalkulatorze energia bierna to kwota za okres analizy.';
+          : 'W kalkulatorze energia bierna to kwota za okres analizy.';
     }
 
     return { item, kind, allowedTargets: allowed, target, status, converted: null, convertedUnit: null, warnings, info, reason };
@@ -246,12 +253,16 @@ export function mapLineItems(
     if (!(m.item.id in overrides)) continue;
     const o = overrides[m.item.id];
     if (o === null) { m.target = null; m.status = m.status === 'unsupported' ? 'unsupported' : 'needs_assignment'; continue; }
-    if (m.allowedTargets.includes(o)) { m.target = o; m.status = 'mapped'; }
+    if (m.allowedTargets.includes(o)) {
+      m.target = o; m.status = 'mapped';
+      if (o === OTHER_SUM_TARGET && !m.warnings.includes(PO_ONLY_WARNING)) m.warnings.push(PO_ONLY_WARNING);
+      if (o !== OTHER_SUM_TARGET) m.warnings = m.warnings.filter((w) => w !== PO_ONLY_WARNING);
+    }
   }
 
   // Kilka pozycji na to samo pole → nie sumuję ani nie wybieram arbitralnie
   const counts = new Map<LineTarget, number>();
-  for (const m of draft) if (m.target) counts.set(m.target, (counts.get(m.target) || 0) + 1);
+  for (const m of draft) if (m.target && m.target !== OTHER_SUM_TARGET) counts.set(m.target, (counts.get(m.target) || 0) + 1);
   for (const m of draft) {
     if (m.target && (counts.get(m.target) || 0) > 1) {
       m.warnings.push('Kilka pozycji wskazuje to samo pole (np. różne okresy stawek). Nie sumuję stawek — zostaw jedną pozycję.');
@@ -270,14 +281,14 @@ export function mapLineItems(
     m.converted = conv.value;
     m.convertedUnit = conv.unit;
     const isAmount = ['capacity_charge_before', 'fixed_distribution_before_total', 'reactive_energy_cost_before'].includes(m.target);
-    if (isAmount && !samePeriod) {
+    if (isAmount && !samePeriod && m.target !== OTHER_SUM_TARGET) {
       m.warnings.push('Okres faktury różni się od okresu analizy — kwota z faktury nie odpowiada kwocie za cały okres analizy.');
     }
     if (m.target === 'reactive_energy_cost_before' && analysis?.reactive_monthly_mode_before) {
       m.warnings.push('Energia bierna PRZED jest w trybie miesięcznym — pole roczne nie będzie użyte w obliczeniach.');
     }
     const cur = analysis ? Number((analysis as unknown as Record<string, unknown>)[m.target]) || 0 : 0;
-    if (cur && Math.abs(cur - conv.value) > 1e-9 && (analysis?.value_sources as Record<string, { source?: string }> | undefined)?.[m.target]?.source === 'manual') {
+    if (m.target !== OTHER_SUM_TARGET && cur && Math.abs(cur - conv.value) > 1e-9 && (analysis?.value_sources as Record<string, { source?: string }> | undefined)?.[m.target]?.source === 'manual') {
       m.warnings.push('Pole ma ręczną korektę — zostanie zastąpione wartością z faktury.');
     }
   }
@@ -287,3 +298,64 @@ export function mapLineItems(
 /** Pozycje „poprawnie przypisane” — bez ostrzeżeń, do „Zaznacz wszystkie”. */
 export const isCleanMapping = (m: LineMapping) =>
   m.status === 'mapped' && m.converted != null && m.warnings.length === 0;
+
+/** Wkład jednej pozycji faktury do „Sumy pozostałych opłat” — zapisywany w value_sources. */
+export interface OtherContribution {
+  document_id: string;
+  item_ref: string;
+  name: string;
+  net_value: number;
+  page: number | null;
+  period_from: string | null;
+  period_to: string | null;
+}
+export type OtherSumMode = 'replace' | 'add';
+
+export interface OtherSumPlan {
+  items: OtherContribution[];
+  total: number;
+  current: number;
+  /** Wkład tego samego dokumentu zastosowany wcześniej (odejmowany przy dodawaniu). */
+  previousSameDoc: number;
+  /** Czy użytkownik musi wybrać „Zastąp” / „Dodaj”. */
+  needsMode: boolean;
+  /** Wartość pola po zastosowaniu; null = brak decyzji. */
+  result: number | null;
+  breakdown: OtherContribution[];
+}
+
+const round2 = (v: number) => Math.round(v * 100) / 100;
+
+/** Sumuje kwoty netto zaznaczonych pozycji przypisanych do „Sumy pozostałych opłat” jednego PPE. */
+export function planOtherCharges(args: {
+  maps: LineMapping[];
+  selected: Set<string>;
+  documentId: string;
+  period: { from: string | null; to: string | null };
+  current: number | null | undefined;
+  previous: OtherContribution[] | null | undefined;
+  mode: OtherSumMode | null;
+}): OtherSumPlan {
+  const items: OtherContribution[] = args.maps
+    .filter((m) => m.target === OTHER_SUM_TARGET && m.status === 'mapped' && args.selected.has(m.item.id) && m.item.net_value != null)
+    .map((m) => ({
+      document_id: args.documentId, item_ref: m.item.id, name: m.item.name, net_value: m.item.net_value!,
+      page: m.item.page, period_from: args.period.from, period_to: args.period.to,
+    }));
+  const total = round2(items.reduce((s, i) => s + i.net_value, 0));
+  const current = Number(args.current) || 0;
+  const prev = args.previous || [];
+  const prevSame = prev.filter((p) => p.document_id === args.documentId);
+  const previousSameDoc = round2(prevSame.reduce((s, i) => s + i.net_value, 0));
+  const needsMode = items.length > 0 && current !== 0;
+  let result: number | null = null;
+  let breakdown: OtherContribution[] = items;
+  if (items.length) {
+    if (!needsMode || args.mode === 'replace') result = total;
+    else if (args.mode === 'add') {
+      result = round2(current - previousSameDoc + total);
+      breakdown = [...prev.filter((p) => p.document_id !== args.documentId), ...items];
+    }
+  }
+  return { items, total, current, previousSameDoc, needsMode, result, breakdown };
+}

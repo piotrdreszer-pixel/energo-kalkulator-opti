@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapLineItems, convertForTarget, isCleanMapping, perKwhToPerMwh, kwhToMwh, type LineItemInput } from './invoice-line-mapping';
+import { mapLineItems, planOtherCharges, type OtherContribution, convertForTarget, isCleanMapping, perKwhToPerMwh, kwhToMwh, type LineItemInput } from './invoice-line-mapping';
 import { calculateEnergyCosts } from './calculation-utils';
 
 const li = (o: Partial<LineItemInput>): LineItemInput => ({
@@ -55,10 +55,11 @@ describe('mapowanie pozycji faktury C11', () => {
     const cost = calculateEnergyCosts({ tariff_code_before: 'B21', zones_count_before: 1, variable_distribution_before_zone1_rate: v.value, consumption_before_zone1_mwh: 0.017 });
     expect(cost.distributionCostBefore).toBeCloseTo(17 * 0.2562, 9);
   });
-  it('jakościowa, OZE i kogeneracyjna nie są doliczane do stawki sieciowej', () => {
+  it('jakościowa, OZE i kogeneracyjna → sugerowana Suma pozostałych opłat, nie zaznaczane automatycznie', () => {
     for (const n of ['Opłata jakościowa', 'Opłata OZE', 'Opłata kogeneracyjna']) {
-      expect(byName(maps, n).status).toBe('unsupported');
-      expect(byName(maps, n).target).toBeNull();
+      expect(byName(maps, n).target).toBe('fixed_distribution_before_total');
+      expect(byName(maps, n).converted).toBe(byName(maps, n).item.net_value);
+      expect(isCleanMapping(byName(maps, n))).toBe(false);
     }
   });
   it('sieciowa stała → stawka zł/kW/mies, nie kwota netto; informacja o niepełnym miesiącu', () => {
@@ -70,9 +71,9 @@ describe('mapowanie pozycji faktury C11', () => {
   it('opłata handlowa → zł/mies', () => {
     expect(byName(maps, 'Opłata handlowa').converted).toBe(49);
   });
-  it('opłata mocowa i abonament wymagają ręcznego przypisania', () => {
+  it('opłata mocowa wymaga przypisania, abonament ma sugestię sumy', () => {
     expect(byName(maps, 'Opłata mocowa').status).toBe('needs_assignment');
-    expect(byName(maps, 'Opłata abonamentowa').status).toBe('needs_assignment');
+    expect(byName(maps, 'Opłata abonamentowa').target).toBe('fixed_distribution_before_total');
   });
   it('„Zaznacz wszystkie poprawnie przypisane” obejmuje 4 pozycje', () => {
     expect(maps.filter(isCleanMapping).map((m) => m.item.name).sort()).toEqual(
@@ -88,5 +89,50 @@ describe('mapowanie pozycji faktury C11', () => {
     const two = [items[0], { ...items[0], id: 'e2', rate: 1.1 }];
     const ms = mapLineItems(two, record, null);
     expect(ms.every((m) => !isCleanMapping(m))).toBe(true);
+  });
+});
+
+describe('Suma pozostałych opłat PRZED', () => {
+  const big: LineItemInput[] = [
+    li({ id: 'q', name: 'Opłata jakościowa', category: 'dystrybucja', quantity: 22000, unit: 'kWh', rate: 0.0338, net_value: 743.45 }),
+    li({ id: 'o', name: 'Opłata OZE', category: 'dystrybucja', quantity: 22000, unit: 'kWh', rate: 0.0073, net_value: 163.47 }),
+    li({ id: 'k', name: 'Opłata kogeneracyjna', category: 'dystrybucja', quantity: 22000, unit: 'kWh', rate: 0.003, net_value: 67.18 }),
+    li({ id: 's', name: 'Saldo z poprzedniego okresu', net_value: 500 }),
+  ];
+  const maps = mapLineItems(big, record, null);
+  const base = { maps, documentId: 'd1', period: { from: '2026-01-01', to: '2026-12-31' }, previous: null };
+  it('sumuje kwoty netto zaznaczonych pozycji: 743,45 + 163,47 + 67,18 = 974,10', () => {
+    const p = planOtherCharges({ ...base, selected: new Set(['q', 'o', 'k']), current: 0, mode: null });
+    expect(p.total).toBe(974.1);
+    expect(p.result).toBe(974.1);
+  });
+  it('odznaczenie pozycji zmniejsza sumę', () => {
+    expect(planOtherCharges({ ...base, selected: new Set(['q', 'k']), current: 0, mode: null }).total).toBe(810.63);
+  });
+  it('saldo nie trafia do sumy', () => {
+    expect(byName(maps, 'Saldo z poprzedniego okresu').status).toBe('unsupported');
+    expect(planOtherCharges({ ...base, selected: new Set(['q', 's']), current: 0, mode: null }).total).toBe(743.45);
+  });
+  it('istniejąca kwota wymaga jawnego wyboru zastąp/dodaj', () => {
+    const sel = new Set(['q', 'o', 'k']);
+    expect(planOtherCharges({ ...base, selected: sel, current: 100, mode: null }).result).toBeNull();
+    expect(planOtherCharges({ ...base, selected: sel, current: 100, mode: 'replace' }).result).toBe(974.1);
+    expect(planOtherCharges({ ...base, selected: sel, current: 100, mode: 'add' }).result).toBe(1074.1);
+  });
+  it('ponowne dodanie tego samego dokumentu przelicza wkład zamiast go dublować', () => {
+    const prev: OtherContribution[] = [{ document_id: 'd1', item_ref: 'q', name: 'x', net_value: 743.45, page: 2, period_from: null, period_to: null }];
+    const p = planOtherCharges({ ...base, selected: new Set(['q', 'o', 'k']), current: 843.45, previous: prev, mode: 'add' });
+    expect(p.result).toBe(1074.1);
+    expect(p.breakdown.length).toBe(3);
+  });
+  it('wkład innego dokumentu zostaje przy dodawaniu', () => {
+    const prev: OtherContribution[] = [{ document_id: 'd0', item_ref: 'z', name: 'x', net_value: 100, page: 1, period_from: null, period_to: null }];
+    const p = planOtherCharges({ ...base, selected: new Set(['q']), current: 100, previous: prev, mode: 'add' });
+    expect(p.result).toBe(843.45);
+    expect(p.breakdown.map((b) => b.document_id)).toEqual(['d0', 'd1']);
+  });
+  it('pozycja przypisana do pola dedykowanego nie trafia do sumy', () => {
+    const m2 = mapLineItems([...big, li({ id: 'm', name: 'Opłata mocowa', category: 'mocowa', net_value: 50 })], record, null, { m: 'capacity_charge_before' });
+    expect(planOtherCharges({ ...base, maps: m2, selected: new Set(['q', 'm']), current: 0, mode: null }).total).toBe(743.45);
   });
 });
