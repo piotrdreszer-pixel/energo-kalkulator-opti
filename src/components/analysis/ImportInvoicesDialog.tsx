@@ -24,7 +24,7 @@ import { formatCurrency } from '@/lib/calculation-utils';
 import { getZonesCount, getZoneLabels, TARIFF_CODES } from '@/lib/tariff-utils';
 import { planReapply, type ReviewState } from '@/lib/invoice-reedit';
 import {
-  mapLineItems, isCleanMapping, LINE_TARGET_LABELS, planOtherCharges, OTHER_SUM_TARGET, CAPACITY_TARGET, capacityGroup, capacityBlockReason, selectionProblems, PO_ONLY_WARNING, type OtherContribution, type OtherSumMode, type OtherSumPlan, type LineMapping, type LineTarget, type LineItemInput,
+  mapLineItems, isCleanMapping, LINE_TARGET_LABELS, planOtherCharges, OTHER_SUM_TARGET, CAPACITY_TARGET, capacityGroup, capacityBlockReason, selectionProblems, planHandling, HANDLING_TARGET, PO_ONLY_WARNING, type OtherContribution, type OtherSumMode, type OtherSumPlan, type LineMapping, type LineTarget, type LineItemInput,
 } from '@/lib/invoice-line-mapping';
 
 const fmtNum = (v: number, max = 6) => new Intl.NumberFormat('pl-PL', { maximumFractionDigits: max }).format(v);
@@ -427,7 +427,8 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
     const consumption = mapConsumptionZones(rec.consumption, getZonesCount(tariff.code || target?.tariff_code_before || 'C11'));
     const maps = mappingsFor(rec, target, tariff.code);
     const selLines = selectedLinesFor(rec.id, maps);
-    const lines = maps.filter((m) => selLines.has(m.item.id) && m.status === 'mapped' && m.target && m.target !== OTHER_SUM_TARGET && m.target !== CAPACITY_TARGET && m.converted != null);
+    const lines = maps.filter((m) => selLines.has(m.item.id) && m.status === 'mapped' && m.target && m.target !== OTHER_SUM_TARGET && m.target !== CAPACITY_TARGET && m.target !== HANDLING_TARGET && m.converted != null);
+    const handling = planHandling(maps, selLines);
     const osd = osdStateFor(rec, target);
     const osdId = osd.apply && osd.choice && osd.choice !== '__keep__' ? osd.choice : null;
     const vsAll = (target?.value_sources as Record<string, { breakdown?: OtherContribution[] }> | undefined) || {};
@@ -453,6 +454,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
     for (const m of lines) desired[m.target!] = m.converted;
     if (other.result != null) desired[OTHER_SUM_TARGET] = other.result;
     if (capacity.result != null) desired[CAPACITY_TARGET] = capacity.result;
+    if (handling.total != null) desired[HANDLING_TARGET] = handling.total;
     const reapply = planReapply({
       desired,
       current: (target as unknown as Record<string, unknown>) || {},
@@ -463,7 +465,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
     });
     // Pola NOT NULL nie wracają do pustej wartości (nowy PPE) — zostają.
     for (const f of NOT_NULL_FIELDS) if (f in reapply.write && reapply.write[f] == null) delete reapply.write[f];
-    return { choice, target, tariff, diffs, defaults, fields, consumption, maps, selLines, lines, osd, osdId, other, capacity, periodMismatch, analysisFrom, analysisTo, reapply, prevState };
+    return { choice, target, tariff, diffs, defaults, fields, consumption, maps, selLines, lines, osd, osdId, other, capacity, handling, periodMismatch, analysisFrom, analysisTo, reapply, prevState };
   };
 
   /** Zapis jednego rekordu. Zwraca id PPE. Rzuca wyjątek przy błędzie. */
@@ -482,6 +484,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
         vs[f] = { source: 'document', document_id: doc.id, page };
       }
       for (const m of lines) if (m.target! in update) vs[m.target!] = { source: 'document', document_id: doc.id, page: m.item.page, item_ref: m.item.id };
+      if (HANDLING_TARGET in update && !reapply.restored.includes(HANDLING_TARGET)) vs[HANDLING_TARGET] = { source: 'document', document_id: doc.id, page: rec.source_pages?.[0] ?? null, item_ref: p.handling.components.flatMap((c) => c.itemIds).join(','), components: p.handling.components };
       if (CAPACITY_TARGET in update) vs[CAPACITY_TARGET] = { source: 'document', document_id: doc.id, breakdown: capacity.breakdown };
       if (OTHER_SUM_TARGET in update) vs[OTHER_SUM_TARGET] = { source: 'document', document_id: doc.id, breakdown: other.breakdown };
       return vs;
@@ -570,6 +573,10 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
       }
       if (p.periodMismatch && !periodAck[rec.id]) {
         toast({ variant: 'destructive', title: 'Okres się różni', description: `${label}: okres faktury różni się od okresu analizy — potwierdź pod tabelą opłat lub odznacz pozycje sumy.` });
+        return;
+      }
+      if (p.handling.conflicts.length) {
+        toast({ variant: 'destructive', title: 'Opłata handlowa PRZED', description: `${label}: ${p.handling.conflicts.join(' ')}` });
         return;
       }
       const blocked = selectionProblems(p.maps, p.selLines);
@@ -684,8 +691,11 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
                   )}
                 </div>
               )}
-              {applied && editing && (
-                <p className="text-sm text-muted-foreground">Punkt: <span className="font-medium text-foreground">{target?.name || '—'}</span></p>
+              {target && (
+                <p className="text-sm rounded bg-muted px-2 py-1">
+                  Dane trafią do punktu: <span className="font-semibold">{target.name}</span>
+                  {target.ppe_number ? ` (PPE ${target.ppe_number})` : ''}
+                </p>
               )}
 
               {!locked && (
@@ -854,6 +864,18 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
                   ack={!!periodAck[rec.id]}
                   onAck={(v) => setPeriodAck((p) => ({ ...p, [rec.id]: v }))}
                 />
+              )}
+
+              {!locked && (plan.handling.components.length > 0 || plan.handling.conflicts.length > 0) && (
+                <div className="rounded-md border bg-muted/40 p-3 space-y-1 text-xs">
+                  <p className="text-sm font-medium">{LINE_TARGET_LABELS[HANDLING_TARGET]}</p>
+                  {plan.handling.components.map((c) => (
+                    <p key={c.label} className="flex justify-between"><span>{c.label}{c.itemIds.length > 1 ? ` (${c.itemIds.length} pozycje, ta sama stawka — liczona raz)` : ''}</span><span>{formatCurrency(c.monthly)}/mies.</span></p>
+                  ))}
+                  {plan.handling.conflicts.map((c) => <p key={c} className="text-warning">{c}</p>)}
+                  <p>Obecna wartość pola: {target?.handling_fee_before != null ? `${formatCurrency(Number(target.handling_fee_before))}/mies.` : '—'}</p>
+                  <p className="font-medium">Po zastosowaniu: {plan.handling.total != null ? `${formatCurrency(plan.handling.total)}/mies.` : '—'}{plan.handling.components.length > 1 ? ' (suma składników)' : ''}</p>
+                </div>
               )}
 
               {!locked && plan.reapply.manual.length > 0 && (
