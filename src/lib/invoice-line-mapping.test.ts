@@ -77,7 +77,7 @@ describe('mapowanie pozycji faktury C11', () => {
   });
   it('„Zaznacz wszystkie poprawnie przypisane” obejmuje 5 pozycji', () => {
     expect(maps.filter(isCleanMapping).map((m) => m.item.name).sort()).toEqual(
-      ['Energia czynna', 'Opłata handlowa', 'Opłata sieciowa stała', 'Opłata sieciowa zmienna']
+      ['Energia czynna', 'Opłata abonamentowa', 'Opłata handlowa', 'Opłata sieciowa stała', 'Opłata sieciowa zmienna']
     );
   });
   it('ręczne przypisanie opłaty mocowej przenosi kwotę z ostrzeżeniem o okresie', () => {
