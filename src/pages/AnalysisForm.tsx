@@ -187,8 +187,13 @@ function AnalysisForm() {
 
   useEffect(() => {
     if (analysis) {
+      // Kody taryf zapisane inną wielkością liter (np. „C22B” z importu) → kod ze słownika i jego liczba stref.
+      const tb = normalizeTariffCode(analysis.tariff_code_before).code;
+      const ta = normalizeTariffCode(analysis.tariff_code_after).code;
       setFormData({
         ...analysis,
+        ...(tb && tb !== analysis.tariff_code_before ? { tariff_code_before: tb, zones_count_before: getZonesCount(tb) } : {}),
+        ...(ta && ta !== analysis.tariff_code_after ? { tariff_code_after: ta, zones_count_after: getZonesCount(ta) } : {}),
         rates_overridden_before: (analysis.rates_overridden_before as Record<string, number>) || {},
         rates_overridden_after: (analysis.rates_overridden_after as Record<string, number>) || {},
       });
