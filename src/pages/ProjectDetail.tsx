@@ -318,7 +318,7 @@ export default function ProjectDetail() {
                         <h3 className="font-semibold text-lg mb-1 break-words">{g.name}</h3>
                         <p className="text-sm text-muted-foreground">
                           Liczba PPE: {items.length}
-                          {items.length > 0 && <> • wybrane do raportu: {chosen.length}</>}
+                          {items.length > 1 && <> • wybrane do raportu: {chosen.length}</>}
                           {' • '}utworzono {format(new Date(g.created_at), 'd MMM yyyy', { locale: pl })}
                         </p>
                       </div>

@@ -652,7 +652,7 @@ function AnalysisForm() {
     );
   }
 
-  if (access.readOnly) return <AppLayout><div className="content-container py-8"><Button variant="outline" asChild><Link to={groupPath}>Wróć do listy PPE</Link></Button><p role="status" className="my-6 text-muted-foreground">{MULTI_PPE_LOCK_MESSAGE}</p><h1 className="text-2xl font-semibold mb-4">{analysis?.name}</h1><dl className="grid grid-cols-2 gap-4"><dt>PPE</dt><dd>{analysis?.ppe_number || '—'}</dd><dt>PRZED</dt><dd>{formatCurrency(results.totalCostBefore)}</dd><dt>PO</dt><dd>{formatCurrency(results.totalCostAfter)}</dd><dt>Oszczędność</dt><dd>{formatCurrency(results.savingsValue)}</dd></dl><Button variant="outline" className="mt-6" asChild><Link to={`/projects/${projectId}/analysis/${analysisId}/report`}>Podgląd raportu PPE</Link></Button></div></AppLayout>;
+  if (access.readOnly) return <AppLayout><div className="content-container py-8"><Button variant="outline" asChild><Link to={groupPath}>Wróć do listy PPE</Link></Button><p role="status" className="my-6 text-muted-foreground">{MULTI_PPE_LOCK_MESSAGE}</p><h1 className="text-2xl font-semibold mb-4">{analysis?.name}</h1><dl className="grid grid-cols-2 gap-4"><dt>PPE</dt><dd>{analysis?.ppe_number || '—'}</dd><dt>PRZED</dt><dd>{formatCurrency(results.totalCostBefore)}</dd><dt>PO</dt><dd>{formatCurrency(results.totalCostAfter)}</dd><dt>Oszczędność</dt><dd>{formatCurrency(results.savingsValue)}</dd></dl><Button variant="outline" className="mt-6" asChild><Link to={`/projects/${projectId}/analysis/${analysisId}/report`}>Raport PPE</Link></Button></div></AppLayout>;
 
   return (
     <AppLayout>
@@ -1211,10 +1211,10 @@ function AnalysisForm() {
             <Button variant="outline" asChild>
               <Link to={groupPath}>Wróć do listy PPE</Link>
             </Button>
-            <Button variant="secondary" onClick={handleSaveAndAddNext} disabled={isAddingNext || saveMutation.isPending || !access.multiPpe}>
+            {access.multiPpe && <Button variant="secondary" onClick={handleSaveAndAddNext} disabled={isAddingNext || saveMutation.isPending}>
               {isAddingNext ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
               Zapisz i dodaj kolejne PPE
-            </Button>
+            </Button>}
             {currentStep === 'summary' ? (
               <Button onClick={handleSave} disabled={saveMutation.isPending}>
                 {saveMutation.isPending ? (
