@@ -26,7 +26,8 @@ export const TARIFF_CODES = [
 export type TariffCode = typeof TARIFF_CODES[number]['code'];
 
 export function getTariffInfo(code: string) {
-  return TARIFF_CODES.find(t => t.code === code) || TARIFF_CODES[0];
+  const c = String(code ?? '').replace(/\s+/g, '').toUpperCase();
+  return TARIFF_CODES.find(t => t.code.toUpperCase() === c) || TARIFF_CODES[0];
 }
 
 export function getZonesCount(tariffCode: string): number {
