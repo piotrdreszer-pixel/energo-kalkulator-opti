@@ -301,8 +301,21 @@ Deno.serve(async (req) => {
       extracted: { warnings: extracted.warnings || [] },
     }).eq('id', documentId)
 
-    return new Response(JSON.stringify({ success: true, documentId, ppeCount: (extracted.ppe || []).length }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    console.log(`[parse-invoice] doc=${documentId} done, ppe=${(extracted.ppe || []).length}`)
+    } catch (bgError) {
+      console.error('[parse-invoice] background error:', bgError)
+      await supabaseAdmin.from('analysis_documents').update({
+        status: 'error', error: 'Nieoczekiwany błąd odczytu. Spróbuj ponownie.',
+      }).eq('id', documentId)
+    } })()
+
+    // deno-lint-ignore no-explicit-any
+    const edgeRuntime = (globalThis as any).EdgeRuntime
+    if (edgeRuntime?.waitUntil) edgeRuntime.waitUntil(work)
+    else await work
+
+    return new Response(JSON.stringify({ success: true, documentId, status: 'processing' }),
+      { status: 202, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (error) {
     console.error('[parse-invoice] Error:', error)
     return new Response(JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Nieznany błąd' }),
