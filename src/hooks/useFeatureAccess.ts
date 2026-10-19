@@ -22,7 +22,7 @@ export function useFeatureAccess(count = 0) {
       if (error) throw error;
       return data;
     },
-    refetchInterval: 5000, staleTime: 0, retry: false,
+    refetchInterval: 1000, refetchIntervalInBackground: true, refetchOnWindowFocus: 'always', staleTime: 0, retry: false,
   });
   return { ...featureRules(query.error || !user ? null : query.data, count), loading: !!user && query.isPending };
 }
@@ -35,9 +35,9 @@ export function useGroupFeatureAccess(groupId?: string | null) {
       const { count, error } = await supabase.from('energy_analyses').select('id', { count: 'exact', head: true }).eq('analysis_group_id', groupId);
       if (error) throw error;
       return count ?? 0;
-    }, refetchInterval: 5000, staleTime: 0,
+    }, refetchInterval: 1000, staleTime: 0,
   });
   const access = useFeatureAccess(countQuery.data ?? 0);
   const unknown = !!groupId && (countQuery.isPending || !!countQuery.error);
-  return { ...access, readOnly: access.readOnly || unknown, canImport: access.canImport && !unknown, loading: access.loading || (!!groupId && countQuery.isPending) };
+  return { ...access, readOnly: access.readOnly || unknown, canAddPpe: access.canAddPpe && !unknown, canImport: access.canImport && !unknown, loading: access.loading || (!!groupId && countQuery.isPending) };
 }

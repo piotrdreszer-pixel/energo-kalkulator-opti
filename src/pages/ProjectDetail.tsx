@@ -149,12 +149,7 @@ export default function ProjectDetail() {
 
   const deleteGroupMutation = useMutation({
     mutationFn: async (groupId: string) => {
-      const { error } = await supabase
-        .from('analysis_groups')
-        .delete()
-        .eq('id', groupId)
-        .eq('client_project_id', projectId!);
-      if (error) throw error;
+      await deleteClientObject('group', groupId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['analysis-groups', projectId] });

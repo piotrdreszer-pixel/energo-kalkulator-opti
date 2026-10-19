@@ -5,7 +5,7 @@ import { ToastAction } from '@/components/ui/toast';
 import { useOsdOperators } from '@/hooks/useOsdOperators';
 import { matchOsd } from '@/lib/osd-match';
 import { supabase } from '@/integrations/supabase/client';
-import { requireFeature, useFeatureAccess } from '@/hooks/useFeatureAccess';
+import { requireFeature, useGroupFeatureAccess } from '@/hooks/useFeatureAccess';
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
@@ -78,7 +78,7 @@ interface Props {
 }
 
 export default function ImportInvoicesDialog({ projectId, groupId, ppes, onApplied }: Props) {
-  const access = useFeatureAccess(ppes.length);
+  const access = useGroupFeatureAccess(groupId);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -215,14 +215,14 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Import faktur energetycznych</DialogTitle>
+          <DialogTitle>{access.canImport ? 'Import faktur energetycznych' : 'Podgląd faktur'}</DialogTitle>
           <DialogDescription>
             Prześlij faktury (PDF, JPG, PNG). AI odczyta dane, a Ty zatwierdzisz, co trafi do kalkulatora.
             Nic nie zostanie zapisane bez Twojego zatwierdzenia. Odczyt AI jest rozliczany z kredytów workspace.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-center gap-3">
+        {access.canImport && <div className="flex items-center gap-3">
           <Input
             type="file"
             accept=".pdf,.jpg,.jpeg,.png"
@@ -232,7 +232,7 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
             aria-label="Wybierz pliki faktur"
           />
           {uploading && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
-        </div>
+        </div>}
 
         {docsQuery.data?.length ? (
           <div className="space-y-2 mt-2">
@@ -299,7 +299,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
   onApplied: (analysisIds: string[]) => void;
 }) {
   const { toast } = useToast();
-  const access = useFeatureAccess(ppes.length);
+  const access = useGroupFeatureAccess(groupId);
   const [singleRecord, setSingleRecord] = useState('');
   const editing = doc.status === 'approved';
   const { data: osdOperators = [] } = useOsdOperators();
