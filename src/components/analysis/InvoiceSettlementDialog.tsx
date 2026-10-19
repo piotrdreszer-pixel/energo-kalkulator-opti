@@ -12,7 +12,6 @@ import { AlertTriangle, ClipboardList, Loader2 } from 'lucide-react';
 import type { EnergyAnalysis } from '@/types/database';
 import type { InvoicePpeRecord } from '@/lib/invoice-import';
 import { buildSettlement, settlementProposals, matchesStored, type Component, type SettlementDoc, type SettlementItem } from '@/lib/invoice-settlement';
-import { sameValue } from '@/lib/invoice-reedit';
 import type { ValueSources } from '@/lib/value-sources';
 import { formatCurrency } from '@/lib/calculation-utils';
 
