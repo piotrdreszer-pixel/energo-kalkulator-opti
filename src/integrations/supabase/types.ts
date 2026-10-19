@@ -233,6 +233,7 @@ export type Database = {
           ppe_address: string | null
           ppe_number: string | null
           reactive: Json | null
+          review_state: Json | null
           source_pages: Json | null
           tariff_code: string | null
         }
@@ -255,6 +256,7 @@ export type Database = {
           ppe_address?: string | null
           ppe_number?: string | null
           reactive?: Json | null
+          review_state?: Json | null
           source_pages?: Json | null
           tariff_code?: string | null
         }
@@ -277,6 +279,7 @@ export type Database = {
           ppe_address?: string | null
           ppe_number?: string | null
           reactive?: Json | null
+          review_state?: Json | null
           source_pages?: Json | null
           tariff_code?: string | null
         }

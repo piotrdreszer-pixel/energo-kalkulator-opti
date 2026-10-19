@@ -55,13 +55,13 @@ Wyekstrahuj, jeśli występują:
 - ppe: tablica punktów poboru energii. Jeden dokument może zawierać WIELE PPE. Dla każdego:
   - ppe_number: numer PPE jako tekst (dokładnie jak w dokumencie)
   - ppe_address: adres punktu
-  - tariff_code: grupa taryfowa (np. C11, C21, B23)
+  - tariff_code: grupa taryfowa DOKŁADNIE jak w części faktury dotyczącej tego PPE, z oznaczeniami literowymi (np. C11, C12a, C12b, C22a, G12w, B23); nie skracaj i nie zgaduj — w razie wątpliwości null
   - osd_name: operator systemu dystrybucyjnego (OSD) dla tego PPE — TYLKO gdy dokument wprost go wskazuje (np. "Operator: ...", "OSD: ...", "Dystrybutor"). NIE wpisuj tu sprzedawcy/wystawcy, nazwy z logo ani nie zgaduj z adresu punktu; w razie wątpliwości null
   - period_from, period_to: okres rozliczenia (YYYY-MM-DD)
   - contracted_power_kw: moc umowna w kW
   - max_power_kw: moc maksymalna w kW
   - power_exceedances: przekroczenia mocy (tablica {period, value_kw} lub null)
-  - consumption: zużycie wg stref: tablica {zone_name, value, unit} — zachowaj ORYGINALNE nazwy stref i jednostki
+  - consumption: rzeczywiste zużycie ENERGII CZYNNEJ wg stref: tablica {zone_name, value, unit, period_from, period_to} — zachowaj ORYGINALNE nazwy stref (np. "szczyt", "pozaszczyt", "przedpołudniowa") i jednostki (kWh/MWh). Każdą strefę i okres podaj RAZ, nawet jeśli ta sama ilość występuje przy kilku opłatach (sprzedaż, dystrybucja zmienna, OZE…). NIE wpisuj tu podstawy opłaty mocowej ani energii biernej. Jeśli faktura podaje zużycie łączne, dodaj osobny wpis z zone_name "Razem". Brak odczytu strefy = pomiń wpis (nie zero)
   - reactive: energia bierna: tablica {name, value, unit} lub null
   - other_charges: pozostałe opłaty nieprzypisane do pozycji (tablica {name, value})
   - source_pages: numery stron, z których pochodzą dane tego PPE
