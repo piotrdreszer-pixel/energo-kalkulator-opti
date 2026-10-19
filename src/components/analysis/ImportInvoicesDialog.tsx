@@ -23,7 +23,7 @@ import {
 import { formatCurrency } from '@/lib/calculation-utils';
 import { getZonesCount } from '@/lib/tariff-utils';
 import {
-  mapLineItems, isCleanMapping, LINE_TARGET_LABELS, type LineMapping, type LineTarget, type LineItemInput,
+  mapLineItems, isCleanMapping, LINE_TARGET_LABELS, planOtherCharges, OTHER_SUM_TARGET, PO_ONLY_WARNING, type OtherContribution, type OtherSumMode, type OtherSumPlan, type LineMapping, type LineTarget, type LineItemInput,
 } from '@/lib/invoice-line-mapping';
 
 const fmtNum = (v: number, max = 6) => new Intl.NumberFormat('pl-PL', { maximumFractionDigits: max }).format(v);
@@ -286,6 +286,8 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
   const [applying, setApplying] = useState(false);
   const [lineOverrides, setLineOverrides] = useState<Record<string, Record<string, LineTarget | null>>>({});
   const [lineSelected, setLineSelected] = useState<Record<string, Set<string>>>({});
+  const [otherMode, setOtherMode] = useState<Record<string, OtherSumMode>>({});
+  const [periodAck, setPeriodAck] = useState<Record<string, boolean>>({});
 
   /** OSD: '' = wymagany wybór, '__keep__' = nie zmieniaj, id = operator. */
   const osdStateFor = (rec: InvoicePpeRecord, target: EnergyAnalysis | null) => {
@@ -355,27 +357,38 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
     const fields = selectedFields[rec.id] ?? defaults;
     const maps = mappingsFor(rec, target);
     const selLines = selectedLinesFor(rec.id, maps);
-    const lines = maps.filter((m) => selLines.has(m.item.id) && m.status === 'mapped' && m.target && m.converted != null);
+    const lines = maps.filter((m) => selLines.has(m.item.id) && m.status === 'mapped' && m.target && m.target !== OTHER_SUM_TARGET && m.converted != null);
     const osd = osdStateFor(rec, target);
     const osdId = osd.apply && osd.choice && osd.choice !== '__keep__' ? osd.choice : null;
-    return { choice, target, diffs, fields, lines, osd, osdId };
+    const prevVs = (target?.value_sources as Record<string, { breakdown?: OtherContribution[] }> | undefined)?.[OTHER_SUM_TARGET];
+    const other = planOtherCharges({
+      maps, selected: selLines, documentId: doc.id,
+      period: { from: rec.period_from, to: rec.period_to },
+      current: target?.fixed_distribution_before_total, previous: prevVs?.breakdown, mode: otherMode[rec.id] ?? null,
+    });
+    const analysisFrom = fields.has('period_from') ? rec.period_from : target?.period_from ?? null;
+    const analysisTo = fields.has('period_to') ? rec.period_to : target?.period_to ?? null;
+    const periodMismatch = other.items.length > 0 && (analysisFrom !== rec.period_from || analysisTo !== rec.period_to);
+    return { choice, target, diffs, fields, lines, osd, osdId, other, periodMismatch, analysisFrom, analysisTo };
   };
 
   /** Zapis jednego rekordu. Zwraca id PPE zwrócone przez zapis. Rzuca wyjątek przy błędzie. */
   const applyRecord = async (rec: InvoicePpeRecord): Promise<string> => {
-    const { choice, diffs, fields, lines, osdId } = planFor(rec);
+    const { choice, diffs, fields, lines, osdId, other } = planFor(rec);
     const update: Record<string, unknown> = {};
     for (const d of diffs) if (fields.has(d.field)) update[d.field] = d.incoming;
     if (typeof update.tariff_code_before === 'string') update.zones_count_before = getZonesCount(update.tariff_code_before) || 1;
     if (osdId) update.osd_id = osdId;
     for (const m of lines) update[m.target!] = m.converted;
+    if (other.result != null) update[OTHER_SUM_TARGET] = other.result;
     const docSources = (vs: Record<string, unknown>) => {
       for (const f of fields) vs[f] = { source: 'document', document_id: doc.id, page: rec.source_pages?.[0] ?? null };
       if (osdId) vs.osd_id = { source: 'document', document_id: doc.id, page: rec.source_pages?.[0] ?? null };
       for (const m of lines) vs[m.target!] = { source: 'document', document_id: doc.id, page: m.item.page, item_ref: m.item.id };
+      if (other.result != null) vs[OTHER_SUM_TARGET] = { source: 'document', document_id: doc.id, breakdown: other.breakdown };
       return vs;
     };
-    const appliedList = [...Array.from(fields), ...(osdId ? ['osd_id'] : []), ...lines.map((m) => `line:${m.item.id}->${m.target}`)];
+    const appliedList = [...Array.from(fields), ...(osdId ? ['osd_id'] : []), ...lines.map((m) => `line:${m.item.id}->${m.target}`), ...other.items.map((i) => `line:${i.item_ref}->${OTHER_SUM_TARGET}`)];
 
     let analysisId = choice;
     if (choice === '__new__') {
@@ -428,7 +441,15 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
         toast({ variant: 'destructive', title: 'Wybierz operatora (OSD)', description: `${label}: operator nie został jednoznacznie rozpoznany — wybierz go lub „Nie zmieniaj”.` });
         return;
       }
-      if (!p.fields.size && !p.lines.length && !p.osdId) {
+      if (p.other.items.length && p.other.result == null) {
+        toast({ variant: 'destructive', title: 'Suma pozostałych opłat', description: `${label}: pole ma już kwotę — wybierz „Zastąp obecną wartość” lub „Dodaj do obecnej wartości”.` });
+        return;
+      }
+      if (p.periodMismatch && !periodAck[rec.id]) {
+        toast({ variant: 'destructive', title: 'Okres się różni', description: `${label}: okres faktury różni się od okresu analizy — potwierdź pod tabelą opłat lub odznacz pozycje sumy.` });
+        return;
+      }
+      if (!p.fields.size && !p.lines.length && !p.osdId && !p.other.items.length) {
         toast({ variant: 'destructive', title: 'Brak wybranych pól', description: `${label}: zaznacz pola do zastosowania.` });
         return;
       }
@@ -485,6 +506,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
           const maps = mappingsFor(rec, target);
           const selLines = selectedLinesFor(rec.id, maps);
           const selCount = maps.filter((m) => selLines.has(m.item.id) && m.status === 'mapped' && m.converted != null).length;
+          const plan = planFor(rec);
 
           return (
             <div key={rec.id} className="rounded-md border p-4 space-y-3">
@@ -599,6 +621,19 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
                 />
               )}
 
+              {!applied && plan.other.items.length > 0 && (
+                <OtherSumSummary
+                  plan={plan.other}
+                  mode={otherMode[rec.id] ?? null}
+                  onMode={(m) => setOtherMode((p) => ({ ...p, [rec.id]: m }))}
+                  periodMismatch={plan.periodMismatch}
+                  invoicePeriod={[rec.period_from, rec.period_to]}
+                  analysisPeriod={[plan.analysisFrom, plan.analysisTo]}
+                  ack={!!periodAck[rec.id]}
+                  onAck={(v) => setPeriodAck((p) => ({ ...p, [rec.id]: v }))}
+                />
+              )}
+
               {!applied && (
                 <p className="text-xs text-muted-foreground">
                   Do zastosowania: {fields.size} pól PPE{osdStateFor(rec, target).apply && osdStateFor(rec, target).choice && osdStateFor(rec, target).choice !== '__keep__' ? ', operator OSD' : ''}, {selCount} stawek i opłat.
@@ -676,7 +711,7 @@ function LineItemsTable({ maps, selected, applied, target, onToggle, onSelectCle
                     </td>
                     <td className="py-1 pr-2 min-w-[12rem]">
                       {m.status === 'unsupported' ? (
-                        <Badge variant="secondary">Brak zgodnego pola</Badge>
+                        <Badge variant="secondary">Nie dotyczy</Badge>
                       ) : m.allowedTargets.length > 0 && !applied ? (
                         <Select value={m.target ?? '__none__'} onValueChange={(v) => onAssign(li.id, v === '__none__' ? null : (v as LineTarget))}>
                           <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
@@ -695,7 +730,7 @@ function LineItemsTable({ maps, selected, applied, target, onToggle, onSelectCle
                     <tr>
                       <td />
                       <td colSpan={5} className="pb-2 space-y-0.5">
-                        {m.reason && !canApply && <p className="text-muted-foreground">{m.reason}</p>}
+                        {m.reason && (!canApply || m.target === OTHER_SUM_TARGET) && <p className="text-muted-foreground">{m.reason}</p>}
                         {m.warnings.map((w, i) => (
                           <p key={i} className="flex items-start gap-1 text-warning"><AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />{w}</p>
                         ))}
@@ -712,6 +747,57 @@ function LineItemsTable({ maps, selected, applied, target, onToggle, onSelectCle
       <p className="text-xs text-muted-foreground">
         Przeniesienie stawek nie gwarantuje odtworzenia kwoty faktury — kalkulator liczy koszty dla całego okresu analizy według własnego sposobu naliczania. Wariant PO nie jest zmieniany.
       </p>
+    </div>
+  );
+}
+
+function OtherSumSummary({ plan, mode, onMode, periodMismatch, invoicePeriod, analysisPeriod, ack, onAck }: {
+  plan: OtherSumPlan;
+  mode: OtherSumMode | null;
+  onMode: (m: OtherSumMode) => void;
+  periodMismatch: boolean;
+  invoicePeriod: [string | null, string | null];
+  analysisPeriod: [string | null, string | null];
+  ack: boolean;
+  onAck: (v: boolean) => void;
+}) {
+  const per = (p: [string | null, string | null]) => `${p[0] || '?'} – ${p[1] || '?'}`;
+  return (
+    <div className="rounded-md border bg-muted/40 p-3 space-y-2 text-xs">
+      <p className="text-sm font-medium">Suma pozostałych opłat PRZED — kwota za okres</p>
+      <ul className="space-y-0.5">
+        {plan.items.map((i) => (
+          <li key={i.item_ref} className="flex justify-between gap-2">
+            <span>{i.name}{i.page != null ? ` (str. ${i.page})` : ''}</span>
+            <span>{formatCurrency(i.net_value)}</span>
+          </li>
+        ))}
+      </ul>
+      <p>Okres pozycji: {per(invoicePeriod)}</p>
+      <p className="font-medium">Łącznie netto: {formatCurrency(plan.total)}</p>
+      <p>Obecna wartość pola: {formatCurrency(plan.current)}
+        {plan.previousSameDoc > 0 && ` (w tym ${formatCurrency(plan.previousSameDoc)} z wcześniejszego importu tego dokumentu)`}</p>
+      {plan.needsMode && (
+        <div className="flex flex-wrap gap-3">
+          {(['replace', 'add'] as const).map((m) => (
+            <label key={m} className="flex items-center gap-1 cursor-pointer">
+              <input type="radio" name={`mode-${plan.items[0]?.item_ref}`} checked={mode === m} onChange={() => onMode(m)} />
+              {m === 'replace' ? 'Zastąp obecną wartość' : 'Dodaj do obecnej wartości'}
+            </label>
+          ))}
+        </div>
+      )}
+      <p className="font-medium">Po zastosowaniu: {plan.result != null ? formatCurrency(plan.result) : 'wybierz sposób zapisu'}</p>
+      {plan.needsMode && mode === 'add' && plan.previousSameDoc > 0 && (
+        <p className="text-muted-foreground">Wcześniejszy wkład tego dokumentu zostanie przeliczony, a nie dodany drugi raz.</p>
+      )}
+      {periodMismatch && (
+        <label className="flex items-start gap-2 text-warning cursor-pointer">
+          <Checkbox checked={ack} onCheckedChange={(v) => onAck(v === true)} aria-label="Potwierdź różnicę okresu" />
+          <span>Okres faktury ({per(invoicePeriod)}) różni się od okresu analizy ({per(analysisPeriod)}). Kwota nie zostanie przeskalowana — potwierdzam, że wpisuję koszt tylko za okres faktury.</span>
+        </label>
+      )}
+      <p className="text-muted-foreground flex items-start gap-1"><AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />{PO_ONLY_WARNING}</p>
     </div>
   );
 }
