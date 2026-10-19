@@ -164,7 +164,7 @@ function PpeSettlement({ analysis, s, onOpenReview, onApplied }: {
   const a = analysis as unknown as Record<string, unknown>;
   const rows = proposals.map((p) => {
     const cur = a[p.field];
-    const manual = sources[p.field]?.source === 'manual' && cur != null && !sameValue(cur, p.value);
+    const manual = sources[p.field]?.source === 'manual' && cur != null && !matchesStored(p.field, p.value, cur);
     return { ...p, current: cur, manual };
   });
 
