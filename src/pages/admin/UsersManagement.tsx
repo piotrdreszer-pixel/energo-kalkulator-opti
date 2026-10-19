@@ -39,6 +39,7 @@ import { toast } from 'sonner';
 import { Users, UserPlus, Trash2, BarChart3, Calendar, FileText, Loader2, Shield, Ban, CheckCircle2 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { pl } from 'date-fns/locale';
+import FeatureAccessDialog from '@/components/admin/FeatureAccessDialog';
 
 interface UserWithStats {
   id: string;
@@ -524,6 +525,7 @@ export default function UsersManagement() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <FeatureAccessDialog userId={user.user_id} name={user.name} />
                           <Button
                             variant="outline"
                             size="sm"
