@@ -17,6 +17,12 @@ import {
   type InvoicePpeRecord, type ImportableField, IMPORT_FIELD_LABELS,
 } from '@/lib/invoice-import';
 import { formatCurrency } from '@/lib/calculation-utils';
+import { getZonesCount } from '@/lib/tariff-utils';
+import {
+  mapLineItems, isCleanMapping, LINE_TARGET_LABELS, type LineMapping, type LineTarget, type LineItemInput,
+} from '@/lib/invoice-line-mapping';
+
+const fmtNum = (v: number, max = 6) => new Intl.NumberFormat('pl-PL', { maximumFractionDigits: max }).format(v);
 
 interface AnalysisDocument {
   id: string;
@@ -227,6 +233,22 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose }: {
   const [selectedFields, setSelectedFields] = useState<Record<string, Set<ImportableField>>>({});
   const [matchChoice, setMatchChoice] = useState<Record<string, string>>({});
   const [applying, setApplying] = useState(false);
+  const [lineOverrides, setLineOverrides] = useState<Record<string, Record<string, LineTarget | null>>>({});
+  const [lineSelected, setLineSelected] = useState<Record<string, Set<string>>>({});
+
+  const mappingsFor = (rec: InvoicePpeRecord, target: EnergyAnalysis | null): LineMapping[] => {
+    const recItems = items.filter((li: { ppe_record_id?: string }) => li.ppe_record_id === rec.id) as unknown as LineItemInput[];
+    return mapLineItems(recItems, rec, target, lineOverrides[rec.id] || {});
+  };
+  const selectedLinesFor = (recId: string, maps: LineMapping[]) =>
+    lineSelected[recId] ?? new Set(maps.filter(isCleanMapping).map((m) => m.item.id));
+  const toggleLine = (recId: string, itemId: string, maps: LineMapping[]) => {
+    setLineSelected((prev) => {
+      const cur = new Set(prev[recId] ?? selectedLinesFor(recId, maps));
+      if (cur.has(itemId)) cur.delete(itemId); else cur.add(itemId);
+      return { ...prev, [recId]: cur };
+    });
+  };
 
   const recordsQuery = useQuery({
     queryKey: ['document-ppe', doc.id],
@@ -270,7 +292,10 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose }: {
     const diffs = diffAgainstAnalysis(rec, target);
     const defaults = new Set(diffs.filter((d) => d.changed).map((d) => d.field));
     const fields = selectedFields[rec.id] ?? defaults;
-    if (!fields.size) {
+    const maps = mappingsFor(rec, target);
+    const selLines = selectedLinesFor(rec.id, maps);
+    const lines = maps.filter((m) => selLines.has(m.item.id) && m.status === 'mapped' && m.target && m.converted != null);
+    if (!fields.size && !lines.length) {
       toast({ variant: 'destructive', title: 'Brak wybranych pól', description: 'Zaznacz pola do zastosowania.' });
       return;
     }
@@ -278,13 +303,22 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose }: {
     setApplying(true);
     try {
       const update: Record<string, unknown> = {};
+      // 1) parametry PPE
       for (const d of diffs) if (fields.has(d.field)) update[d.field] = d.incoming;
+      if (typeof update.tariff_code_before === 'string') update.zones_count_before = getZonesCount(update.tariff_code_before) || 1;
+      // 2) zatwierdzone stawki i opłaty z faktury (w tym samym zapisie — brak wyścigu z pobieraniem stawek)
+      for (const m of lines) update[m.target!] = m.converted;
+      const docSources = (vs: Record<string, unknown>) => {
+        for (const f of fields) vs[f] = { source: 'document', document_id: doc.id, page: rec.source_pages?.[0] ?? null };
+        for (const m of lines) vs[m.target!] = { source: 'document', document_id: doc.id, page: m.item.page, item_ref: m.item.id };
+        return vs;
+      };
+      const appliedList = [...Array.from(fields), ...lines.map((m) => `line:${m.item.id}->${m.target}`)];
 
       let analysisId = choice;
       if (choice === '__new__') {
         const name = rec.ppe_number ? `PPE ${rec.ppe_number}` : `PPE ${ppes.length + 1}`;
-        const vs: Record<string, unknown> = {};
-        for (const f of fields) vs[f] = { source: 'document', document_id: doc.id };
+        const vs = docSources({});
         const { data, error } = await supabase
           .from('energy_analyses')
           .insert({ client_project_id: projectId, analysis_group_id: groupId, name, ...update, value_sources: vs } as never)
@@ -294,8 +328,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose }: {
       } else {
         // value_sources: oznacz pola jako odczytane z dokumentu
         const { data: cur } = await supabase.from('energy_analyses').select('value_sources').eq('id', choice).single();
-        const vs = { ...((cur?.value_sources as Record<string, unknown>) || {}) };
-        for (const f of fields) vs[f] = { source: 'document', document_id: doc.id };
+        const vs = docSources({ ...((cur?.value_sources as Record<string, unknown>) || {}) });
         const { error } = await supabase.from('energy_analyses').update({ ...update, value_sources: vs } as never).eq('id', choice);
         if (error) throw error;
       }
@@ -305,7 +338,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose }: {
         .update({
           matched_analysis_id: analysisId,
           match_status: choice === '__new__' ? 'new' : 'matched',
-          applied_fields: Array.from(fields),
+          applied_fields: appliedList,
           applied_at: new Date().toISOString(),
         } as never)
         .eq('id', rec.id)
@@ -317,7 +350,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose }: {
       if (!remaining.length) {
         await supabase.from('analysis_documents').update({ status: 'approved' } as never).eq('id', doc.id);
       }
-      toast({ title: 'Zastosowano dane', description: `${rec.ppe_number || 'PPE'}: ${fields.size} pól.` });
+      toast({ title: 'Zastosowano dane', description: `${rec.ppe_number || 'PPE'}: ${fields.size} pól PPE, ${lines.length} stawek/opłat.` });
     } catch (e) {
       toast({ variant: 'destructive', title: 'Błąd zapisu', description: e instanceof Error ? e.message : 'Spróbuj ponownie — nic nie zostało zdublowane.' });
     } finally {
@@ -360,7 +393,9 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose }: {
           const diffs = diffAgainstAnalysis(rec, target);
           const defaults = new Set(diffs.filter((d) => d.changed).map((d) => d.field));
           const fields = selectedFields[rec.id] ?? defaults;
-          const recItems = items.filter((li: { ppe_record_id?: string }) => li.ppe_record_id === rec.id);
+          const maps = mappingsFor(rec, target);
+          const selLines = selectedLinesFor(rec.id, maps);
+          const selCount = maps.filter((m) => selLines.has(m.item.id) && m.status === 'mapped' && m.converted != null).length;
 
           return (
             <div key={rec.id} className="rounded-md border p-4 space-y-3">
@@ -422,42 +457,126 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose }: {
                 </table>
               )}
 
-              {recItems.length > 0 && (
-                <details className="text-sm">
-                  <summary className="cursor-pointer text-muted-foreground">Pozycje kosztowe z faktury ({recItems.length}) — do porównania, nie są przenoszone automatycznie</summary>
-                  <table className="w-full mt-2 text-xs">
-                    <thead>
-                      <tr className="text-left text-muted-foreground">
-                        <th className="py-1 pr-2">Nazwa</th>
-                        <th className="py-1 pr-2">Ilość</th>
-                        <th className="py-1 pr-2">Stawka</th>
-                        <th className="py-1">Netto</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {recItems.map((li: { id: string; name: string; quantity: number | null; unit: string | null; rate: number | null; net_value: number | null }) => (
-                        <tr key={li.id}>
-                          <td className="py-1 pr-2">{li.name}</td>
-                          <td className="py-1 pr-2">{li.quantity ?? '—'} {li.unit || ''}</td>
-                          <td className="py-1 pr-2">{li.rate ?? '—'}</td>
-                          <td className="py-1">{li.net_value != null ? formatCurrency(li.net_value) : '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </details>
+              {maps.length > 0 && (
+                <LineItemsTable
+                  maps={maps}
+                  selected={selLines}
+                  applied={applied}
+                  target={target}
+                  onToggle={(id) => toggleLine(rec.id, id, maps)}
+                  onSelectClean={() => setLineSelected((p) => ({ ...p, [rec.id]: new Set(maps.filter(isCleanMapping).map((m) => m.item.id)) }))}
+                  onAssign={(id, t) => setLineOverrides((p) => ({ ...p, [rec.id]: { ...(p[rec.id] || {}), [id]: t } }))}
+                />
               )}
 
               {!applied && (
                 <Button size="sm" onClick={() => applyRecord(rec)} disabled={applying}>
                   {applying && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-                  Zatwierdź i zastosuj ({fields.size} pól)
+                  Zatwierdź i zastosuj ({fields.size} pól PPE, {selCount} stawek i opłat)
                 </Button>
               )}
             </div>
           );
         })
       )}
+    </div>
+  );
+}
+
+function LineItemsTable({ maps, selected, applied, target, onToggle, onSelectClean, onAssign }: {
+  maps: LineMapping[];
+  selected: Set<string>;
+  applied: boolean;
+  target: EnergyAnalysis | null;
+  onToggle: (itemId: string) => void;
+  onSelectClean: () => void;
+  onAssign: (itemId: string, t: LineTarget | null) => void;
+}) {
+  const current = (t: LineTarget | null) => {
+    if (!t || !target) return '—';
+    const v = (target as unknown as Record<string, unknown>)[t];
+    return v == null ? '—' : fmtNum(Number(v));
+  };
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-medium">Ceny i opłaty z faktury → pola PRZED</p>
+        {!applied && (
+          <Button size="sm" variant="outline" onClick={onSelectClean}>Zaznacz wszystkie poprawnie przypisane</Button>
+        )}
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-left text-muted-foreground">
+              <th className="py-1 pr-2">Zastosuj</th>
+              <th className="py-1 pr-2">Pozycja faktury</th>
+              <th className="py-1 pr-2">Pole kalkulatora</th>
+              <th className="py-1 pr-2">Obecnie</th>
+              <th className="py-1 pr-2">Odczytano</th>
+              <th className="py-1">Po przeliczeniu</th>
+            </tr>
+          </thead>
+          <tbody>
+            {maps.map((m) => {
+              const li = m.item;
+              const canApply = m.status === 'mapped' && m.converted != null;
+              return (
+                <React.Fragment key={li.id}>
+                  <tr className="border-t align-top">
+                    <td className="py-1 pr-2">
+                      <Checkbox
+                        checked={canApply && selected.has(li.id)}
+                        disabled={applied || !canApply}
+                        onCheckedChange={() => onToggle(li.id)}
+                        aria-label={`Zastosuj ${li.name}`}
+                      />
+                    </td>
+                    <td className="py-1 pr-2">
+                      {li.name}
+                      {li.page != null && <span className="text-muted-foreground"> (str. {li.page})</span>}
+                      <div className="text-muted-foreground">
+                        {li.quantity != null ? `${fmtNum(li.quantity)} ${li.unit || ''}` : '—'} · netto {li.net_value != null ? formatCurrency(li.net_value) : '—'}
+                      </div>
+                    </td>
+                    <td className="py-1 pr-2 min-w-[12rem]">
+                      {m.status === 'unsupported' ? (
+                        <Badge variant="secondary">Brak zgodnego pola</Badge>
+                      ) : m.allowedTargets.length > 0 && !applied ? (
+                        <Select value={m.target ?? '__none__'} onValueChange={(v) => onAssign(li.id, v === '__none__' ? null : (v as LineTarget))}>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">Wymaga przypisania</SelectItem>
+                            {m.allowedTargets.map((t) => <SelectItem key={t} value={t}>{LINE_TARGET_LABELS[t]}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      ) : m.target ? LINE_TARGET_LABELS[m.target] : 'Wymaga przypisania'}
+                    </td>
+                    <td className="py-1 pr-2">{current(m.target)}</td>
+                    <td className="py-1 pr-2">{li.rate != null ? `${fmtNum(li.rate)} zł/${li.unit || '?'}` : '—'}</td>
+                    <td className="py-1 font-medium">{m.converted != null ? `${fmtNum(m.converted)} ${m.convertedUnit}` : '—'}</td>
+                  </tr>
+                  {(m.reason || m.warnings.length > 0 || m.info.length > 0) && (
+                    <tr>
+                      <td />
+                      <td colSpan={5} className="pb-2 space-y-0.5">
+                        {m.reason && !canApply && <p className="text-muted-foreground">{m.reason}</p>}
+                        {m.warnings.map((w, i) => (
+                          <p key={i} className="flex items-start gap-1 text-warning"><AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />{w}</p>
+                        ))}
+                        {m.info.map((w, i) => <p key={i} className="text-muted-foreground">ℹ {w}</p>)}
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Przeniesienie stawek nie gwarantuje odtworzenia kwoty faktury — kalkulator liczy koszty dla całego okresu analizy według własnego sposobu naliczania. Wariant PO nie jest zmieniany.
+      </p>
     </div>
   );
 }
