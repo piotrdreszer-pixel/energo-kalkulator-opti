@@ -9,7 +9,7 @@
 
 import type { EnergyAnalysis } from '@/types/database';
 import { getZonesCount, isRatesInMWh } from './tariff-utils';
-import type { InvoicePpeRecord } from './invoice-import';
+import { zoneFromName, type InvoicePpeRecord } from './invoice-import';
 
 export interface LineItemInput {
   id: string;

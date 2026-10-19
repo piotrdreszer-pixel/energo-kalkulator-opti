@@ -130,3 +130,13 @@ describe('suma opłat przy ponownej edycji', () => {
   });
   it('odznaczenie wszystkiego zostawia tylko inne faktury', () => expect(run([]).result).toBe(30));
 });
+
+import { mapLineItems } from './invoice-line-mapping';
+describe('strefa opłaty wg nazwy', () => {
+  it('„zmienna dzienna/nocna” trafia do strefy 1/2 dla C22b', () => {
+    const it = (id: string, name: string) => ({ id, name, quantity: 1000, unit: 'kWh', rate: 0.3, net_value: 300, vat_rate: 23, gross_value: null, category: 'dystrybucja', page: 4 });
+    const maps = mapLineItems([it('a', 'Opłata sieciowa zmienna dzienna'), it('b', 'Opłata sieciowa zmienna nocna')],
+      { tariff_code: 'C22B', consumption: [{ zone_name: 'Dzień', value: 1, unit: 'kWh' }, { zone_name: 'Noc', value: 1, unit: 'kWh' }], period_from: null, period_to: null, contracted_power_kw: null }, null);
+    expect(maps.map((m) => m.target)).toEqual(['variable_distribution_before_zone1_rate', 'variable_distribution_before_zone2_rate']);
+  });
+});
