@@ -3,6 +3,7 @@
 
 import { normalizePpe } from './project-totals';
 import type { EnergyAnalysis } from '@/types/database';
+import { TARIFF_CODES, getZonesCount } from './tariff-utils';
 
 export interface InvoiceLineItem {
   id: string;
@@ -42,6 +43,7 @@ export interface InvoicePpeRecord {
   match_status: 'matched' | 'new' | 'ambiguous' | 'unmatched';
   applied_fields: string[];
   applied_at: string | null;
+  review_state?: unknown;
 }
 
 /** Pola PRZED, które import może zaproponować. Nigdy pola PO. */
@@ -135,7 +137,7 @@ export function zoneFromName(name: string, zones: number): number | 'total' | nu
   const n = plain(name);
   if (!n) return null;
   if (TOTAL_RE.test(n)) return 'total';
-  if (zones === 1) return /calodob|caly dzien|jednostref|strefa 1\b|\bs1\b|\bi\b/.test(n) || n.length > 0 ? 1 : null;
+  if (zones === 1) return 1;
   if (zones === 2) {
     if (/poza ?szczyt|pozaszczyt|nocn|\bnoc\b|weekend|strefa (ii|2)\b|\bs2\b|\bt2\b|niska/.test(n)) return 2;
     if (/szczyt|dzien|dzienn|strefa (i|1)\b|\bs1\b|\bt1\b|wysoka/.test(n)) return 1;
