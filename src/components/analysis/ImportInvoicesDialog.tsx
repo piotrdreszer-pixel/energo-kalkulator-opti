@@ -337,80 +337,107 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
     });
   };
 
-  const applyRecord = async (rec: InvoicePpeRecord) => {
-    if (!canApplyRecord(rec)) return;
+  // Stałe identyfikatory nowych PPE — ponowienie po błędzie nie tworzy duplikatu.
+  const [newIds] = useState<Record<string, string>>({});
+  const newIdFor = (recId: string) => (newIds[recId] ??= crypto.randomUUID());
+
+  const planFor = (rec: InvoicePpeRecord) => {
     const proposal = proposals[rec.id];
     const choice = matchChoice[rec.id] ?? (proposal.status === 'matched' ? proposal.analysisId! : proposal.status === 'new' ? '__new__' : '');
-    if (!choice) {
-      toast({ variant: 'destructive', title: 'Wymagane przypisanie', description: 'Wybierz punkt PPE lub utwórz nowy.' });
-      return;
-    }
-    const target = choice === '__new__' ? null : ppes.find((p) => p.id === choice) || null;
+    const target = choice && choice !== '__new__' ? ppes.find((p) => p.id === choice) || null : null;
     const diffs = diffAgainstAnalysis(rec, target);
     const defaults = new Set(diffs.filter((d) => d.changed).map((d) => d.field));
     const fields = selectedFields[rec.id] ?? defaults;
     const maps = mappingsFor(rec, target);
     const selLines = selectedLinesFor(rec.id, maps);
     const lines = maps.filter((m) => selLines.has(m.item.id) && m.status === 'mapped' && m.target && m.converted != null);
-    if (!fields.size && !lines.length) {
-      toast({ variant: 'destructive', title: 'Brak wybranych pól', description: 'Zaznacz pola do zastosowania.' });
-      return;
-    }
+    const osd = osdStateFor(rec, target);
+    const osdId = osd.apply && osd.choice && osd.choice !== '__keep__' ? osd.choice : null;
+    return { choice, target, diffs, fields, lines, osd, osdId };
+  };
 
-    setApplying(true);
-    try {
-      const update: Record<string, unknown> = {};
-      // 1) parametry PPE
-      for (const d of diffs) if (fields.has(d.field)) update[d.field] = d.incoming;
-      if (typeof update.tariff_code_before === 'string') update.zones_count_before = getZonesCount(update.tariff_code_before) || 1;
-      // 2) zatwierdzone stawki i opłaty z faktury (w tym samym zapisie — brak wyścigu z pobieraniem stawek)
-      for (const m of lines) update[m.target!] = m.converted;
-      const docSources = (vs: Record<string, unknown>) => {
-        for (const f of fields) vs[f] = { source: 'document', document_id: doc.id, page: rec.source_pages?.[0] ?? null };
-        for (const m of lines) vs[m.target!] = { source: 'document', document_id: doc.id, page: m.item.page, item_ref: m.item.id };
-        return vs;
-      };
-      const appliedList = [...Array.from(fields), ...lines.map((m) => `line:${m.item.id}->${m.target}`)];
+  /** Zapis jednego rekordu. Zwraca id PPE zwrócone przez zapis. Rzuca wyjątek przy błędzie. */
+  const applyRecord = async (rec: InvoicePpeRecord): Promise<string> => {
+    const { choice, diffs, fields, lines, osdId } = planFor(rec);
+    const update: Record<string, unknown> = {};
+    for (const d of diffs) if (fields.has(d.field)) update[d.field] = d.incoming;
+    if (typeof update.tariff_code_before === 'string') update.zones_count_before = getZonesCount(update.tariff_code_before) || 1;
+    if (osdId) update.osd_id = osdId;
+    for (const m of lines) update[m.target!] = m.converted;
+    const docSources = (vs: Record<string, unknown>) => {
+      for (const f of fields) vs[f] = { source: 'document', document_id: doc.id, page: rec.source_pages?.[0] ?? null };
+      if (osdId) vs.osd_id = { source: 'document', document_id: doc.id, page: rec.source_pages?.[0] ?? null };
+      for (const m of lines) vs[m.target!] = { source: 'document', document_id: doc.id, page: m.item.page, item_ref: m.item.id };
+      return vs;
+    };
+    const appliedList = [...Array.from(fields), ...(osdId ? ['osd_id'] : []), ...lines.map((m) => `line:${m.item.id}->${m.target}`)];
 
-      let analysisId = choice;
-      if (choice === '__new__') {
+    let analysisId = choice;
+    if (choice === '__new__') {
+      const newId = newIdFor(rec.id);
+      const { data: exists } = await supabase.from('energy_analyses').select('id').eq('id', newId).maybeSingle();
+      if (!exists) {
         const name = rec.ppe_number ? `PPE ${rec.ppe_number}` : `PPE ${ppes.length + 1}`;
-        const vs = docSources({});
         const { data, error } = await supabase
           .from('energy_analyses')
-          .insert({ client_project_id: projectId, analysis_group_id: groupId, name, ...update, value_sources: vs } as never)
+          .insert({ id: newId, client_project_id: projectId, analysis_group_id: groupId, name, ...update, value_sources: docSources({}) } as never)
           .select('id').single();
         if (error) throw error;
         analysisId = data.id;
       } else {
-        // value_sources: oznacz pola jako odczytane z dokumentu
-        const { data: cur } = await supabase.from('energy_analyses').select('value_sources').eq('id', choice).single();
-        const vs = docSources({ ...((cur?.value_sources as Record<string, unknown>) || {}) });
-        const { error } = await supabase.from('energy_analyses').update({ ...update, value_sources: vs } as never).eq('id', choice);
-        if (error) throw error;
+        analysisId = exists.id;
       }
+    } else {
+      const { data: cur, error: curErr } = await supabase.from('energy_analyses').select('value_sources').eq('id', choice).single();
+      if (curErr) throw curErr;
+      const vs = docSources({ ...((cur?.value_sources as Record<string, unknown>) || {}) });
+      const { error } = await supabase.from('energy_analyses').update({ ...update, value_sources: vs } as never).eq('id', choice);
+      if (error) throw error;
+    }
 
-      const { error: recError } = await supabase
-        .from('document_ppe_records')
-        .update({
-          matched_analysis_id: analysisId,
-          match_status: choice === '__new__' ? 'new' : 'matched',
-          applied_fields: appliedList,
-          applied_at: new Date().toISOString(),
-        } as never)
-        .eq('id', rec.id)
-        .is('applied_at', null); // idempotentność: nie nadpisuj zastosowanego rekordu
-      if (recError) throw recError;
+    const { error: recError } = await supabase
+      .from('document_ppe_records')
+      .update({
+        matched_analysis_id: analysisId,
+        match_status: choice === '__new__' ? 'new' : 'matched',
+        applied_fields: appliedList,
+        applied_at: new Date().toISOString(),
+      } as never)
+      .eq('id', rec.id)
+      .is('applied_at', null);
+    if (recError) throw recError;
+    return analysisId;
+  };
 
-      // Dokument zatwierdzony, gdy wszystkie rekordy zastosowane
-      const remaining = records.filter((r) => r.id !== rec.id && !r.applied_at);
-      if (!remaining.length) {
-        await supabase.from('analysis_documents').update({ status: 'approved' } as never).eq('id', doc.id);
+  const applyAll = async () => {
+    if (applying) return;
+    const pending = records.filter(canApplyRecord);
+    for (const rec of pending) {
+      const p = planFor(rec);
+      const label = rec.ppe_number || 'PPE bez numeru';
+      if (!p.choice) {
+        toast({ variant: 'destructive', title: 'Wymagane przypisanie', description: `${label}: wybierz punkt PPE lub utwórz nowy.` });
+        return;
       }
-      toast({ title: 'Zastosowano dane', description: `${rec.ppe_number || 'PPE'}: ${fields.size} pól PPE, ${lines.length} stawek/opłat.` });
+      if (!p.osd.choice) {
+        toast({ variant: 'destructive', title: 'Wybierz operatora (OSD)', description: `${label}: operator nie został jednoznacznie rozpoznany — wybierz go lub „Nie zmieniaj”.` });
+        return;
+      }
+      if (!p.fields.size && !p.lines.length && !p.osdId) {
+        toast({ variant: 'destructive', title: 'Brak wybranych pól', description: `${label}: zaznacz pola do zastosowania.` });
+        return;
+      }
+    }
+    setApplying(true);
+    try {
+      const ids: string[] = records.filter((r) => !canApplyRecord(r) && r.matched_analysis_id).map((r) => r.matched_analysis_id!);
+      for (const rec of pending) ids.push(await applyRecord(rec));
+      const { error } = await supabase.from('analysis_documents').update({ status: 'approved' } as never).eq('id', doc.id);
+      if (error) throw error;
+      onApplied(Array.from(new Set(ids)));
     } catch (e) {
-      toast({ variant: 'destructive', title: 'Błąd zapisu', description: e instanceof Error ? e.message : 'Spróbuj ponownie — nic nie zostało zdublowane.' });
-    } finally {
+      await recordsQuery.refetch(); // zapisane rekordy są oznaczone — ponowienie ich nie zdubluje
+      toast({ variant: 'destructive', title: 'Błąd zapisu', description: `${e instanceof Error ? e.message : 'Nieznany błąd'}. Twoje wybory zostały zachowane — spróbuj ponownie.` });
       setApplying(false);
     }
   };
