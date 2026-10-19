@@ -160,3 +160,34 @@ describe('Suma pozostałych opłat — pełny scenariusz 100 + 25,50 + 74,50', (
     expect(p.map((x) => x.name)).toEqual(['x', 'y']);
   });
 });
+
+import { planHandling, monthlyAmount, fullMonths } from './invoice-line-mapping';
+describe('abonament → opłata handlowa PRZED (zł/mies)', () => {
+  const li = (id: string, o: Record<string, unknown>) => ({ id, name: 'Opłata abonamentowa', quantity: null, unit: null, rate: null, net_value: null, vat_rate: null, gross_value: null, category: 'abonament', page: 1, ...o });
+  it('30 zł za 3 pełne miesiące = 10 zł/mies; stawka miesięczna przenoszona wprost', () => {
+    expect(fullMonths('2026-01-01', '2026-03-31')).toBe(3);
+    expect(monthlyAmount(li('a', { net_value: 30 }), { from: '2026-01-01', to: '2026-03-31' })).toBe(10);
+    expect(monthlyAmount(li('a', { quantity: 3, unit: 'm-c', net_value: 30 }))).toBe(10);
+    expect(monthlyAmount(li('a', { quantity: 1, unit: 'mc', rate: 7.4, net_value: 7.4 }))).toBe(7.4);
+  });
+  it('niejasny okres → brak kwoty miesięcznej', () => {
+    expect(monthlyAmount(li('a', { net_value: 30 }), { from: '2026-01-05', to: '2026-03-31' })).toBeNull();
+    expect(monthlyAmount(li('a', { net_value: 30 }))).toBeNull();
+  });
+  it('abonament + opłata handlowa sumowane; ta sama stawka za kolejne miesiące liczona raz; różne stawki = konflikt', () => {
+    const items = [
+      li('s1', { quantity: 1, unit: 'mc', rate: 7.4, net_value: 7.4 }),
+      li('s2', { quantity: 1, unit: 'mc', rate: 7.4, net_value: 7.4 }),
+      { ...li('h', { quantity: 1, unit: 'mc', rate: 49, net_value: 49 }), name: 'Opłata handlowa', category: 'handlowa' },
+    ];
+    const maps = mapLineItems(items, { tariff_code: 'C11', consumption: null, period_from: '2026-01-01', period_to: '2026-02-28', contracted_power_kw: null }, null);
+    expect(maps.map((m) => m.target)).toEqual(['handling_fee_before', 'handling_fee_before', 'handling_fee_before']);
+    const p = planHandling(maps, new Set(['s1', 's2', 'h']));
+    expect(p.total).toBe(56.4);
+    expect(planHandling(maps, new Set(['h'])).total).toBe(49);
+    const diff = mapLineItems([items[0], li('s3', { quantity: 1, unit: 'mc', rate: 8, net_value: 8 })], { tariff_code: 'C11', consumption: null, period_from: null, period_to: null, contracted_power_kw: null }, null);
+    const c = planHandling(diff, new Set(['s1', 's3']));
+    expect(c.total).toBeNull();
+    expect(c.conflicts).toHaveLength(1);
+  });
+});
