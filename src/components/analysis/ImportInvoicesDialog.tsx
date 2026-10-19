@@ -86,10 +86,13 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
   const [reviewDocId, setReviewDocId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (searchParams.get('import') === '1') {
+    const review = searchParams.get('review');
+    if (searchParams.get('import') === '1' || review) {
       setOpen(true);
+      if (review) setReviewDocId(review);
       const next = new URLSearchParams(searchParams);
       next.delete('import');
+      next.delete('review');
       setSearchParams(next, { replace: true });
     }
   }, [searchParams, setSearchParams]);

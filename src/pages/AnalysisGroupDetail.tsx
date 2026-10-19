@@ -26,6 +26,7 @@ import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import ProjectAggregatePanel from '@/components/project/ProjectAggregatePanel';
 import ImportInvoicesDialog from '@/components/analysis/ImportInvoicesDialog';
+import InvoiceSettlementDialog from '@/components/analysis/InvoiceSettlementDialog';
 
 export default function AnalysisGroupDetail() {
   const { projectId, groupId } = useParams<{ projectId: string; groupId: string }>();
@@ -206,6 +207,7 @@ export default function AnalysisGroupDetail() {
           </div>
           <div className="flex gap-2">
             <ImportInvoicesDialog projectId={projectId!} groupId={groupId!} ppes={ppes || []} onApplied={invalidate} />
+            <InvoiceSettlementDialog projectId={projectId!} groupId={groupId!} ppes={ppes || []} onApplied={invalidate} />
             <Button onClick={addPpe} disabled={addPpeMutation.isPending}>
               {addPpeMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
               Dodaj PPE
