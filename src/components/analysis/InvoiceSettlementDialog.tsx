@@ -14,6 +14,7 @@ import type { InvoicePpeRecord } from '@/lib/invoice-import';
 import { buildSettlement, settlementProposals, matchesStored, type Component, type SettlementDoc, type SettlementItem } from '@/lib/invoice-settlement';
 import type { ValueSources } from '@/lib/value-sources';
 import { formatCurrency } from '@/lib/calculation-utils';
+import { requireFeature, useGroupFeatureAccess } from '@/hooks/useFeatureAccess';
 
 const fmt = (v: number | null | undefined, d = 3) =>
   v == null ? 'brak danych' : v.toLocaleString('pl-PL', { minimumFractionDigits: 0, maximumFractionDigits: d });
@@ -49,7 +50,7 @@ export default function InvoiceSettlementDialog({ projectId, groupId, ppes, onAp
 
   const all = useMemo(() => {
     if (!data.data) return [];
-    return ppes.map((a) => ({ a, s: buildSettlement({ ppeNumber: a.ppe_number || '', analysisId: a.id, ...data.data! }) }));
+    return ppes.map((a) => ({ a, s: buildSettlement({ ppeNumber: a.ppe_number || '', analysisId: a.id, ...data.data }) }));
   }, [data.data, ppes]);
   const current = all.find((x) => x.a.id === ppeId);
   const openReview = (docId: string) => { setOpen(false); navigate(`/projects/${projectId}/analyses/${groupId}?review=${docId}`); };
@@ -154,6 +155,7 @@ function PpeSettlement({ analysis, s, onOpenReview, onApplied }: {
   analysis: EnergyAnalysis; s: ReturnType<typeof buildSettlement>; onOpenReview: (id: string) => void; onApplied: () => void;
 }) {
   const { toast } = useToast();
+  const access = useGroupFeatureAccess(analysis.analysis_group_id);
   const [busy, setBusy] = useState(false);
   const [confirmPeriod, setConfirmPeriod] = useState(false);
   const [showApply, setShowApply] = useState(false);
@@ -172,16 +174,18 @@ function PpeSettlement({ analysis, s, onOpenReview, onApplied }: {
   }
 
   const applyPeriod = async () => {
-    if (!s.proposedPeriod) return;
+    if (!s.proposedPeriod || !access.canImport) return;
     setBusy(true);
-    const { error } = await supabase.from('energy_analyses')
-      .update({ period_from: s.proposedPeriod.from, period_to: s.proposedPeriod.to } as never).eq('id', analysis.id);
+    const { error } = await supabase.rpc('apply_invoice_period', { _analysis_id: analysis.id, _from: s.proposedPeriod.from, _to: s.proposedPeriod.to });
     setBusy(false); setConfirmPeriod(false);
     if (error) toast({ variant: 'destructive', title: 'Błąd', description: 'Nie udało się zapisać okresu.' });
     else { toast({ title: 'Zastosowano okres z faktur' }); onApplied(); }
   };
 
   const applyBefore = async () => {
+    if (!access.canImport) return;
+    try { await requireFeature('invoice_import', analysis.analysis_group_id); }
+    catch { toast({ variant: 'destructive', title: 'Brak dostępu do zastosowania faktur' }); return; }
     const write: Record<string, unknown> = {};
     const nextSources: ValueSources = { ...sources };
     for (const r of rows) {
@@ -258,8 +262,8 @@ function PpeSettlement({ analysis, s, onOpenReview, onApplied }: {
           <div className="flex flex-wrap items-center gap-3">
             <span>Proponowany z dat rozliczenia: <b>{per(s.proposedPeriod.from, s.proposedPeriod.to)}</b></span>
             <span className="text-muted-foreground">Analiza: {per(analysis.period_from, analysis.period_to)}</span>
-            {periodDiffers && !confirmPeriod && <Button size="sm" variant="outline" onClick={() => setConfirmPeriod(true)}>Zastosuj okres z faktur</Button>}
-            {confirmPeriod && (
+            {access.canImport && periodDiffers && !confirmPeriod && <Button size="sm" variant="outline" onClick={() => setConfirmPeriod(true)}>Zastosuj okres z faktur</Button>}
+            {access.canImport && confirmPeriod && (
               <span className="flex items-center gap-2">
                 Zmienić okres analizy? <Button size="sm" onClick={applyPeriod} disabled={busy}>Tak, zmień</Button>
                 <Button size="sm" variant="ghost" onClick={() => setConfirmPeriod(false)}>Anuluj</Button>
@@ -308,7 +312,7 @@ function PpeSettlement({ analysis, s, onOpenReview, onApplied }: {
         {s.handling && <p className="mt-1 text-muted-foreground">Abonament / opłata handlowa: koszt za okres {formatCurrency(s.handling.totalNet)}. {s.handling.note}</p>}
       </section>
 
-      <section className="rounded-md border p-3">
+      {access.canImport && <section className="rounded-md border p-3">
         {!showApply ? (
           <Button onClick={() => setShowApply(true)} disabled={!rows.length}>Zastosuj zestawienie do PRZED</Button>
         ) : (
@@ -345,7 +349,7 @@ function PpeSettlement({ analysis, s, onOpenReview, onApplied }: {
             </div>
           </div>
         )}
-      </section>
+      </section>}
     </div>
   );
 }
