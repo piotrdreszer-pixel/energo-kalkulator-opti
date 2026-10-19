@@ -78,12 +78,12 @@ describe('mapConsumptionZones', () => {
   });
   it('rekord → pola PRZED: taryfa ze słownika i strefy dla dwóch PPE niezależnie', () => {
     const base = { id: 'r', document_id: 'd', ppe_address: null, osd_name: null, period_from: null, period_to: null, contracted_power_kw: null, max_power_kw: null, reactive: null, other_charges: null, source_pages: null, matched_analysis_id: null, match_status: 'new', applied_fields: [], applied_at: null } as const;
-    const a = recordToBeforeFields({ ...base, ppe_number: 'A', tariff_code: 'c12a', consumption: [{ zone_name: 'poza szczytem', value: 3000, unit: 'kWh' }, { zone_name: 'szczyt', value: 1000, unit: 'kWh' }] } as InvoicePpeRecord);
-    const b = recordToBeforeFields({ ...base, ppe_number: 'B', tariff_code: 'B23', consumption: [{ zone_name: 'S3', value: 9, unit: 'MWh' }, { zone_name: 'S1', value: 1, unit: 'MWh' }, { zone_name: 'S2', value: 2, unit: 'MWh' }] } as InvoicePpeRecord);
+    const a = recordToBeforeFields({ ...base, ppe_number: 'A', tariff_code: 'c12a', consumption: [{ zone_name: 'poza szczytem', value: 3000, unit: 'kWh' }, { zone_name: 'szczyt', value: 1000, unit: 'kWh' }] } as unknown as InvoicePpeRecord);
+    const b = recordToBeforeFields({ ...base, ppe_number: 'B', tariff_code: 'B23', consumption: [{ zone_name: 'S3', value: 9, unit: 'MWh' }, { zone_name: 'S1', value: 1, unit: 'MWh' }, { zone_name: 'S2', value: 2, unit: 'MWh' }] } as unknown as InvoicePpeRecord);
     expect(a).toMatchObject({ tariff_code_before: 'C12a', consumption_before_zone1_mwh: 1, consumption_before_zone2_mwh: 3 });
     expect(a.consumption_before_zone3_mwh).toBeUndefined();
     expect(b).toMatchObject({ tariff_code_before: 'B23', consumption_before_zone1_mwh: 1, consumption_before_zone2_mwh: 2, consumption_before_zone3_mwh: 9 });
-    const u = recordToBeforeFields({ ...base, ppe_number: 'C', tariff_code: 'XYZ', consumption: [{ zone_name: 'szczyt', value: 1000, unit: 'kWh' }] } as InvoicePpeRecord);
+    const u = recordToBeforeFields({ ...base, ppe_number: 'C', tariff_code: 'XYZ', consumption: [{ zone_name: 'szczyt', value: 1000, unit: 'kWh' }] } as unknown as InvoicePpeRecord);
     expect(u.tariff_code_before).toBeUndefined();
     expect(u.consumption_before_zone1_mwh).toBeUndefined();
   });
