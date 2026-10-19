@@ -131,6 +131,11 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
       return (data || []) as unknown as AnalysisDocument[];
     },
     enabled: open,
+    // Odczyt AI działa w tle — odświeżaj, dopóki jakiś dokument jest w trakcie.
+    refetchInterval: (query) => {
+      const data = query.state.data as AnalysisDocument[] | undefined;
+      return data?.some((d) => d.status === 'processing' || d.status === 'pending') ? 4000 : false;
+    },
   });
 
   const invalidateDocs = () => queryClient.invalidateQueries({ queryKey: ['analysis-documents', groupId] });
