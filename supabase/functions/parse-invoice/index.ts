@@ -56,7 +56,7 @@ Wyekstrahuj, jeśli występują:
   - ppe_number: numer PPE jako tekst (dokładnie jak w dokumencie)
   - ppe_address: adres punktu
   - tariff_code: grupa taryfowa (np. C11, C21, B23)
-  - osd_name: operator sieci dystrybucyjnej
+  - osd_name: operator systemu dystrybucyjnego (OSD) dla tego PPE — TYLKO gdy dokument wprost go wskazuje (np. "Operator: ...", "OSD: ...", "Dystrybutor"). NIE wpisuj tu sprzedawcy/wystawcy, nazwy z logo ani nie zgaduj z adresu punktu; w razie wątpliwości null
   - period_from, period_to: okres rozliczenia (YYYY-MM-DD)
   - contracted_power_kw: moc umowna w kW
   - max_power_kw: moc maksymalna w kW

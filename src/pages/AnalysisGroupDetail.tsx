@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -33,6 +33,8 @@ export default function AnalysisGroupDetail() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const creatingRef = useRef(false);
+  const [searchParams] = useSearchParams();
+  const highlighted = new Set((searchParams.get('highlight') || '').split(',').filter(Boolean));
 
   const { data: project, isLoading: l1 } = useQuery({
     queryKey: ['project', projectId],
@@ -236,7 +238,10 @@ export default function AnalysisGroupDetail() {
             {ppes?.map((a) => {
               const r = calculateEnergyCosts(a);
               return (
-                <Card key={a.id} className="card-interactive">
+                <Card key={a.id} className={`card-interactive ${highlighted.has(a.id) ? 'ring-2 ring-primary' : ''}`}>
+                  {highlighted.has(a.id) && (
+                    <div className="px-4 pt-3 sm:px-6"><span className="text-xs font-medium text-primary">Zaimportowano z faktury</span></div>
+                  )}
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                       <div className="flex-1 min-w-0">
