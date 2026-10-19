@@ -1,9 +1,9 @@
 # Roadmap
 
 ## Dostęp do funkcji
-- [ ] Trwałe uprawnienia, historia zmian i zabezpieczenia operacji.
-- [ ] Przełączniki administratora oraz ograniczenia importu i wielu PPE.
-- [ ] Testy reguł i sprawdzenie działania w aplikacji.
+- [x] Trwałe uprawnienia, historia zmian i zabezpieczenia operacji.
+- [x] Przełączniki administratora oraz ograniczenia importu i wielu PPE.
+- [x] Testy reguł i sprawdzenie działania w aplikacji.
 
 ## Zakończone
 - [x] Zbiorcze rozliczanie wielu faktur na PPE („Rozliczenia z faktur”).
