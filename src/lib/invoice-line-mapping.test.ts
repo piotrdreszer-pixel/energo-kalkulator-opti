@@ -71,11 +71,11 @@ describe('mapowanie pozycji faktury C11', () => {
   it('opłata handlowa → zł/mies', () => {
     expect(byName(maps, 'Opłata handlowa').converted).toBe(49);
   });
-  it('opłata mocowa wymaga przypisania, abonament ma sugestię sumy', () => {
+  it('opłata mocowa wymaga przypisania, abonament → opłata handlowa', () => {
     expect(byName(maps, 'Opłata mocowa').status).toBe('needs_assignment');
-    expect(byName(maps, 'Opłata abonamentowa').target).toBe('fixed_distribution_before_total');
+    expect(byName(maps, 'Opłata abonamentowa').target).toBe('handling_fee_before');
   });
-  it('„Zaznacz wszystkie poprawnie przypisane” obejmuje 4 pozycje', () => {
+  it('„Zaznacz wszystkie poprawnie przypisane” obejmuje 5 pozycji', () => {
     expect(maps.filter(isCleanMapping).map((m) => m.item.name).sort()).toEqual(
       ['Energia czynna', 'Opłata handlowa', 'Opłata sieciowa stała', 'Opłata sieciowa zmienna']
     );
