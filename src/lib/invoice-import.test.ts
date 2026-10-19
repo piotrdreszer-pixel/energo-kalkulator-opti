@@ -62,7 +62,7 @@ describe('recordToBeforeFields', () => {
     expect(Object.keys(f).every((k) => !k.includes('_after'))).toBe(true);
   });
   it('przelicza kWh na MWh', () => {
-    const f = recordToBeforeFields(rec());
+    const f = recordToBeforeFields(rec({ tariff_code: 'G12' }));
     expect(f.consumption_before_zone1_mwh).toBe(12);
     expect(f.consumption_before_zone2_mwh).toBe(3);
   });
