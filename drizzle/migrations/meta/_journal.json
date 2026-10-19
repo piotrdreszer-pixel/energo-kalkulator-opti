@@ -57,6 +57,13 @@
       "when": 1792424964509,
       "tag": "0007_invoice_review_state",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792429561665,
+      "tag": "0008_individual_feature_permissions",
+      "breakpoints": true
     }
   ]
 }
