@@ -24,7 +24,7 @@ import { formatCurrency } from '@/lib/calculation-utils';
 import { getZonesCount, getZoneLabels, TARIFF_CODES } from '@/lib/tariff-utils';
 import { planReapply, type ReviewState } from '@/lib/invoice-reedit';
 import {
-  mapLineItems, isCleanMapping, LINE_TARGET_LABELS, planOtherCharges, OTHER_SUM_TARGET, CAPACITY_TARGET, capacityGroup, capacityBlockReason, PO_ONLY_WARNING, type OtherContribution, type OtherSumMode, type OtherSumPlan, type LineMapping, type LineTarget, type LineItemInput,
+  mapLineItems, isCleanMapping, LINE_TARGET_LABELS, planOtherCharges, OTHER_SUM_TARGET, CAPACITY_TARGET, capacityGroup, capacityBlockReason, selectionProblems, PO_ONLY_WARNING, type OtherContribution, type OtherSumMode, type OtherSumPlan, type LineMapping, type LineTarget, type LineItemInput,
 } from '@/lib/invoice-line-mapping';
 
 const fmtNum = (v: number, max = 6) => new Intl.NumberFormat('pl-PL', { maximumFractionDigits: max }).format(v);
@@ -273,20 +273,6 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
       </DialogContent>
     </Dialog>
   );
-}
-
-/** Zaznaczone pozycje, których nie da się zastosować — z konkretną przyczyną (nic nie pomijamy po cichu). */
-export function selectionProblems(maps: LineMapping[], selected: Set<string>): { name: string; reason: string }[] {
-  return maps
-    .filter((m) => selected.has(m.item.id))
-    .filter((m) => !(m.status === 'mapped' && m.target && m.converted != null && (!SUM_FIELDS.includes(m.target) || m.item.net_value != null)))
-    .map((m) => ({
-      name: m.item.name,
-      reason: m.status === 'unsupported' ? (m.reason || 'pozycja nie dotyczy kalkulatora')
-        : !m.target ? 'nie wybrano pola kalkulatora'
-        : m.item.net_value == null && SUM_FIELDS.includes(m.target) ? 'brak kwoty netto'
-        : m.reason || m.warnings[0] || 'brak przeliczenia',
-    }));
 }
 
 const NOT_NULL_FIELDS = new Set(['tariff_code_before', 'zones_count_before']);
