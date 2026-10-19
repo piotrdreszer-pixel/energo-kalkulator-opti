@@ -654,6 +654,36 @@ export type Database = {
           },
         ]
       }
+      feature_access_history: {
+        Row: {
+          actor_user_id: string
+          changed_at: string
+          feature: string
+          id: string
+          new_value: boolean
+          old_value: boolean
+          target_user_id: string
+        }
+        Insert: {
+          actor_user_id: string
+          changed_at?: string
+          feature: string
+          id?: string
+          new_value: boolean
+          old_value: boolean
+          target_user_id: string
+        }
+        Update: {
+          actor_user_id?: string
+          changed_at?: string
+          feature?: string
+          id?: string
+          new_value?: boolean
+          old_value?: boolean
+          target_user_id?: string
+        }
+        Relationships: []
+      }
       manager_assignments: {
         Row: {
           assigned_by_user_id: string | null
@@ -864,6 +894,27 @@ export type Database = {
           },
         ]
       }
+      user_feature_access: {
+        Row: {
+          invoice_import: boolean
+          multi_ppe: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          invoice_import?: boolean
+          multi_ppe?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          invoice_import?: boolean
+          multi_ppe?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -887,11 +938,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_invoice_period: {
+        Args: { _analysis_id: string; _from: string; _to: string }
+        Returns: undefined
+      }
       can_access_analysis_group: {
         Args: { _group_id: string }
         Returns: boolean
       }
+      can_edit_feature_group: { Args: { _group_id: string }; Returns: boolean }
       get_nip_owner: { Args: { _nip: string }; Returns: string }
+      has_feature_access: { Args: { _feature: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

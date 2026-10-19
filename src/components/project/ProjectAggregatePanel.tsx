@@ -17,7 +17,7 @@ export const excludedLabels = (a: Partial<EnergyAnalysis>) =>
 
 export const NO_PPE_CONFIRM_KEY = (scopeId: string) => `ppe-confirm-${scopeId}`;
 
-export default function ProjectAggregatePanel({ scopeId, reportPath, analyses }: { scopeId: string; reportPath: string; analyses: EnergyAnalysis[] }) {
+export default function ProjectAggregatePanel({ scopeId, reportPath, analyses, readOnly = false }: { scopeId: string; reportPath: string; analyses: EnergyAnalysis[]; readOnly?: boolean }) {
   const navigate = useNavigate();
   const t = calculateProjectTotals(analyses);
   const [confirmed, setConfirmed] = useState(() => sessionStorage.getItem(NO_PPE_CONFIRM_KEY(scopeId)) === '1');
@@ -106,7 +106,7 @@ export default function ProjectAggregatePanel({ scopeId, reportPath, analyses }:
           </div>
         )}
 
-        <Button disabled={blocked} onClick={() => navigate(reportPath)}>
+        <Button disabled={blocked || readOnly} onClick={() => navigate(reportPath)}>
           Generuj raport analizy
         </Button>
       </CardContent>

@@ -6,6 +6,7 @@ export function useAdminRole() {
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [checkedUserId, setCheckedUserId] = useState<string | null>(null);
 
   useEffect(() => {
     const checkAdminRole = async () => {
@@ -16,6 +17,7 @@ export function useAdminRole() {
       }
 
       try {
+        setLoading(true);
         const [{ data, error }, { data: ownerData }] = await Promise.all([
           supabase
             .from('user_roles')
@@ -37,6 +39,7 @@ export function useAdminRole() {
         console.error('Error checking admin role:', error);
         setIsAdmin(false);
       } finally {
+        setCheckedUserId(user.id);
         setLoading(false);
       }
     };
@@ -44,5 +47,5 @@ export function useAdminRole() {
     checkAdminRole();
   }, [user]);
 
-  return { isAdmin, loading };
+  return { isAdmin: !!user && checkedUserId === user.id && isAdmin, loading: loading || (!!user && checkedUserId !== user.id) };
 }

@@ -9,6 +9,8 @@ import { calculateEnergyCosts } from '@/lib/calculation-utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { exportElementToPdf } from '@/lib/pdf-export';
 import AnalysisPdfDocument from '@/components/pdf/AnalysisPdfDocument';
+import { useGroupFeatureAccess } from '@/hooks/useFeatureAccess';
+import { MULTI_PPE_LOCK_MESSAGE } from '@/lib/feature-access';
 
 export default function AnalysisReport() {
   const { projectId, analysisId } = useParams<{ projectId: string; analysisId: string }>();
@@ -45,6 +47,7 @@ export default function AnalysisReport() {
     enabled: !!analysisId,
   });
 
+  const access = useGroupFeatureAccess(analysis?.analysis_group_id);
   const pdfTitle = useMemo(() => {
     const nip = project?.client_nip?.trim() || 'brak-NIP';
     const rawName = (profile?.name || user?.email || 'Nieznany')
@@ -80,7 +83,7 @@ export default function AnalysisReport() {
   }, [project, pdfTitle]);
 
 
-  if (isLoading) {
+  if (isLoading || access.loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -107,7 +110,11 @@ export default function AnalysisReport() {
   const preparerEmail = profile?.name && user?.email ? user.email : undefined;
 
   const handleDownloadPdf = async () => {
-    if (!reportContentRef.current) return;
+    if (!reportContentRef.current || access.readOnly) return;
+    if (analysis.analysis_group_id) {
+      const { data, error } = await supabase.rpc('can_edit_feature_group', { _group_id: analysis.analysis_group_id });
+      if (error || data !== true) return;
+    }
     setIsGeneratingPdf(true);
     try {
       await exportElementToPdf(reportContentRef.current, {
@@ -135,7 +142,7 @@ export default function AnalysisReport() {
               Wróć do edycji
             </Link>
           </Button>
-          <Button onClick={handleDownloadPdf} disabled={isGeneratingPdf}>
+          <Button onClick={handleDownloadPdf} disabled={isGeneratingPdf || access.readOnly}>
             {isGeneratingPdf ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             ) : (
@@ -146,6 +153,7 @@ export default function AnalysisReport() {
         </div>
       </div>
 
+      {access.readOnly && <p role="status" className="py-4 text-center text-muted-foreground">{MULTI_PPE_LOCK_MESSAGE}</p>}
       {/* PDF Content */}
       <div className="flex justify-center py-8 no-print-margin">
         <div ref={reportContentRef} data-pdf-root="true">

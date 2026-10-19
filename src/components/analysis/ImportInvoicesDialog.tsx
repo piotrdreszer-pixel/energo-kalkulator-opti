@@ -5,6 +5,7 @@ import { ToastAction } from '@/components/ui/toast';
 import { useOsdOperators } from '@/hooks/useOsdOperators';
 import { matchOsd } from '@/lib/osd-match';
 import { supabase } from '@/integrations/supabase/client';
+import { requireFeature, useFeatureAccess } from '@/hooks/useFeatureAccess';
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
@@ -77,6 +78,7 @@ interface Props {
 }
 
 export default function ImportInvoicesDialog({ projectId, groupId, ppes, onApplied }: Props) {
+  const access = useFeatureAccess(ppes.length);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -149,8 +151,10 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
     if (!files?.length) return;
     setUploading(true);
     try {
+      await requireFeature('invoice_import', groupId);
       const existing = docsQuery.data || [];
       for (const file of Array.from(files)) {
+        await requireFeature('invoice_import', groupId);
         const ext = file.name.toLowerCase();
         if (!ext.endsWith('.pdf') && !ext.endsWith('.jpg') && !ext.endsWith('.jpeg') && !ext.endsWith('.png')) {
           toast({ variant: 'destructive', title: 'Nieobsługiwany format', description: `${file.name}: dozwolone PDF, JPG, PNG` });
@@ -191,6 +195,7 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
 
   const retryMutation = useMutation({
     mutationFn: async (documentId: string) => {
+      await requireFeature('invoice_import', groupId);
       const { error } = await supabase.functions.invoke('parse-invoice', { body: { documentId } });
       if (error) throw error;
     },
@@ -205,7 +210,7 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
       <DialogTrigger asChild>
         <Button variant="outline">
           <FileUp className="mr-2 h-4 w-4" />
-          Importuj faktury
+          {access.canImport ? 'Importuj faktury' : 'Podgląd faktur'}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
@@ -222,7 +227,7 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
             type="file"
             accept=".pdf,.jpg,.jpeg,.png"
             multiple
-            disabled={uploading}
+            disabled={uploading || !access.canImport}
             onChange={(e) => { handleUpload(e.target.files); e.target.value = ''; }}
             aria-label="Wybierz pliki faktur"
           />
@@ -245,12 +250,12 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
                   {STATUS_LABELS[d.status]}
                 </Badge>
                 {d.status === 'needs_review' && (
-                  <Button size="sm" onClick={() => setReviewDocId(d.id)}>Sprawdź i zatwierdź</Button>
+                  <Button size="sm" onClick={() => setReviewDocId(d.id)}>{access.canImport ? 'Sprawdź i zatwierdź' : 'Podgląd'}</Button>
                 )}
                 {d.status === 'approved' && (
-                  <Button size="sm" variant="outline" onClick={() => setReviewDocId(d.id)}>Przejrzyj i zmień</Button>
+                  <Button size="sm" variant="outline" onClick={() => setReviewDocId(d.id)}>{access.canImport ? 'Przejrzyj i zmień' : 'Podgląd'}</Button>
                 )}
-                {d.status === 'error' && (
+                {d.status === 'error' && access.canImport && (
                   <Button size="sm" variant="outline" onClick={() => retryMutation.mutate(d.id)} disabled={retryMutation.isPending}>
                     <RefreshCw className="h-4 w-4 mr-1" /> Ponów
                   </Button>
@@ -294,6 +299,8 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
   onApplied: (analysisIds: string[]) => void;
 }) {
   const { toast } = useToast();
+  const access = useFeatureAccess(ppes.length);
+  const [singleRecord, setSingleRecord] = useState('');
   const editing = doc.status === 'approved';
   const { data: osdOperators = [] } = useOsdOperators();
   const [selectedFields, setSelectedFields] = useState<Record<string, Set<ImportableField>>>({});
@@ -473,6 +480,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
 
   /** Zapis jednego rekordu. Zwraca id PPE. Rzuca wyjątek przy błędzie. */
   const applyRecord = async (rec: InvoicePpeRecord): Promise<string> => {
+    await requireFeature('invoice_import', groupId);
     const p = planFor(rec);
     const { choice, fields, lines, osdId, other, capacity, reapply } = p;
     const update = reapply.write;
@@ -553,8 +561,14 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
   };
 
   const applyAll = async () => {
-    if (applying) return;
-    const pending = editing ? records.filter((r) => r.applied_at) : records.filter(canApplyRecord);
+    if (applying || !access.canImport) return;
+    const candidates = editing ? records.filter((r) => r.applied_at) : records.filter(canApplyRecord);
+    const pending = access.multiPpe ? candidates : candidates.filter(r => r.id === (singleRecord || candidates[0]?.id));
+    if (!pending.length) return;
+    if (!access.multiPpe && pending.some(r => choiceFor(r) === '__new__' && ppes.length > 0)) {
+      toast({ variant: 'destructive', title: 'Jeden PPE na analizę', description: 'Wybierz istniejący punkt lub utwórz osobną analizę dla kolejnego PPE.' });
+      return;
+    }
     for (const rec of pending) {
       const p = planFor(rec);
       const label = rec.ppe_number || 'PPE bez numeru';
@@ -650,6 +664,8 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
         <p className="text-sm text-muted-foreground">Korekta faktury: {doc.corrected_document_number}</p>
       )}
 
+      {!access.canImport && <p className="text-muted-foreground text-sm">Podgląd dokumentu — zastosowanie danych wymaga dostępu do funkcji Import faktur oraz prawa edycji analizy.</p>}
+      {!access.multiPpe && records.length > 1 && access.canImport && <div className="space-y-2"><p className="text-sm">Bez dostępu do funkcji Analizy wielu PPE możesz zastosować jeden punkt z dokumentu. Pozostałe punkty pozostaną w podglądzie.</p><Select value={singleRecord || (editing ? records.find(r => r.applied_at)?.id : records.find(canApplyRecord)?.id)} onValueChange={setSingleRecord}><SelectTrigger><SelectValue placeholder="Wybierz jeden PPE z faktury" /></SelectTrigger><SelectContent>{records.filter(r => editing ? r.applied_at : canApplyRecord(r)).map(r => <SelectItem key={r.id} value={r.id}>{r.ppe_number || r.ppe_address || 'PPE bez numeru'}</SelectItem>)}</SelectContent></Select></div>}
       {recordsQuery.isLoading || !hydrated ? (
         <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
       ) : records.length === 0 ? (
@@ -658,7 +674,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
         records.map((rec) => {
           const proposal = proposals[rec.id];
           const applied = !canApplyRecord(rec);
-          const locked = applied && !editing;
+          const locked = !access.canImport || (applied && !editing) || (!access.multiPpe && records.length > 1 && rec.id !== (singleRecord || (editing ? records.find(r => r.applied_at)?.id : records.find(canApplyRecord)?.id)));
           const plan = planFor(rec);
           const { choice, target, diffs, defaults, fields, maps, selLines, consumption, tariff } = plan;
           const selCount = maps.filter((m) => selLines.has(m.item.id) && m.status === 'mapped' && m.converted != null).length;
@@ -677,13 +693,13 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
                 ) : null}
               </div>
 
-              {!applied && (
+              {!applied && !locked && (
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm text-muted-foreground">Przypisz do:</span>
                   <Select value={choice} onValueChange={(v) => setMatchChoice((p) => ({ ...p, [rec.id]: v }))}>
                     <SelectTrigger className="w-64"><SelectValue placeholder="Wybierz punkt PPE" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__new__">Utwórz nowy PPE</SelectItem>
+                      {(access.multiPpe || ppes.length === 0) && <SelectItem value="__new__">Utwórz nowy PPE</SelectItem>}
                       {ppes.map((p) => (
                         <SelectItem key={p.id} value={p.id}>{p.name}{p.ppe_number ? ` (${p.ppe_number})` : ''}</SelectItem>
                       ))}
@@ -726,7 +742,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
                 </div>
               )}
 
-              {!locked && diffs.length > 0 && (
+              {diffs.length > 0 && (
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-muted-foreground">
@@ -741,6 +757,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
                       <tr key={d.field} className={d.changed ? '' : 'opacity-60'}>
                         <td className="py-1 pr-2">
                           <Checkbox
+                            disabled={locked}
                             checked={fields.has(d.field)}
                             onCheckedChange={() => toggleField(rec.id, d.field, defaults)}
                             aria-label={`Zastosuj ${d.label}`}
@@ -755,7 +772,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
                 </table>
               )}
 
-              {!locked && consumption.rows.length > 0 && (
+              {consumption.rows.length > 0 && (
                 <div className="rounded-md border bg-muted/40 p-3 space-y-1 text-xs">
                   <p className="text-sm font-medium">Zużycie energii czynnej z faktury → strefy PRZED</p>
                   <table className="w-full">
@@ -924,7 +941,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
           );
         })
       )}
-      {(editing ? records.some((r) => r.applied_at) : records.some(canApplyRecord)) && (
+      {access.canImport && (editing ? records.some((r) => r.applied_at) : records.some(canApplyRecord)) && (
         <div className="flex gap-2">
           <Button onClick={applyAll} disabled={applying || !hydrated}>
             {applying && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}

@@ -42,6 +42,8 @@ import { useOsdOperators } from '@/hooks/useOsdOperators';
 import { useRatesResolver } from '@/hooks/useRatesResolver';
 import { useVisibleTariffsForOsd } from '@/hooks/useVisibleTariffsForOsd';
 import { cn } from '@/lib/utils';
+import { useGroupFeatureAccess, requireFeature } from '@/hooks/useFeatureAccess';
+import { MULTI_PPE_LOCK_MESSAGE } from '@/lib/feature-access';
 import { initialRatesYear, canAutoApplyRates, markSources, rateBaseFields, type ValueSources, type RatesSourceSnapshot } from '@/lib/value-sources';
 
 // Signature of the parameters rates were last fetched for (used to auto-fetch
@@ -186,6 +188,8 @@ function AnalysisForm() {
     enabled: !!analysisId,
   });
 
+  const access = useGroupFeatureAccess(analysis?.analysis_group_id);
+
   useEffect(() => {
     if (analysis) {
       // Kody taryf zapisane inną wielkością liter (np. „C22B” z importu) → kod ze słownika i jego liczba stref.
@@ -316,6 +320,10 @@ function AnalysisForm() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      if (analysis?.analysis_group_id) {
+        const { data, error } = await supabase.rpc('can_edit_feature_group', { _group_id: analysis.analysis_group_id });
+        if (error || data !== true) throw new Error(MULTI_PPE_LOCK_MESSAGE);
+      }
       const dataToSave = {
         ...formData,
         rates_year_before: Number(ratesYearBefore) || null,
@@ -558,7 +566,9 @@ function AnalysisForm() {
   const addingNextRef = React.useRef(false);
   const [isAddingNext, setIsAddingNext] = useState(false);
   const handleSaveAndAddNext = async () => {
-    if (addingNextRef.current) return;
+    if (addingNextRef.current || !access.multiPpe || access.readOnly) return;
+    try { await requireFeature('multi_ppe', formData.analysis_group_id); }
+    catch { toast({ variant: 'destructive', title: 'Brak dostępu do funkcji Analizy wielu PPE' }); return; }
     const errors = Object.values(validationErrors);
     if (errors.length > 0) {
       toast({ variant: 'destructive', title: 'Błąd walidacji', description: errors[0] || 'Popraw błędy w formularzu.' });
@@ -622,7 +632,7 @@ function AnalysisForm() {
   const goNext = () => canGoNext && setCurrentStep(WIZARD_STEPS[currentStepIndex + 1].id);
   const goPrev = () => canGoPrev && setCurrentStep(WIZARD_STEPS[currentStepIndex - 1].id);
 
-  const results = calculateEnergyCosts(formData);
+  const results = calculateEnergyCosts(access.readOnly ? analysis || {} : formData);
   const groupPath = formData.analysis_group_id
     ? `/projects/${projectId}/analyses/${formData.analysis_group_id}`
     : `/projects/${projectId}`;
@@ -632,7 +642,7 @@ function AnalysisForm() {
   const zoneLabelsAfter = getZoneLabels(zonesCountAfter);
   const periodMonths = calculatePeriodMonths(formData.period_from || null, formData.period_to || null);
 
-  if (isLoading) {
+  if (isLoading || access.loading) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center py-20">
@@ -641,6 +651,8 @@ function AnalysisForm() {
       </AppLayout>
     );
   }
+
+  if (access.readOnly) return <AppLayout><div className="content-container py-8"><Button variant="outline" asChild><Link to={groupPath}>Wróć do listy PPE</Link></Button><p role="status" className="my-6 text-muted-foreground">{MULTI_PPE_LOCK_MESSAGE}</p><h1 className="text-2xl font-semibold mb-4">{analysis?.name}</h1><dl className="grid grid-cols-2 gap-4"><dt>PPE</dt><dd>{analysis?.ppe_number || '—'}</dd><dt>PRZED</dt><dd>{formatCurrency(results.totalCostBefore)}</dd><dt>PO</dt><dd>{formatCurrency(results.totalCostAfter)}</dd><dt>Oszczędność</dt><dd>{formatCurrency(results.savingsValue)}</dd></dl><Button variant="outline" className="mt-6" asChild><Link to={`/projects/${projectId}/analysis/${analysisId}/report`}>Podgląd raportu PPE</Link></Button></div></AppLayout>;
 
   return (
     <AppLayout>
@@ -1199,7 +1211,7 @@ function AnalysisForm() {
             <Button variant="outline" asChild>
               <Link to={groupPath}>Wróć do listy PPE</Link>
             </Button>
-            <Button variant="secondary" onClick={handleSaveAndAddNext} disabled={isAddingNext || saveMutation.isPending}>
+            <Button variant="secondary" onClick={handleSaveAndAddNext} disabled={isAddingNext || saveMutation.isPending || !access.multiPpe}>
               {isAddingNext ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
               Zapisz i dodaj kolejne PPE
             </Button>
