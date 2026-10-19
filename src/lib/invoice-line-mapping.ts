@@ -61,6 +61,8 @@ export interface LineMapping {
   convertedUnit: string | null;
   /** Ostrzeżenia: konflikty, różnice w sposobie naliczenia. */
   warnings: string[];
+  /** Informacje bez konfliktu (np. różnica sposobu naliczenia). */
+  info: string[];
   reason: string | null;
 }
 
@@ -181,6 +183,7 @@ export function mapLineItems(
       return !m || Number(m[1]) <= zones;
     });
     const warnings: string[] = [];
+    const info: string[] = [];
     let target: LineTarget | null = null;
     let reason: string | null = null;
     let status: LineMapping['status'] = 'needs_assignment';
@@ -208,7 +211,7 @@ export function mapLineItems(
         if (Math.abs(full - item.net_value) > 0.01) {
           const share = item.net_value / full;
           const days = daysInclusive(record.period_from, record.period_to);
-          warnings.push(
+          info.push(
             `Na fakturze naliczono ${(share * 100).toFixed(1).replace('.', ',')}% pełnego miesiąca` +
               (days ? ` (okres ${days} dni)` : '') +
               '. Kalkulator stosuje stawkę miesięczną × moc umowna × liczba miesięcy okresu analizy — kwota faktury nie zostanie odtworzona 1:1.'
@@ -235,7 +238,7 @@ export function mapLineItems(
             : 'W kalkulatorze energia bierna to kwota za okres analizy.';
     }
 
-    return { item, kind, allowedTargets: allowed, target, status, converted: null, convertedUnit: null, warnings, reason };
+    return { item, kind, allowedTargets: allowed, target, status, converted: null, convertedUnit: null, warnings, info, reason };
   });
 
   // Ręczne wybory użytkownika
@@ -273,8 +276,8 @@ export function mapLineItems(
     if (m.target === 'reactive_energy_cost_before' && analysis?.reactive_monthly_mode_before) {
       m.warnings.push('Energia bierna PRZED jest w trybie miesięcznym — pole roczne nie będzie użyte w obliczeniach.');
     }
-    const cur = analysis ? Number((analysis as Record<string, unknown>)[m.target]) || 0 : 0;
-    if (cur && Math.abs(cur - conv.value) > 1e-9 && analysis?.value_sources?.[m.target]?.source === 'manual') {
+    const cur = analysis ? Number((analysis as unknown as Record<string, unknown>)[m.target]) || 0 : 0;
+    if (cur && Math.abs(cur - conv.value) > 1e-9 && (analysis?.value_sources as Record<string, { source?: string }> | undefined)?.[m.target]?.source === 'manual') {
       m.warnings.push('Pole ma ręczną korektę — zostanie zastąpione wartością z faktury.');
     }
   }
