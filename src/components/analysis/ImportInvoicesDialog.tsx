@@ -74,9 +74,46 @@ interface Props {
 export default function ImportInvoicesDialog({ projectId, groupId, ppes, onApplied }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [open, setOpen] = useState(searchParams.get('import') === '1');
   const [uploading, setUploading] = useState(false);
   const [reviewDocId, setReviewDocId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (searchParams.get('import') === '1') {
+      setOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('import');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
+  const handleDocApplied = async (docId: string, analysisIds: string[]) => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['analysis-documents', groupId] }),
+      queryClient.invalidateQueries({ queryKey: ['document-ppe', docId] }),
+      ...analysisIds.map((id) => queryClient.invalidateQueries({ queryKey: ['analysis', id] })),
+    ]);
+    onApplied();
+    const { data: docs } = await supabase
+      .from('analysis_documents').select('id,status').eq('analysis_group_id', groupId);
+    const pending = (docs || []).filter((d) => d.id !== docId && (d.status === 'needs_review' || d.status === 'pending' || d.status === 'processing')).length;
+    setReviewDocId(null);
+    setOpen(false);
+    const back = `/projects/${projectId}/analyses/${groupId}?import=1`;
+    toast({
+      title: 'Zaimportowano dane z faktury',
+      description: pending
+        ? `Zastosowano dane dla ${analysisIds.length} PPE. ${pending} dokument(y) nadal czeka na zatwierdzenie.`
+        : `Zastosowano dane dla ${analysisIds.length} PPE.`,
+      action: pending ? (
+        <ToastAction altText="Wróć do importu" onClick={() => navigate(back)}>Wróć do importu</ToastAction>
+      ) : undefined,
+    });
+    if (analysisIds.length === 1) navigate(`/projects/${projectId}/analysis/${analysisIds[0]}`);
+    else navigate(`/projects/${projectId}/analyses/${groupId}?highlight=${analysisIds.join(',')}`, { replace: true });
+  };
 
   const docsQuery = useQuery({
     queryKey: ['analysis-documents', groupId],
