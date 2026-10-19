@@ -120,7 +120,7 @@ const ALLOWED: Record<LineKind, LineTarget[]> = {
   fixed_network: ['contracted_power_charge_rate_before'],
   handling: ['handling_fee_before'],
   capacity: ['capacity_charge_before', 'fixed_distribution_before_total'],
-  subscription: ['fixed_distribution_before_total'],
+  subscription: ['handling_fee_before', 'fixed_distribution_before_total'],
   reactive: ['reactive_energy_cost_before', 'fixed_distribution_before_total'],
   quality_oze_chp: ['fixed_distribution_before_total'],
   other: ['fixed_distribution_before_total'],
@@ -131,7 +131,8 @@ const ALLOWED: Record<LineKind, LineTarget[]> = {
 export function convertForTarget(
   item: LineItemInput,
   target: LineTarget,
-  tariffCode: string
+  tariffCode: string,
+  period?: { from: string | null; to: string | null }
 ): { value: number; unit: string } | null {
   const qu = quantityUnit(item.unit);
   if (target.startsWith('active_energy_price')) {
@@ -152,12 +153,38 @@ export function convertForTarget(
     return { value: item.rate, unit: 'zł/kW/mies' };
   }
   if (target === 'handling_fee_before') {
-    if (item.rate == null || qu !== 'month') return null;
-    return { value: item.rate, unit: 'zł/mies' };
+    const v = monthlyAmount(item, period);
+    return v == null ? null : { value: v, unit: 'zł/mies' };
   }
   // Pola kwotowe — kwota netto pozycji za okres faktury
   if (item.net_value == null) return null;
   return { value: item.net_value, unit: 'zł (kwota za okres faktury)' };
+}
+
+/** Pełne miesiące kalendarzowe okresu (1. dzień → ostatni dzień miesiąca); null gdy okres niejednoznaczny. */
+export function fullMonths(from: string | null | undefined, to: string | null | undefined): number | null {
+  if (!from || !to) return null;
+  const a = new Date(from + 'T00:00:00Z'), b = new Date(to + 'T00:00:00Z');
+  if (Number.isNaN(+a) || Number.isNaN(+b) || a.getUTCDate() !== 1) return null;
+  const next = new Date(b); next.setUTCDate(b.getUTCDate() + 1);
+  if (next.getUTCDate() !== 1) return null;
+  const m = (next.getUTCFullYear() - a.getUTCFullYear()) * 12 + next.getUTCMonth() - a.getUTCMonth();
+  return m > 0 ? m : null;
+}
+
+/** Kwota miesięczna (zł/mies) z pozycji abonamentu / opłaty handlowej. null = jednostka lub okres niejasne. */
+export function monthlyAmount(item: LineItemInput, period?: { from: string | null; to: string | null }): number | null {
+  const qu = quantityUnit(item.unit);
+  if (qu === 'month') {
+    if (item.rate != null) return item.rate;
+    if (item.net_value != null && item.quantity != null && item.quantity > 0) return Math.round((item.net_value / item.quantity) * 100) / 100;
+    return null;
+  }
+  if (qu == null && item.rate == null && item.net_value != null) {
+    const months = fullMonths(period?.from, period?.to);
+    return months ? Math.round((item.net_value / months) * 100) / 100 : null;
+  }
+  return null;
 }
 
 function zoneIndexFromName(name: string, zoneNames: string[]): number | null {
@@ -200,7 +227,12 @@ export function mapLineItems(
     if (kind === 'balance') {
       status = 'unsupported';
       reason = 'Saldo, zaległość, nadpłata lub podsumowanie — nie jest kosztem do analizy.';
-    } else if (kind === 'quality_oze_chp' || kind === 'other' || kind === 'subscription') {
+    } else if (kind === 'subscription') {
+      // Organizacja kalkulatora: abonament → „Opłata handlowa PRZED (miesięcznie)”.
+      target = 'handling_fee_before';
+      status = 'mapped';
+      info.push('Abonament przypisany do „Opłata handlowa PRZED (miesięcznie)” jako kwota miesięczna.');
+    } else if (kind === 'quality_oze_chp' || kind === 'other') {
       // Sugestia: „Suma pozostałych opłat” (kwota netto za okres). Zastosowanie tylko po zaznaczeniu.
       target = OTHER_SUM_TARGET;
       status = 'mapped';
@@ -238,7 +270,7 @@ export function mapLineItems(
         warnings.push(`Podstawa naliczenia (${item.quantity} kW) różni się od mocy umownej (${record.contracted_power_kw} kW).`);
       }
     } else if (kind === 'handling') {
-      if (quantityUnit(item.unit) === 'month') {
+      if (quantityUnit(item.unit) === 'month' || monthlyAmount(item, { from: record.period_from, to: record.period_to }) != null) {
         target = allowed[0];
         status = 'mapped';
       } else reason = 'Jednostka opłaty handlowej nie jest miesięczna — wymaga przypisania.';
@@ -269,7 +301,7 @@ export function mapLineItems(
 
   // Kilka pozycji na to samo pole → nie sumuję ani nie wybieram arbitralnie
   const counts = new Map<LineTarget, number>();
-  for (const m of draft) if (m.target && !SUMMED_TARGETS.includes(m.target)) counts.set(m.target, (counts.get(m.target) || 0) + 1);
+  for (const m of draft) if (m.target && !SUMMED_TARGETS.includes(m.target) && m.target !== 'handling_fee_before') counts.set(m.target, (counts.get(m.target) || 0) + 1);
   for (const m of draft) {
     if (m.target && (counts.get(m.target) || 0) > 1) {
       m.warnings.push('Kilka pozycji wskazuje to samo pole (np. różne okresy stawek). Nie sumuję stawek — zostaw jedną pozycję.');
@@ -279,10 +311,12 @@ export function mapLineItems(
 
   for (const m of draft) {
     if (!m.target) continue;
-    const conv = convertForTarget(m.item, m.target, tariff);
+    const conv = convertForTarget(m.item, m.target, tariff, { from: record.period_from, to: record.period_to });
     if (!conv) {
       m.status = 'needs_assignment';
-      m.warnings.push('Jednostka pozycji nie pasuje do pola — brak przeliczenia.');
+      m.warnings.push(m.target === 'handling_fee_before'
+        ? 'Nie da się ustalić kwoty miesięcznej — faktura nie podaje stawki za miesiąc ani jednoznacznego okresu naliczenia. Uzupełnij okres lub wpisz kwotę ręcznie.'
+        : 'Jednostka pozycji nie pasuje do pola — brak przeliczenia.');
       continue;
     }
     m.converted = conv.value;
@@ -398,3 +432,39 @@ export function selectionProblems(maps: LineMapping[], selected: Set<string>): {
     }));
 }
 
+
+export const HANDLING_TARGET: LineTarget = 'handling_fee_before';
+
+export interface HandlingPlan {
+  components: { label: string; monthly: number; itemIds: string[] }[];
+  total: number | null;
+  conflicts: string[];
+}
+
+/**
+ * „Opłata handlowa PRZED (miesięcznie)” = opłata handlowa + abonament (różne składniki sumowane).
+ * Ta sama opłata powtórzona za kolejne miesiące liczona raz; różne stawki tej samej opłaty = konflikt.
+ */
+export function planHandling(maps: LineMapping[], selected: Set<string>): HandlingPlan {
+  const groups = new Map<string, { label: string; values: Map<number, string[]> }>();
+  for (const m of maps) {
+    if (m.target !== HANDLING_TARGET || m.status !== 'mapped' || m.converted == null || !selected.has(m.item.id)) continue;
+    const key = m.kind === 'subscription' ? 'subscription' : 'handling';
+    const g = groups.get(key) || { label: key === 'subscription' ? 'Opłata abonamentowa' : 'Opłata handlowa', values: new Map() };
+    const v = Math.round(m.converted * 100) / 100;
+    g.values.set(v, [...(g.values.get(v) || []), m.item.id]);
+    groups.set(key, g);
+  }
+  const components: HandlingPlan['components'] = [];
+  const conflicts: string[] = [];
+  for (const g of groups.values()) {
+    if (g.values.size > 1) {
+      conflicts.push(`${g.label}: różne stawki miesięczne (${Array.from(g.values.keys()).map((v) => v.toFixed(2).replace('.', ',')).join(' / ')} zł/mies) — zostaw zaznaczoną jedną.`);
+      continue;
+    }
+    const [[monthly, itemIds]] = Array.from(g.values.entries());
+    components.push({ label: g.label, monthly, itemIds });
+  }
+  const total = components.length && !conflicts.length ? round2(components.reduce((s, c) => s + c.monthly, 0)) : null;
+  return { components, total, conflicts };
+}
