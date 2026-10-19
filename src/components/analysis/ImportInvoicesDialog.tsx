@@ -23,7 +23,7 @@ import {
 import { formatCurrency } from '@/lib/calculation-utils';
 import { getZonesCount } from '@/lib/tariff-utils';
 import {
-  mapLineItems, isCleanMapping, LINE_TARGET_LABELS, planOtherCharges, OTHER_SUM_TARGET, PO_ONLY_WARNING, type OtherContribution, type OtherSumMode, type OtherSumPlan, type LineMapping, type LineTarget, type LineItemInput,
+  mapLineItems, isCleanMapping, LINE_TARGET_LABELS, planOtherCharges, OTHER_SUM_TARGET, CAPACITY_TARGET, capacityGroup, capacityBlockReason, PO_ONLY_WARNING, type OtherContribution, type OtherSumMode, type OtherSumPlan, type LineMapping, type LineTarget, type LineItemInput,
 } from '@/lib/invoice-line-mapping';
 
 const fmtNum = (v: number, max = 6) => new Intl.NumberFormat('pl-PL', { maximumFractionDigits: max }).format(v);
@@ -357,7 +357,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
     const fields = selectedFields[rec.id] ?? defaults;
     const maps = mappingsFor(rec, target);
     const selLines = selectedLinesFor(rec.id, maps);
-    const lines = maps.filter((m) => selLines.has(m.item.id) && m.status === 'mapped' && m.target && m.target !== OTHER_SUM_TARGET && m.converted != null);
+    const lines = maps.filter((m) => selLines.has(m.item.id) && m.status === 'mapped' && m.target && m.target !== OTHER_SUM_TARGET && m.target !== CAPACITY_TARGET && m.converted != null);
     const osd = osdStateFor(rec, target);
     const osdId = osd.apply && osd.choice && osd.choice !== '__keep__' ? osd.choice : null;
     const prevVs = (target?.value_sources as Record<string, { breakdown?: OtherContribution[] }> | undefined)?.[OTHER_SUM_TARGET];
@@ -366,29 +366,35 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
       period: { from: rec.period_from, to: rec.period_to },
       current: target?.fixed_distribution_before_total, previous: prevVs?.breakdown, mode: otherMode[rec.id] ?? null,
     });
+    const capacity = planOtherCharges({
+      maps, selected: selLines, documentId: doc.id, period: { from: rec.period_from, to: rec.period_to },
+      current: target?.capacity_charge_before, previous: null, mode: 'replace', target: CAPACITY_TARGET,
+    });
     const analysisFrom = fields.has('period_from') ? rec.period_from : target?.period_from ?? null;
     const analysisTo = fields.has('period_to') ? rec.period_to : target?.period_to ?? null;
     const periodMismatch = other.items.length > 0 && (analysisFrom !== rec.period_from || analysisTo !== rec.period_to);
-    return { choice, target, diffs, fields, lines, osd, osdId, other, periodMismatch, analysisFrom, analysisTo };
+    return { choice, target, diffs, fields, lines, osd, osdId, other, capacity, periodMismatch, analysisFrom, analysisTo };
   };
 
   /** Zapis jednego rekordu. Zwraca id PPE zwrócone przez zapis. Rzuca wyjątek przy błędzie. */
   const applyRecord = async (rec: InvoicePpeRecord): Promise<string> => {
-    const { choice, diffs, fields, lines, osdId, other } = planFor(rec);
+    const { choice, diffs, fields, lines, osdId, other, capacity } = planFor(rec);
     const update: Record<string, unknown> = {};
     for (const d of diffs) if (fields.has(d.field)) update[d.field] = d.incoming;
     if (typeof update.tariff_code_before === 'string') update.zones_count_before = getZonesCount(update.tariff_code_before) || 1;
     if (osdId) update.osd_id = osdId;
     for (const m of lines) update[m.target!] = m.converted;
     if (other.result != null) update[OTHER_SUM_TARGET] = other.result;
+    if (capacity.result != null) update[CAPACITY_TARGET] = capacity.result;
     const docSources = (vs: Record<string, unknown>) => {
       for (const f of fields) vs[f] = { source: 'document', document_id: doc.id, page: rec.source_pages?.[0] ?? null };
       if (osdId) vs.osd_id = { source: 'document', document_id: doc.id, page: rec.source_pages?.[0] ?? null };
       for (const m of lines) vs[m.target!] = { source: 'document', document_id: doc.id, page: m.item.page, item_ref: m.item.id };
+      if (capacity.result != null) vs[CAPACITY_TARGET] = { source: 'document', document_id: doc.id, breakdown: capacity.breakdown };
       if (other.result != null) vs[OTHER_SUM_TARGET] = { source: 'document', document_id: doc.id, breakdown: other.breakdown };
       return vs;
     };
-    const appliedList = [...Array.from(fields), ...(osdId ? ['osd_id'] : []), ...lines.map((m) => `line:${m.item.id}->${m.target}`), ...other.items.map((i) => `line:${i.item_ref}->${OTHER_SUM_TARGET}`)];
+    const appliedList = [...Array.from(fields), ...(osdId ? ['osd_id'] : []), ...lines.map((m) => `line:${m.item.id}->${m.target}`), ...other.items.map((i) => `line:${i.item_ref}->${OTHER_SUM_TARGET}`), ...capacity.items.map((i) => `line:${i.item_ref}->${CAPACITY_TARGET}`)];
 
     let analysisId = choice;
     if (choice === '__new__') {
@@ -449,7 +455,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
         toast({ variant: 'destructive', title: 'Okres się różni', description: `${label}: okres faktury różni się od okresu analizy — potwierdź pod tabelą opłat lub odznacz pozycje sumy.` });
         return;
       }
-      if (!p.fields.size && !p.lines.length && !p.osdId && !p.other.items.length) {
+      if (!p.fields.size && !p.lines.length && !p.osdId && !p.other.items.length && !p.capacity.items.length) {
         toast({ variant: 'destructive', title: 'Brak wybranych pól', description: `${label}: zaznacz pola do zastosowania.` });
         return;
       }
@@ -608,6 +614,27 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
                   </div>
                 );
               })()}
+
+              {!applied && capacityGroup(maps).length > 0 && (
+                <CapacityGroup
+                  maps={capacityGroup(maps)}
+                  selected={selLines}
+                  plan={plan.capacity}
+                  period={[rec.period_from, rec.period_to]}
+                  onToggleAll={(on) => {
+                    const group = capacityGroup(maps);
+                    const ids = group.filter((m) => m.item.net_value != null).map((m) => m.item.id);
+                    if (on) {
+                      setLineOverrides((p) => ({ ...p, [rec.id]: { ...(p[rec.id] || {}), ...Object.fromEntries(group.map((m) => [m.item.id, CAPACITY_TARGET])) } }));
+                    }
+                    setLineSelected((p) => {
+                      const cur = new Set(p[rec.id] ?? selLines);
+                      for (const id of ids) on ? cur.add(id) : cur.delete(id);
+                      return { ...p, [rec.id]: cur };
+                    });
+                  }}
+                />
+              )}
 
               {maps.length > 0 && (
                 <LineItemsTable
@@ -798,6 +825,40 @@ function OtherSumSummary({ plan, mode, onMode, periodMismatch, invoicePeriod, an
         </label>
       )}
       <p className="text-muted-foreground flex items-start gap-1"><AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />{PO_ONLY_WARNING}</p>
+    </div>
+  );
+}
+
+function CapacityGroup({ maps, selected, plan, period, onToggleAll }: {
+  maps: LineMapping[];
+  selected: Set<string>;
+  plan: OtherSumPlan;
+  period: [string | null, string | null];
+  onToggleAll: (on: boolean) => void;
+}) {
+  const usable = maps.filter((m) => capacityBlockReason(m) == null || m.target !== CAPACITY_TARGET);
+  const eligible = usable.filter((m) => m.item.net_value != null);
+  const chosen = maps.filter((m) => m.target === CAPACITY_TARGET && m.converted != null && selected.has(m.item.id));
+  const all = eligible.length > 0 && chosen.length === eligible.length;
+  const state: boolean | 'indeterminate' = all ? true : chosen.length > 0 ? 'indeterminate' : false;
+  const blocked = maps.map((m) => ({ m, r: capacityBlockReason(m) })).filter((x) => x.r);
+  return (
+    <div className="rounded-md border p-3 space-y-1 text-xs">
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+          <Checkbox checked={state} disabled={!eligible.length} onCheckedChange={() => onToggleAll(!all)} aria-label="Zaznacz wszystkie opłaty mocowe" />
+          Opłata mocowa — {all ? 'Odznacz wszystkie' : 'Zaznacz wszystkie'}
+        </label>
+        <span className="text-muted-foreground">Wybrano {chosen.length} z {maps.length} pozycji</span>
+        <span className="font-medium">Suma: {formatCurrency(plan.total)}</span>
+      </div>
+      {plan.items.length > 0 && (
+        <p>Do pola „{LINE_TARGET_LABELS[CAPACITY_TARGET]}”: {formatCurrency(plan.total)} za okres {period[0] || '?'} – {period[1] || '?'}
+          {plan.current ? ` (zastąpi obecne ${formatCurrency(plan.current)})` : ''}. Suma kwot netto — bez ponownego mnożenia przez miesiące ani MWh.</p>
+      )}
+      {blocked.map(({ m, r }) => (
+        <p key={m.item.id} className="text-warning flex items-start gap-1"><AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />{m.item.name}: {r}</p>
+      ))}
     </div>
   );
 }

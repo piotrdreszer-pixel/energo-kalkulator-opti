@@ -51,6 +51,9 @@ export type LineKind =
 
 /** Pole zbiorcze: kwoty netto pozycji są sumowane (nie stawki). */
 export const OTHER_SUM_TARGET: LineTarget = 'fixed_distribution_before_total';
+export const CAPACITY_TARGET: LineTarget = 'capacity_charge_before';
+/** Pola, do których kwoty netto kilku pozycji są sumowane (bez konfliktu). */
+export const SUMMED_TARGETS: LineTarget[] = [OTHER_SUM_TARGET, CAPACITY_TARGET];
 export const PO_ONLY_WARNING = 'Ujęcie tego kosztu tylko w PRZED może zawyżyć oszczędność, jeśli ten koszt pozostaje także w PO.';
 
 export interface LineMapping {
@@ -262,7 +265,7 @@ export function mapLineItems(
 
   // Kilka pozycji na to samo pole → nie sumuję ani nie wybieram arbitralnie
   const counts = new Map<LineTarget, number>();
-  for (const m of draft) if (m.target && m.target !== OTHER_SUM_TARGET) counts.set(m.target, (counts.get(m.target) || 0) + 1);
+  for (const m of draft) if (m.target && !SUMMED_TARGETS.includes(m.target)) counts.set(m.target, (counts.get(m.target) || 0) + 1);
   for (const m of draft) {
     if (m.target && (counts.get(m.target) || 0) > 1) {
       m.warnings.push('Kilka pozycji wskazuje to samo pole (np. różne okresy stawek). Nie sumuję stawek — zostaw jedną pozycję.');
@@ -288,7 +291,7 @@ export function mapLineItems(
       m.warnings.push('Energia bierna PRZED jest w trybie miesięcznym — pole roczne nie będzie użyte w obliczeniach.');
     }
     const cur = analysis ? Number((analysis as unknown as Record<string, unknown>)[m.target]) || 0 : 0;
-    if (m.target !== OTHER_SUM_TARGET && cur && Math.abs(cur - conv.value) > 1e-9 && (analysis?.value_sources as Record<string, { source?: string }> | undefined)?.[m.target]?.source === 'manual') {
+    if (!SUMMED_TARGETS.includes(m.target) && cur && Math.abs(cur - conv.value) > 1e-9 && (analysis?.value_sources as Record<string, { source?: string }> | undefined)?.[m.target]?.source === 'manual') {
       m.warnings.push('Pole ma ręczną korektę — zostanie zastąpione wartością z faktury.');
     }
   }
@@ -335,9 +338,11 @@ export function planOtherCharges(args: {
   current: number | null | undefined;
   previous: OtherContribution[] | null | undefined;
   mode: OtherSumMode | null;
+  target?: LineTarget;
 }): OtherSumPlan {
+  const tgt = args.target ?? OTHER_SUM_TARGET;
   const items: OtherContribution[] = args.maps
-    .filter((m) => m.target === OTHER_SUM_TARGET && m.status === 'mapped' && args.selected.has(m.item.id) && m.item.net_value != null)
+    .filter((m) => m.target === tgt && m.status === 'mapped' && args.selected.has(m.item.id) && m.item.net_value != null)
     .map((m) => ({
       document_id: args.documentId, item_ref: m.item.id, name: m.item.name, net_value: m.item.net_value!,
       page: m.item.page, period_from: args.period.from, period_to: args.period.to,
@@ -358,4 +363,13 @@ export function planOtherCharges(args: {
     }
   }
   return { items, total, current, previousSameDoc, needsMode, result, breakdown };
+}
+
+/** Pozycje opłaty mocowej jednego PPE (grupa do zaznaczania zbiorczego). */
+export const capacityGroup = (maps: LineMapping[]) => maps.filter((m) => m.kind === 'capacity');
+/** Czy pozycję grupy da się zastosować; null = tak, inaczej przyczyna blokady. */
+export function capacityBlockReason(m: LineMapping): string | null {
+  if (m.item.net_value == null) return 'Brak kwoty netto na fakturze.';
+  if (m.target === CAPACITY_TARGET && m.converted == null) return m.warnings[0] || 'Brak przeliczenia.';
+  return null;
 }
