@@ -1,0 +1,2 @@
+ALTER TABLE public.document_ppe_records ADD COLUMN IF NOT EXISTS review_state jsonb;
+COMMENT ON COLUMN public.document_ppe_records.review_state IS 'User selections in invoice review + snapshot of applied values (before/after) for safe re-edit';

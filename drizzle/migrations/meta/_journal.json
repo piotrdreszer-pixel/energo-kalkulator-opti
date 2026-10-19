@@ -50,6 +50,13 @@
       "when": 1792354730390,
       "tag": "0006_invoice_documents_storage_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792424964509,
+      "tag": "0007_invoice_review_state",
+      "breakpoints": true
     }
   ]
 }
