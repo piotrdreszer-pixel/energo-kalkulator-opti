@@ -223,8 +223,8 @@ function AnalysisForm() {
         const sum = v.reduce((a, b) => a + b, 0);
         return { sum, dist: sum > 0 ? v.map(x => (x / sum) * 100) : getDefaultDistribution(zones) };
       };
-      const zb = analysis.zones_count_before || 1;
-      const za = analysis.zones_count_after || 1;
+      const zb = (tb ? getZonesCount(tb) : analysis.zones_count_before) || 1;
+      const za = (ta ? getZonesCount(ta) : analysis.zones_count_after) || 1;
       const before = restoreSplit([
         analysis.consumption_before_zone1_mwh, analysis.consumption_before_zone2_mwh, analysis.consumption_before_zone3_mwh,
       ], zb);
