@@ -5,3 +5,6 @@ export function featureRules(access: FeatureAccess | null | undefined, count: nu
   const readOnly = count > 1 && !multiPpe;
   return { multiPpe, readOnly, canImport: access?.invoice_import === true && !readOnly, canAddPpe: !readOnly && (multiPpe || count === 0) };
 }
+export function canDeleteClientData(actorId: string | null, creatorId: string | null, isAdmin: boolean, isOwner: boolean) {
+  return !!actorId && (actorId === creatorId || isAdmin || isOwner);
+}

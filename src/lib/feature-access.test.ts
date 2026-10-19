@@ -1,6 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { featureRules } from './feature-access';
+import { featureRules, canDeleteClientData } from './feature-access';
 describe('individual feature permissions', () => {
+  it('disabled feature flags do not remove owner deletion rights', () => {
+    expect(featureRules(null, 3).readOnly).toBe(true);
+    expect(canDeleteClientData('owner', 'owner', false, false)).toBe(true);
+  });
+  it('admin and app owner may delete regardless of feature flags', () => {
+    expect(canDeleteClientData('admin', 'other', true, false)).toBe(true);
+    expect(canDeleteClientData('superadmin', 'other', false, true)).toBe(true);
+  });
+  it('other users and managers cannot delete someone else data', () => {
+    expect(canDeleteClientData('manager', 'other', false, false)).toBe(false);
+    expect(canDeleteClientData(null, null, true, true)).toBe(false);
+  });
   it('missing or null access denies both features', () => {
     for (const access of [undefined, null, {}, { invoice_import: null, multi_ppe: null }]) {
       expect(featureRules(access, 1)).toEqual({ multiPpe: false, readOnly: false, canImport: false, canAddPpe: false });

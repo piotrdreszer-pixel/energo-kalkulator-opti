@@ -217,8 +217,7 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
         <DialogHeader>
           <DialogTitle>{access.canImport ? 'Import faktur energetycznych' : 'Podgląd faktur'}</DialogTitle>
           <DialogDescription>
-            Prześlij faktury (PDF, JPG, PNG). AI odczyta dane, a Ty zatwierdzisz, co trafi do kalkulatora.
-            Nic nie zostanie zapisane bez Twojego zatwierdzenia. Odczyt AI jest rozliczany z kredytów workspace.
+            {access.canImport ? 'Prześlij faktury (PDF, JPG, PNG). Odczyt AI jest rozliczany z kredytów workspace; zastosowanie danych wymaga Twojego zatwierdzenia.' : 'Wcześniejsze dokumenty i odczytane dane.'}
           </DialogDescription>
         </DialogHeader>
 
