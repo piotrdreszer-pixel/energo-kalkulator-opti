@@ -11,6 +11,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { NO_PPE_CONFIRM_KEY } from '@/components/project/ProjectAggregatePanel';
 import AnalysisPdfDocument from '@/components/pdf/AnalysisPdfDocument';
 import MultiPpePdfDocument from '@/components/pdf/MultiPpePdfDocument';
+import { useGroupFeatureAccess } from '@/hooks/useFeatureAccess';
+import { MULTI_PPE_LOCK_MESSAGE } from '@/lib/feature-access';
 
 const safe = (v: string) => v.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -18,6 +20,7 @@ const safe = (v: string) => v.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' '
 export default function ProjectReport() {
   const { projectId, groupId } = useParams<{ projectId: string; groupId: string }>();
   const { profile, user } = useAuth();
+  const access = useGroupFeatureAccess(groupId);
   const pdfRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
@@ -75,11 +78,15 @@ export default function ProjectReport() {
   const preparerEmail = profile?.name && user?.email ? user.email : undefined;
   const single = selected.length === 1 ? t.entries[0] : null;
 
-  if (l1 || l2 || l3) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  if (l1 || l2 || l3 || access.loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   if (!project || !group) return <div className="min-h-screen flex items-center justify-center"><Button asChild><Link to="/projects">Wróć do projektów</Link></Button></div>;
 
   const download = async () => {
-    if (!pdfRef.current) return;
+    if (!pdfRef.current || access.readOnly) return;
+    if (groupId) {
+      const { data, error } = await supabase.rpc('can_edit_feature_group', { _group_id: groupId });
+      if (error || data !== true) return;
+    }
     setBusy(true);
     try {
       await exportElementToPdf(pdfRef.current, {
@@ -97,12 +104,13 @@ export default function ProjectReport() {
           <Button variant="ghost" size="sm" asChild>
             <Link to={`/projects/${projectId}/analyses/${groupId}`}><ArrowLeft className="h-4 w-4 mr-2" />Wróć do analizy</Link>
           </Button>
-          <Button onClick={download} disabled={busy || !!blockedReason || (!single && !ready)}>
+          <Button onClick={download} disabled={busy || access.readOnly || !!blockedReason || (!single && !ready)}>
             {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}Pobierz PDF
           </Button>
         </div>
       </div>
 
+      {access.readOnly && <p role="status" className="text-center py-4 text-muted-foreground">{MULTI_PPE_LOCK_MESSAGE}. Podgląd zapisanych danych — pobieranie nowego raportu jest niedostępne.</p>}
       {blockedReason ? (
         <p className="text-center py-20 text-muted-foreground">{blockedReason}</p>
       ) : (

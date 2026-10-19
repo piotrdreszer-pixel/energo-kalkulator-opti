@@ -107,6 +107,12 @@ Deno.serve(async (req) => {
     }
     const userId = claimsData.claims.sub as string
 
+    const { data: invoiceAllowed, error: featureError } = await supabaseUser.rpc('has_feature_access', { _feature: 'invoice_import' })
+    if (featureError || invoiceAllowed !== true) {
+      return new Response(JSON.stringify({ success: false, error: 'Brak dostępu do funkcji Import faktur' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
     const { documentId } = await req.json()
     if (!documentId) {
       return new Response(JSON.stringify({ success: false, error: 'Brak identyfikatora dokumentu' }),
@@ -157,6 +163,16 @@ Deno.serve(async (req) => {
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
+    const { data: groupEditable, error: groupAccessError } = await supabaseUser.rpc('can_edit_feature_group', { _group_id: doc.analysis_group_id })
+    if (groupAccessError || groupEditable !== true) {
+      return new Response(JSON.stringify({ success: false, error: 'Edycja tej analizy wymaga dostępu do funkcji Analizy wielu PPE' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+    const { count: approvedCount, error: approvedError } = await supabaseAdmin.from('document_ppe_records').select('id', { count: 'exact', head: true }).eq('document_id', documentId).not('applied_at', 'is', null)
+    if (approvedError || (approvedCount ?? 0) > 0) {
+      return new Response(JSON.stringify({ success: false, error: 'Zatwierdzony dokument można edytować bez ponownego odczytu AI' }),
+        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
     await supabaseAdmin.from('analysis_documents').update({ status: 'processing', error: null }).eq('id', documentId)
 
     // Odczyt AI trwa często > 150 s — wykonujemy go w tle, klient odpytuje status dokumentu.
@@ -180,7 +196,13 @@ Deno.serve(async (req) => {
 
     console.log(`[parse-invoice] doc=${documentId} file=${doc.file_name} size=${arrayBuffer.byteLength}`)
 
-    const callAi = () => fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const callAi = async () => {
+      const [feature, groupAccess] = await Promise.all([
+        supabaseUser.rpc('has_feature_access', { _feature: 'invoice_import' }),
+        supabaseUser.rpc('can_edit_feature_group', { _group_id: doc.analysis_group_id }),
+      ])
+      if (feature.error || feature.data !== true || groupAccess.error || groupAccess.data !== true) throw new Error('Dostęp do odczytu faktur został odebrany')
+      return fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${lovableApiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -199,6 +221,7 @@ Deno.serve(async (req) => {
         max_tokens: 32000,
       }),
     })
+    }
 
     // Ograniczone ponowienie tylko dla 429/5xx (maks. 2 próby, z odstępem).
     let aiResponse = await callAi()

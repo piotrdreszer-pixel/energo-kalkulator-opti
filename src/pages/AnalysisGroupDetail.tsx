@@ -27,6 +27,8 @@ import { pl } from 'date-fns/locale';
 import ProjectAggregatePanel from '@/components/project/ProjectAggregatePanel';
 import ImportInvoicesDialog from '@/components/analysis/ImportInvoicesDialog';
 import InvoiceSettlementDialog from '@/components/analysis/InvoiceSettlementDialog';
+import { useFeatureAccess } from '@/hooks/useFeatureAccess';
+import { MULTI_PPE_LOCK_MESSAGE } from '@/lib/feature-access';
 
 export default function AnalysisGroupDetail() {
   const { projectId, groupId } = useParams<{ projectId: string; groupId: string }>();
@@ -77,6 +79,7 @@ export default function AnalysisGroupDetail() {
     enabled: !!projectId && !!groupId,
   });
 
+  const access = useFeatureAccess(ppes?.length || 0);
   const [name, setName] = useState('');
   useEffect(() => { if (group) setName(group.name); }, [group]);
 
@@ -116,7 +119,7 @@ export default function AnalysisGroupDetail() {
     onSettled: () => { creatingRef.current = false; },
   });
   const addPpe = () => {
-    if (creatingRef.current) return;
+    if (creatingRef.current || !access.canAddPpe) return;
     creatingRef.current = true;
     addPpeMutation.mutate();
   };
@@ -143,7 +146,7 @@ export default function AnalysisGroupDetail() {
     onError: () => toast({ variant: 'destructive', title: 'Błąd', description: 'Nie udało się zapisać wyboru' }),
   });
 
-  if (l1 || l2 || l3) {
+  if (l1 || l2 || l3 || access.loading) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center py-20">
@@ -188,6 +191,7 @@ export default function AnalysisGroupDetail() {
               <Link to={`/projects/${projectId}`} className="hover:underline">{project.client_name}</Link> › Analiza
             </p>
             <Input
+              disabled={access.readOnly}
               aria-label="Nazwa analizy"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -198,6 +202,7 @@ export default function AnalysisGroupDetail() {
           </div>
         </div>
 
+        {access.readOnly && <p role="status" className="mb-4 border-l-4 border-primary pl-3 text-muted-foreground">{MULTI_PPE_LOCK_MESSAGE}</p>}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
           <div>
             <h2 className="text-xl font-display font-semibold">Punkty poboru (PPE)</h2>
@@ -208,7 +213,7 @@ export default function AnalysisGroupDetail() {
           <div className="flex gap-2">
             <ImportInvoicesDialog projectId={projectId!} groupId={groupId!} ppes={ppes || []} onApplied={invalidate} />
             <InvoiceSettlementDialog projectId={projectId!} groupId={groupId!} ppes={ppes || []} onApplied={invalidate} />
-            <Button onClick={addPpe} disabled={addPpeMutation.isPending}>
+            <Button onClick={addPpe} disabled={addPpeMutation.isPending || !access.canAddPpe}>
               {addPpeMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
               Dodaj PPE
             </Button>
@@ -220,6 +225,7 @@ export default function AnalysisGroupDetail() {
             scopeId={groupId!}
             reportPath={`/projects/${projectId}/analyses/${groupId}/report`}
             analyses={selected}
+            readOnly={access.readOnly}
           />
         )}
 
@@ -229,7 +235,7 @@ export default function AnalysisGroupDetail() {
               <TrendingDown className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-medium mb-2">Brak punktów poboru</h3>
               <p className="text-muted-foreground mb-4">Dodaj pierwszy punkt poboru (PPE) do tej analizy.</p>
-              <Button onClick={addPpe} disabled={addPpeMutation.isPending}>
+              <Button onClick={addPpe} disabled={addPpeMutation.isPending || !access.canAddPpe}>
                 <Plus className="mr-2 h-4 w-4" />
                 Dodaj PPE
               </Button>
@@ -257,6 +263,7 @@ export default function AnalysisGroupDetail() {
                         )}
                         <label className="flex items-center gap-2 text-sm mb-1 cursor-pointer">
                           <Checkbox
+                            disabled={access.readOnly}
                             checked={!!a.include_in_project_report}
                             onCheckedChange={(v) => toggleIncludeMutation.mutate({ id: a.id, value: v === true })}
                           />
@@ -295,7 +302,7 @@ export default function AnalysisGroupDetail() {
                         <Button variant="outline" size="sm" asChild>
                           <Link to={`/projects/${projectId}/analysis/${a.id}`}>
                             <Edit className="h-4 w-4 mr-1" />
-                            Edytuj
+                            {access.readOnly ? 'Podgląd' : 'Edytuj'}
                           </Link>
                         </Button>
                         <Button variant="outline" size="sm" asChild>
@@ -306,7 +313,7 @@ export default function AnalysisGroupDetail() {
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" aria-label="Usuń PPE">
+                            <Button disabled={access.readOnly} variant="ghost" size="icon" className="text-destructive hover:text-destructive" aria-label="Usuń PPE">
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </AlertDialogTrigger>
