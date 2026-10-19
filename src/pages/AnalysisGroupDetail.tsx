@@ -29,13 +29,17 @@ import ImportInvoicesDialog from '@/components/analysis/ImportInvoicesDialog';
 import InvoiceSettlementDialog from '@/components/analysis/InvoiceSettlementDialog';
 import { useGroupFeatureAccess } from '@/hooks/useFeatureAccess';
 import { deleteClientObject } from '@/lib/delete-client-object';
-import { MULTI_PPE_LOCK_MESSAGE } from '@/lib/feature-access';
+import { MULTI_PPE_LOCK_MESSAGE, canDeleteClientData } from '@/lib/feature-access';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUserRoles } from '@/hooks/useUserRoles';
 
 export default function AnalysisGroupDetail() {
   const { projectId, groupId } = useParams<{ projectId: string; groupId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { isAdmin, isOwner } = useUserRoles();
   const creatingRef = useRef(false);
   const [searchParams] = useSearchParams();
   const highlighted = new Set((searchParams.get('highlight') || '').split(',').filter(Boolean));
@@ -313,7 +317,7 @@ export default function AnalysisGroupDetail() {
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" aria-label="Usuń PPE">
+                            <Button disabled={!canDeleteClientData(user?.id ?? null, project.created_by_user_id, isAdmin, isOwner)} variant="ghost" size="icon" className="text-destructive hover:text-destructive" aria-label="Usuń PPE">
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </AlertDialogTrigger>
