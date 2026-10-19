@@ -64,6 +64,13 @@
       "when": 1792429561665,
       "tag": "0008_individual_feature_permissions",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792430682175,
+      "tag": "0009_restore_authorized_transactional_deletion",
+      "breakpoints": true
     }
   ]
 }
