@@ -2,6 +2,10 @@ import React, { useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { deleteClientObject } from '@/lib/delete-client-object';
+import { canDeleteClientData } from '@/lib/feature-access';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUserRoles } from '@/hooks/useUserRoles';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -61,6 +65,8 @@ export default function ProjectDetail() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { isAdmin, isOwner } = useUserRoles();
 
   const { data: project, isLoading: projectLoading } = useQuery({
     queryKey: ['project', projectId],
@@ -149,12 +155,7 @@ export default function ProjectDetail() {
 
   const deleteGroupMutation = useMutation({
     mutationFn: async (groupId: string) => {
-      const { error } = await supabase
-        .from('analysis_groups')
-        .delete()
-        .eq('id', groupId)
-        .eq('client_project_id', projectId!);
-      if (error) throw error;
+      await deleteClientObject('group', groupId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['analysis-groups', projectId] });
@@ -356,7 +357,7 @@ export default function ProjectDetail() {
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" aria-label="Usuń analizę">
+                            <Button disabled={!canDeleteClientData(user?.id ?? null, project.created_by_user_id, isAdmin, isOwner)} variant="ghost" size="icon" className="text-destructive hover:text-destructive" aria-label="Usuń analizę">
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </AlertDialogTrigger>

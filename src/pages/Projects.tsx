@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useUserRoles } from '@/hooks/useUserRoles';
+import { deleteClientObject } from '@/lib/delete-client-object';
 import { ArrowLeft, User as UserIcon } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -267,12 +268,7 @@ export default function Projects() {
 
     setIsDeleting(true);
     try {
-      const { error } = await supabase
-        .from('client_projects')
-        .delete()
-        .eq('id', projectToDelete.id);
-
-      if (error) throw error;
+      await deleteClientObject('project', projectToDelete.id);
 
       toast({
         title: 'Sukces',

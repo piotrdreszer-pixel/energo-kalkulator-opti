@@ -27,14 +27,19 @@ import { pl } from 'date-fns/locale';
 import ProjectAggregatePanel from '@/components/project/ProjectAggregatePanel';
 import ImportInvoicesDialog from '@/components/analysis/ImportInvoicesDialog';
 import InvoiceSettlementDialog from '@/components/analysis/InvoiceSettlementDialog';
-import { useFeatureAccess } from '@/hooks/useFeatureAccess';
-import { MULTI_PPE_LOCK_MESSAGE } from '@/lib/feature-access';
+import { useGroupFeatureAccess } from '@/hooks/useFeatureAccess';
+import { deleteClientObject } from '@/lib/delete-client-object';
+import { MULTI_PPE_LOCK_MESSAGE, canDeleteClientData } from '@/lib/feature-access';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUserRoles } from '@/hooks/useUserRoles';
 
 export default function AnalysisGroupDetail() {
   const { projectId, groupId } = useParams<{ projectId: string; groupId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { isAdmin, isOwner } = useUserRoles();
   const creatingRef = useRef(false);
   const [searchParams] = useSearchParams();
   const highlighted = new Set((searchParams.get('highlight') || '').split(',').filter(Boolean));
@@ -79,7 +84,7 @@ export default function AnalysisGroupDetail() {
     enabled: !!projectId && !!groupId,
   });
 
-  const access = useFeatureAccess(ppes?.length || 0);
+  const access = useGroupFeatureAccess(groupId);
   const [name, setName] = useState('');
   useEffect(() => { if (group) setName(group.name); }, [group]);
 
@@ -126,8 +131,7 @@ export default function AnalysisGroupDetail() {
 
   const deletePpeMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('energy_analyses').delete().eq('id', id).eq('analysis_group_id', groupId!);
-      if (error) throw error;
+      await deleteClientObject('ppe', id);
     },
     onSuccess: () => { invalidate(); toast({ title: 'PPE zostało usunięte' }); },
     onError: () => toast({ variant: 'destructive', title: 'Błąd', description: 'Nie udało się usunąć PPE' }),
@@ -313,7 +317,7 @@ export default function AnalysisGroupDetail() {
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button disabled={access.readOnly} variant="ghost" size="icon" className="text-destructive hover:text-destructive" aria-label="Usuń PPE">
+                            <Button disabled={!canDeleteClientData(user?.id ?? null, project.created_by_user_id, isAdmin, isOwner)} variant="ghost" size="icon" className="text-destructive hover:text-destructive" aria-label="Usuń PPE">
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </AlertDialogTrigger>

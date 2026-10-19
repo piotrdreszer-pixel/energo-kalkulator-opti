@@ -684,6 +684,33 @@ export type Database = {
         }
         Relationships: []
       }
+      invoice_file_cleanup: {
+        Row: {
+          actor_user_id: string | null
+          attempts: number
+          created_at: string
+          file_path: string
+          id: string
+          last_error: string | null
+        }
+        Insert: {
+          actor_user_id?: string | null
+          attempts?: number
+          created_at?: string
+          file_path: string
+          id?: string
+          last_error?: string | null
+        }
+        Update: {
+          actor_user_id?: string | null
+          attempts?: number
+          created_at?: string
+          file_path?: string
+          id?: string
+          last_error?: string | null
+        }
+        Relationships: []
+      }
       manager_assignments: {
         Row: {
           assigned_by_user_id: string | null
@@ -946,7 +973,15 @@ export type Database = {
         Args: { _group_id: string }
         Returns: boolean
       }
+      can_delete_client_project: {
+        Args: { _project_id: string }
+        Returns: boolean
+      }
       can_edit_feature_group: { Args: { _group_id: string }; Returns: boolean }
+      delete_client_object: {
+        Args: { _id: string; _kind: string }
+        Returns: boolean
+      }
       get_nip_owner: { Args: { _nip: string }; Returns: string }
       has_feature_access: { Args: { _feature: string }; Returns: boolean }
       has_role: {
