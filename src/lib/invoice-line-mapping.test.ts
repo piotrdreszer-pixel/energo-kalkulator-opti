@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapLineItems, planOtherCharges, type OtherContribution, convertForTarget, isCleanMapping, perKwhToPerMwh, kwhToMwh, type LineItemInput } from './invoice-line-mapping';
+import { capacityGroup, capacityBlockReason, mapLineItems, planOtherCharges, type OtherContribution, convertForTarget, isCleanMapping, perKwhToPerMwh, kwhToMwh, type LineItemInput } from './invoice-line-mapping';
 import { calculateEnergyCosts } from './calculation-utils';
 
 const li = (o: Partial<LineItemInput>): LineItemInput => ({
@@ -134,5 +134,31 @@ describe('Suma pozostałych opłat PRZED', () => {
   it('pozycja przypisana do pola dedykowanego nie trafia do sumy', () => {
     const m2 = mapLineItems([...big, li({ id: 'm', name: 'Opłata mocowa', category: 'mocowa', net_value: 50 })], record, null, { m: 'capacity_charge_before' });
     expect(planOtherCharges({ ...base, maps: m2, selected: new Set(['q', 'm']), current: 0, mode: null }).total).toBe(743.45);
+  });
+});
+
+describe('grupa opłaty mocowej', () => {
+  const cap = (id: string, net: number | null) => li({ id, name: `Opłata mocowa ${id}`, category: 'mocowa', quantity: 9, unit: 'kWh', rate: 0.2194, net_value: net });
+  const its = [cap('m1', 120.5), cap('m2', 80.25), cap('m3', 49.25), cap('mx', null), items[0]];
+  const all = { m1: 'capacity_charge_before', m2: 'capacity_charge_before', m3: 'capacity_charge_before', mx: 'capacity_charge_before' } as const;
+  const maps = mapLineItems(its, record, null, all);
+  const plan = (sel: string[], m = maps) => planOtherCharges({ maps: m, selected: new Set(sel), documentId: 'd1', period: { from: null, to: null }, current: 0, previous: null, mode: 'replace', target: 'capacity_charge_before' });
+  it('kilka pozycji mocowej na jedno pole nie powoduje konfliktu', () => {
+    expect(capacityGroup(maps).length).toBe(4);
+    expect(maps.filter((m) => m.item.id !== 'mx' && m.kind === 'capacity').every((m) => m.status === 'mapped')).toBe(true);
+  });
+  it('zaznaczenie wszystkich sumuje kwoty netto', () => expect(plan(['m1', 'm2', 'm3', 'mx']).total).toBe(250));
+  it('odznaczenie jednej pozycji usuwa jej wkład', () => expect(plan(['m1', 'm3']).total).toBe(169.75));
+  it('odznaczenie całej grupy → brak sumy', () => expect(plan([]).result).toBeNull());
+  it('pozycja bez kwoty zablokowana z przyczyną', () => {
+    expect(capacityBlockReason(maps.find((m) => m.item.id === 'mx')!)).toBe('Brak kwoty netto na fakturze.');
+  });
+  it('mocowa nie trafia do Sumy pozostałych opłat', () => {
+    expect(planOtherCharges({ maps, selected: new Set(['m1']), documentId: 'd1', period: { from: null, to: null }, current: 0, previous: null, mode: null }).total).toBe(0);
+  });
+  it('dwa PPE liczone niezależnie', () => {
+    const m2 = mapLineItems([cap('m1', 10)], record, null, { m1: 'capacity_charge_before' });
+    expect(plan(['m1'], m2).total).toBe(10);
+    expect(plan(['m1']).total).toBe(120.5);
   });
 });
