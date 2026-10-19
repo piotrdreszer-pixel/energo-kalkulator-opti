@@ -541,6 +541,47 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
                 </table>
               )}
 
+              {!applied && (() => {
+                const o = osdStateFor(rec, target);
+                return (
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={o.apply}
+                        disabled={!o.choice || o.choice === '__keep__'}
+                        onCheckedChange={(v) => setOsdApply((p) => ({ ...p, [rec.id]: v === true }))}
+                        aria-label="Zastosuj Operator sieci (OSD)"
+                      />
+                      <span>Operator sieci (OSD)</span>
+                      <span className="text-muted-foreground">{osdName(o.current)} →</span>
+                      <Select
+                        value={o.choice}
+                        onValueChange={(v) => {
+                          setOsdChoice((p) => ({ ...p, [rec.id]: v }));
+                          setOsdApply((p) => ({ ...p, [rec.id]: v !== '__keep__' }));
+                        }}
+                      >
+                        <SelectTrigger className="w-64 h-8"><SelectValue placeholder="Wybierz operatora" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__keep__">Nie zmieniaj OSD</SelectItem>
+                          {osdOperators.map((op) => <SelectItem key={op.id} value={op.id}>{op.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Odczytano: {rec.osd_name || 'brak wskazania operatora'}
+                      {o.match.status !== 'matched' && ' — nie rozpoznano jednoznacznie, wybierz operatora ręcznie.'}
+                    </p>
+                    {o.conflict && o.apply && (
+                      <p className="text-xs text-warning flex items-start gap-1">
+                        <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                        Konflikt: punkt ma obecnie {osdName(o.current)}, faktura wskazuje {osdName(o.choice)}. Zatwierdzenie zmieni OSD.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+
               {maps.length > 0 && (
                 <LineItemsTable
                   maps={maps}
@@ -554,14 +595,19 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
               )}
 
               {!applied && (
-                <Button size="sm" onClick={() => applyRecord(rec)} disabled={applying}>
-                  {applying && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-                  Zatwierdź i zastosuj ({fields.size} pól PPE, {selCount} stawek i opłat)
-                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Do zastosowania: {fields.size} pól PPE{osdStateFor(rec, target).apply && osdStateFor(rec, target).choice && osdStateFor(rec, target).choice !== '__keep__' ? ', operator OSD' : ''}, {selCount} stawek i opłat.
+                </p>
               )}
             </div>
           );
         })
+      )}
+      {records.some(canApplyRecord) && (
+        <Button onClick={applyAll} disabled={applying}>
+          {applying && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+          {applying ? 'Zapisywanie…' : 'Zatwierdź i zastosuj'}
+        </Button>
       )}
     </div>
   );
