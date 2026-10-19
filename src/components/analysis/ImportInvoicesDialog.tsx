@@ -376,7 +376,7 @@ function InvoiceReview({ document: doc, ppes, projectId, groupId, onClose, onApp
   /** OSD: '' = wymagany wybór, '__keep__' = nie zmieniaj, id = operator. */
   const osdStateFor = (rec: InvoicePpeRecord, target: EnergyAnalysis | null) => {
     const m = matchOsd(rec.osd_name, osdOperators);
-    const choice = osdChoice[rec.id] ?? (m.status === 'matched' ? m.osdId! : '');
+    const choice = osdChoice[rec.id] ?? (m.status === 'matched' ? m.osdId! : rec.applied_at ? '__keep__' : '');
     const apply = osdApply[rec.id] ?? (m.status === 'matched' && (!target || target.osd_id !== m.osdId));
     const current = target?.osd_id || null;
     const conflict = !!current && !!choice && choice !== '__keep__' && choice !== current;

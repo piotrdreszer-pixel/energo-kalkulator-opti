@@ -210,7 +210,11 @@ export function mapLineItems(
       const same = items.filter((i) => classifyItem(i) === kind);
       if (same.length === 1 && zones === 1) target = allowed[0];
       else {
-        const zi = zoneIndexFromName(item.name, zoneNames);
+        let zi = zoneIndexFromName(item.name, zoneNames);
+        if (zi == null && zones > 1) {
+          const z = zoneFromName(item.name.replace(/^.*?(sieciow\w*|energi\w*)\s+(zmienn\w*|czynn\w*)?/i, ''), zones);
+          if (typeof z === 'number') zi = z - 1;
+        }
         if (zi != null && zi < zones) target = allowed[zi];
         else reason = 'Nie da się jednoznacznie ustalić strefy — wybierz pole ręcznie.';
       }
