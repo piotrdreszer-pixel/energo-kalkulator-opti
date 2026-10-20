@@ -37,3 +37,11 @@ describe('comparison', () => {
     expect(cheapest([a, { ...a, code: 'Y', costPo: 12 }])?.code).toBe('X');
   });
 });
+
+import { validateAppChanges } from '../../supabase/functions/ai-assistant/proposal';
+describe('tariff PO operation fields', () => {
+  it('tariff PO change may not touch PRZED', () => {
+    expect(validateAppChanges('tariff_po', [{ field: 'tariff_code_after', value: 'B23' }, { field: 'contracted_power_after_kw', value: 1050 }])).toEqual([]);
+    expect(validateAppChanges('tariff_po', [{ field: 'tariff_code_before', value: 'B23' }]).length).toBe(1);
+  });
+});

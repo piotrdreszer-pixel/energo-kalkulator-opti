@@ -19,10 +19,13 @@ export type Database = {
           analysis_group_id: string
           analysis_id: string
           assumption: string | null
+          command: string | null
           created_at: string
           fields: Json
           id: string
           proposal_id: string
+          result_after: Json | null
+          result_before: Json | null
           source: string
           undone_at: string | null
           undone_by: string | null
@@ -32,10 +35,13 @@ export type Database = {
           analysis_group_id: string
           analysis_id: string
           assumption?: string | null
+          command?: string | null
           created_at?: string
           fields: Json
           id?: string
           proposal_id: string
+          result_after?: Json | null
+          result_before?: Json | null
           source: string
           undone_at?: string | null
           undone_by?: string | null
@@ -45,10 +51,13 @@ export type Database = {
           analysis_group_id?: string
           analysis_id?: string
           assumption?: string | null
+          command?: string | null
           created_at?: string
           fields?: Json
           id?: string
           proposal_id?: string
+          result_after?: Json | null
+          result_before?: Json | null
           source?: string
           undone_at?: string | null
           undone_by?: string | null
@@ -167,11 +176,14 @@ export type Database = {
           base_updated_at: string
           before: Json
           changes: Json
+          command: string | null
           created_at: string
           estimates: Json | null
           id: string
           is_simulation: boolean
           kind: string
+          result_after: Json | null
+          result_before: Json | null
           source: string
           status: string
           updated_at: string
@@ -185,11 +197,14 @@ export type Database = {
           base_updated_at: string
           before: Json
           changes: Json
+          command?: string | null
           created_at?: string
           estimates?: Json | null
           id?: string
           is_simulation?: boolean
           kind?: string
+          result_after?: Json | null
+          result_before?: Json | null
           source: string
           status?: string
           updated_at?: string
@@ -203,11 +218,14 @@ export type Database = {
           base_updated_at?: string
           before?: Json
           changes?: Json
+          command?: string | null
           created_at?: string
           estimates?: Json | null
           id?: string
           is_simulation?: boolean
           kind?: string
+          result_after?: Json | null
+          result_before?: Json | null
           source?: string
           status?: string
           updated_at?: string
