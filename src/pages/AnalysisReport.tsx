@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { exportElementToPdf } from '@/lib/pdf-export';
 import AnalysisPdfDocument from '@/components/pdf/AnalysisPdfDocument';
 import { useGroupFeatureAccess } from '@/hooks/useFeatureAccess';
+import { useActiveEstimates } from '@/hooks/useInvoiceFacts';
 import { MULTI_PPE_LOCK_MESSAGE } from '@/lib/feature-access';
 
 export default function AnalysisReport() {
@@ -48,6 +49,7 @@ export default function AnalysisReport() {
   });
 
   const access = useGroupFeatureAccess(analysis?.analysis_group_id);
+  const estimates = useActiveEstimates(analysis?.id);
   const pdfTitle = useMemo(() => {
     const nip = project?.client_nip?.trim() || 'brak-NIP';
     const rawName = (profile?.name || user?.email || 'Nieznany')
@@ -163,6 +165,7 @@ export default function AnalysisReport() {
             results={results}
             preparerName={preparerName}
             preparerEmail={preparerEmail}
+            estimates={estimates.data}
           />
         </div>
       </div>

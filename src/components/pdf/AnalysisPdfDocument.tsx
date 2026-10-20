@@ -1,4 +1,5 @@
 import React from 'react';
+import { incompletePo, ESTIMATE_FIELD_LABELS } from '@/lib/invoice-gaps';
 import type { EnergyAnalysis, ClientProject } from '@/types/database';
 import { CalculationResult, formatCurrency, formatPercent, formatNumber } from '@/lib/calculation-utils';
 import { format } from 'date-fns';
@@ -73,12 +74,14 @@ interface Props {
   preparerEmail?: string;
   /** Overrides the line under the cover title (default: analysis name). */
   coverSubtitle?: React.ReactNode;
+  /** Active estimates of this PPE — marked in the report. */
+  estimates?: PdfEstimate[];
 }
 
 /* ═══════════════════════════════════════════
    MAIN COMPONENT
    ═══════════════════════════════════════════ */
-export default function AnalysisPdfDocument({ analysis, project, results, preparerName, preparerEmail, coverSubtitle }: Props) {
+export default function AnalysisPdfDocument({ analysis, project, results, preparerName, preparerEmail, coverSubtitle, estimates }: Props) {
   const zonesCountBefore = analysis.zones_count_before || 1;
   const zonesCountAfter = analysis.zones_count_after || 1;
   const dateStr = format(new Date(), 'd MMMM yyyy', { locale: pl });
@@ -370,7 +373,7 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
           <img src={logo} alt="" style={{ height: 24, opacity: 0.5 }} />
         </div>
 
-        <ParamCardsGrid analysis={analysis} results={results} isVisible={isVisible} />
+        <ParamCardsGrid analysis={analysis} results={results} isVisible={isVisible} estimates={estimates} />
 
         {/* ── Bottom insight: Zone share chart (PO scenario) ── */}
         {isVisible('distribution') && totalAfterMWh > 0 && (
@@ -560,10 +563,27 @@ export function buildCostRows(analysis: Partial<EnergyAnalysis>, results: Calcul
 
 
 /** Parameter cards of one PPE (shared by single and multi-PPE reports). */
-export function ParamCardsGrid({ analysis, results, isVisible }: { analysis: Partial<EnergyAnalysis>; results: CalculationResult; isVisible: (k: string) => boolean }) {
+export interface PdfEstimate { field: string; period_from: string; period_to: string; value: number; unit: string }
+const pdfDate = (s: string) => s.slice(0, 10).split('-').reverse().join('.');
+
+/** Estimates and incomplete-PO marks under the parameter cards (never presented as invoice data). */
+function ParamNotes({ analysis, estimates }: { analysis: Partial<EnergyAnalysis>; estimates?: PdfEstimate[] }) {
+  const missing = incompletePo(analysis as Record<string, unknown>);
+  if (!estimates?.length && !missing.length) return null;
+  return (
+    <div style={{ marginTop: 12, padding: '8px 12px', border: '1px solid #e0b84c', borderRadius: 6, background: '#fff8e6', fontSize: 9, lineHeight: 1.45, color: '#5a4a1a' }} data-testid="pdf-estimates">
+      {!!estimates?.length && <p style={{ margin: 0 }}><b>* Wartości szacunkowe</b> (średnia dobowa z sąsiednich rozliczeń, nie z faktur): {estimates.map((e) => `${ESTIMATE_FIELD_LABELS[e.field] ?? e.field} — w tym ${formatNumber(Number(e.value), e.unit === 'MWh' ? 4 : 2)} ${e.unit} za ${pdfDate(e.period_from)}–${pdfDate(e.period_to)}`).join('; ')}. Szacunek nie potwierdza Pmax ani bezpiecznej mocy umownej.</p>}
+      {missing.length > 0 && <p style={{ margin: estimates?.length ? '4px 0 0' : 0, color: '#a12a2a' }}><b>Wariant PO niepełny:</b> koszt w PRZED, brak w PO — {missing.join(', ')}. Oszczędność może być zawyżona.</p>}
+    </div>
+  );
+}
+
+export function ParamCardsGrid({ analysis, results, isVisible, estimates }: { analysis: Partial<EnergyAnalysis>; results: CalculationResult; isVisible: (k: string) => boolean; estimates?: PdfEstimate[] }) {
+  const est = (f: string) => (estimates?.some((e) => e.field === f) ? ' *' : '');
   const zonesCountBefore = analysis.zones_count_before || 1;
   const zonesCountAfter = analysis.zones_count_after || 1;
   return (
+    <>
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
       {/* Moc umowna */}
       {isVisible('contractedPower') && (
@@ -576,18 +596,18 @@ export function ParamCardsGrid({ analysis, results, isVisible }: { analysis: Par
       {/* Zużycie PRZED */}
       {isVisible('distribution') && (
         <ParamCard icon={iconEnergy} title="Zużycie energii PRZED">
-          <ParamRow label="Strefa 1" value={`${formatNumber(Number(analysis.consumption_before_zone1_mwh), 2)} MWh`} />
-          {zonesCountBefore >= 2 && <ParamRow label="Strefa 2" value={`${formatNumber(Number(analysis.consumption_before_zone2_mwh), 2)} MWh`} />}
-          {zonesCountBefore >= 3 && <ParamRow label="Strefa 3" value={`${formatNumber(Number(analysis.consumption_before_zone3_mwh), 2)} MWh`} />}
+          <ParamRow label="Strefa 1" value={`${formatNumber(Number(analysis.consumption_before_zone1_mwh), 2)} MWh${est('consumption_before_zone1_mwh')}`} />
+          {zonesCountBefore >= 2 && <ParamRow label="Strefa 2" value={`${formatNumber(Number(analysis.consumption_before_zone2_mwh), 2)} MWh${est('consumption_before_zone2_mwh')}`} />}
+          {zonesCountBefore >= 3 && <ParamRow label="Strefa 3" value={`${formatNumber(Number(analysis.consumption_before_zone3_mwh), 2)} MWh${est('consumption_before_zone3_mwh')}`} />}
         </ParamCard>
       )}
 
       {/* Zużycie PO */}
       {isVisible('distribution') && (
         <ParamCard icon={iconEnergy} title="Zużycie energii PO">
-          <ParamRow label="Strefa 1" value={`${formatNumber(Number(analysis.consumption_after_zone1_mwh), 2)} MWh`} />
-          {zonesCountAfter >= 2 && <ParamRow label="Strefa 2" value={`${formatNumber(Number(analysis.consumption_after_zone2_mwh), 2)} MWh`} />}
-          {zonesCountAfter >= 3 && <ParamRow label="Strefa 3" value={`${formatNumber(Number(analysis.consumption_after_zone3_mwh), 2)} MWh`} />}
+          <ParamRow label="Strefa 1" value={`${formatNumber(Number(analysis.consumption_after_zone1_mwh), 2)} MWh${est('consumption_after_zone1_mwh')}`} />
+          {zonesCountAfter >= 2 && <ParamRow label="Strefa 2" value={`${formatNumber(Number(analysis.consumption_after_zone2_mwh), 2)} MWh${est('consumption_after_zone2_mwh')}`} />}
+          {zonesCountAfter >= 3 && <ParamRow label="Strefa 3" value={`${formatNumber(Number(analysis.consumption_after_zone3_mwh), 2)} MWh${est('consumption_after_zone3_mwh')}`} />}
         </ParamCard>
       )}
 
@@ -607,7 +627,7 @@ export function ParamCardsGrid({ analysis, results, isVisible }: { analysis: Par
       {/* Opłata mocowa */}
       {(isVisible('capacity') || isVisible('handling')) && (
         <ParamCard icon={iconSavings} title="Opłaty dodatkowe">
-          {isVisible('capacity') && <ParamRow label="Opl. mocowa PRZED" value={formatCurrency(results.capacityChargeBefore)} />}
+          {isVisible('capacity') && <ParamRow label="Opl. mocowa PRZED" value={`${formatCurrency(results.capacityChargeBefore)}${est('capacity_charge_before')}`} />}
           {isVisible('capacity') && <ParamRow label="Opl. mocowa PO" value={formatCurrency(results.capacityChargeAfter)} />}
           {isVisible('capacity') && isVisible('handling') && <div style={{ height: 5 }} />}
           {isVisible('handling') && <ParamRow label="Opl. handlowa PRZED" value={`${formatNumber(Number(analysis.handling_fee_before))} zł/mies.`} />}
@@ -618,12 +638,14 @@ export function ParamCardsGrid({ analysis, results, isVisible }: { analysis: Par
       {/* Energia bierna */}
       {isVisible('reactive') && (
         <ParamCard icon={iconEnergy} title="Energia bierna">
-          <ParamRow label="PRZED" value={formatCurrency(results.reactiveEnergyCostBefore)} />
+          <ParamRow label="PRZED" value={`${formatCurrency(results.reactiveEnergyCostBefore)}${est('reactive_energy_cost_before')}`} />
           <ParamRow label="PO" value={formatCurrency(results.reactiveEnergyCostAfter)} />
         </ParamCard>
       )}
 
     </div>
+    <ParamNotes analysis={analysis} estimates={estimates} />
+    </>
   );
 }
 

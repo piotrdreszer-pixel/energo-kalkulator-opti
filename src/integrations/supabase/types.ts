@@ -168,8 +168,10 @@ export type Database = {
           before: Json
           changes: Json
           created_at: string
+          estimates: Json | null
           id: string
           is_simulation: boolean
+          kind: string
           source: string
           status: string
           updated_at: string
@@ -184,8 +186,10 @@ export type Database = {
           before: Json
           changes: Json
           created_at?: string
+          estimates?: Json | null
           id?: string
           is_simulation?: boolean
+          kind?: string
           source: string
           status?: string
           updated_at?: string
@@ -200,8 +204,10 @@ export type Database = {
           before?: Json
           changes?: Json
           created_at?: string
+          estimates?: Json | null
           id?: string
           is_simulation?: boolean
+          kind?: string
           source?: string
           status?: string
           updated_at?: string
@@ -327,6 +333,88 @@ export type Database = {
             columns: ["analysis_group_id"]
             isOneToOne: false
             referencedRelation: "analysis_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      analysis_estimates: {
+        Row: {
+          analysis_group_id: string
+          analysis_id: string
+          base_value: number | null
+          basis: Json
+          change_id: string | null
+          created_at: string
+          created_by: string | null
+          field: string
+          id: string
+          method: string
+          period_from: string
+          period_to: string
+          replaced_change_id: string | null
+          status: string
+          unit: string
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          analysis_group_id: string
+          analysis_id: string
+          base_value?: number | null
+          basis?: Json
+          change_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          field: string
+          id?: string
+          method: string
+          period_from: string
+          period_to: string
+          replaced_change_id?: string | null
+          status?: string
+          unit: string
+          updated_at?: string
+          value: number
+        }
+        Update: {
+          analysis_group_id?: string
+          analysis_id?: string
+          base_value?: number | null
+          basis?: Json
+          change_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          field?: string
+          id?: string
+          method?: string
+          period_from?: string
+          period_to?: string
+          replaced_change_id?: string | null
+          status?: string
+          unit?: string
+          updated_at?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analysis_estimates_analysis_group_id_fkey"
+            columns: ["analysis_group_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analysis_estimates_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "energy_analyses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analysis_estimates_change_id_fkey"
+            columns: ["change_id"]
+            isOneToOne: false
+            referencedRelation: "ai_applied_changes"
             referencedColumns: ["id"]
           },
         ]
@@ -1217,6 +1305,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      ai_allowed_fields: { Args: { _kind: string }; Returns: string[] }
       ai_allowed_po_fields: { Args: never; Returns: string[] }
       ai_apply_proposal: {
         Args: { _expected_updated_at: string; _id: string }

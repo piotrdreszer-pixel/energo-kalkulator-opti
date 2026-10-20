@@ -85,6 +85,20 @@
       "when": 1792482240334,
       "tag": "0011_ai_assistant_proposals",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792514541981,
+      "tag": "0012_ai_period_estimates",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792514560187,
+      "tag": "0013_ai_undo_jsonb_compare",
+      "breakpoints": true
     }
   ]
 }

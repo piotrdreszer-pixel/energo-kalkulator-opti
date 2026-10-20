@@ -1,4 +1,5 @@
 import type { CalculationResult } from './calculation-utils';
+import { incompletePo } from './invoice-gaps';
 
 export const AI_MAX_MESSAGE = 2000;
 
@@ -17,6 +18,7 @@ export function assistantResultSummary(a: Record<string, unknown>, r: Calculatio
     oszczednosc_zl: r2(r.savingsValue),
     oszczednosc_proc: r.totalCostBefore ? r2(r.savingsPercent) : null,
     skladniki_wylaczone_z_wyliczen: excluded,
+    po_niepelne: incompletePo(a),
     rozbicie_zl: {
       energia_czynna: { przed: r2(r.activeEnergyCostBefore), po: r2(r.activeEnergyCostAfter) },
       dystrybucja: { przed: r2(r.distributionCostBefore), po: r2(r.distributionCostAfter) },

@@ -38,6 +38,7 @@ import { RatesInputPanel } from '@/components/analysis/RatesInputPanel';
 import { ConsumptionMapping } from '@/components/analysis/ConsumptionMapping';
 import { ConsumptionMappingBefore } from '@/components/analysis/ConsumptionMappingBefore';
 import { ComparisonSummary } from '@/components/analysis/ComparisonSummary';
+import { InvoiceGapsNotice, IncompletePoNotice } from '@/components/analysis/InvoiceGapsNotice';
 import { useOsdOperators } from '@/hooks/useOsdOperators';
 import { useRatesResolver } from '@/hooks/useRatesResolver';
 import { useVisibleTariffsForOsd } from '@/hooks/useVisibleTariffsForOsd';
@@ -842,6 +843,7 @@ function AnalysisForm() {
                     />
                   </div>
                 </div>
+                <InvoiceGapsNotice groupId={analysis?.analysis_group_id} row={analysis as unknown as Record<string, unknown>} canImport={access.canImport} />
                 {formData.period_from && formData.period_to && (
                   <div className="p-4 bg-muted/50 rounded-lg">
                     <p className="text-sm">
@@ -1183,6 +1185,7 @@ function AnalysisForm() {
 
           {/* Step 6: Summary */}
           {currentStep === 'summary' && access.aiAssistant && <div className="flex justify-end mb-3"><AssistantContextButton label="Wyjaśnij wynik" prompt="Wyjaśnij wynik kalkulatora: z czego wynikają sumy PRZED i PO oraz oszczędność, i jakie braki ograniczają ocenę." /></div>}
+          {currentStep === 'summary' && <div className="mb-3"><IncompletePoNotice row={formData as Record<string, unknown>} /></div>}
           {currentStep === 'summary' && (
             <ComparisonSummary
               costBefore={results.totalCostBefore}
@@ -1253,7 +1256,7 @@ function AnalysisForm() {
         </div>
       </div>
       {access.aiAssistant && analysis?.analysis_group_id && <AssistantPanel groupId={analysis.analysis_group_id} clientName={project?.client_name} groupName={aiGroup?.name}
-        ppes={aiGroup?.ppes ?? [{ id: analysisId!, name: formData.name || 'PPE', ppe_number: formData.ppe_number }]} currentPpeId={analysisId} allowAll={access.multiPpe}
+        ppes={aiGroup?.ppes ?? [{ id: analysisId!, name: formData.name || 'PPE', ppe_number: formData.ppe_number }]} currentPpeId={analysisId} allowAll={access.multiPpe} invoiceImport={access.canImport}
         step={WIZARD_STEPS.find(s => s.id === currentStep)?.label} draft={formData as Record<string, unknown>} saved={analysis as unknown as Record<string, unknown>}
         results={results as unknown as Record<string, unknown>} issues={assistantIssues(formData as Record<string, unknown>)}
         onSaveForm={async () => { if (Object.keys(validationErrors).length) { handleSave(); return false; } try { await saveMutation.mutateAsync(); return true; } catch { return false; } }} />}
