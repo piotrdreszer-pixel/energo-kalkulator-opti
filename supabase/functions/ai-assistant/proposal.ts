@@ -67,22 +67,75 @@ export function numbersInText(text: string): number[] {
     .map(s => Number(s.replace(/[\s\u00a0]/g, '').replace(',', '.'))).filter(Number.isFinite);
 }
 
-const IMPERATIVE = /\b(ustaw|zmień|zmien|wpisz|zapisz|popraw|podmień|zastąp|zastap|daj|wstaw)\b/i;
+const IMPERATIVE = /(^|\s)(ustaw|zmień|zmien|wpisz|zapisz|popraw|podmień|zastąp|zastap|daj|wstaw|uzupełnij|uzupelnij|oszacuj)(\s|$|[,.:])/i;
 const QUESTION = /\?\s*$|\b(co da|co by|jak by|ile by|dlaczego|czy)\b/i;
 
-/** Server-side check that a "command" really is one: imperative, not a question, every value literally given by the user. Returns a reason when not. */
-export function commandGuard(message: string, changes: { value: number }[], source: string): string | null {
-  if (source !== 'polecenie_uzytkownika') return 'wartość nie pochodzi od użytkownika';
-  if (!IMPERATIVE.test(message)) return 'brak polecenia';
-  if (QUESTION.test(message)) return 'pytanie lub symulacja';
-  const nums = numbersInText(message);
-  if (!changes.every(c => nums.some(n => Math.abs(n - c.value) < 1e-9))) return 'wartości nie podane w poleceniu';
-  return null;
+/** Imperative, not a question/simulation. */
+export function isCommand(message: string): boolean {
+  return IMPERATIVE.test(message) && !QUESTION.test(message);
 }
 
-/** Explicit acceptance of the latest proposal in chat. */
+/**
+ * Server-side check that a PO "command" may be saved without another confirmation. Returns a reason when not.
+ * - polecenie_uzytkownika: every value literally given in the message;
+ * - dane_analizy: every value equals a value already present in the analysis (e.g. "ustaw cenę PO jak PRZED");
+ * - zalozenie: never saved without acceptance.
+ */
+export function commandGuard(message: string, changes: { field?: string; value: number }[], source: string, row?: Record<string, unknown> | null): string | null {
+  if (!isCommand(message)) return QUESTION.test(message) ? 'pytanie lub symulacja' : 'brak polecenia';
+  if (source === 'polecenie_uzytkownika') {
+    const nums = numbersInText(message);
+    return changes.every(c => nums.some(n => Math.abs(n - c.value) < 1e-9)) ? null : 'wartości nie podane w poleceniu';
+  }
+  if (source === 'dane_analizy' && row) {
+    const known = Object.entries(row).filter(([, v]) => typeof v === 'number' || (typeof v === 'string' && v !== '' && Number.isFinite(Number(v))));
+    return changes.every(c => known.some(([k, v]) => k !== c.field && Math.abs(Number(v) - c.value) < 1e-9)) ? null : 'wartości nie wynikają z danych analizy';
+  }
+  return 'wartość jest założeniem — wymaga akceptacji';
+}
+
+/** Explicit acceptance of a proposal in chat. */
 export function isAcceptance(message: string): boolean {
   const m = message.trim().toLowerCase();
   if (m.includes('?') || /\b(nie|anuluj|odrzuć|odrzuc)\b/.test(m)) return false;
   return /\b(zastosuj|zatwierdzam|zatwierdź|zatwierdz|akceptuję|akceptuje|tak,? (zapisz|zastosuj|wprowadź|wprowadz)|wprowadź|wprowadz)\b/.test(m);
+}
+
+export interface PendingProposal { id: string; analysis_id: string; base_updated_at: string; created_at: string; kind?: string | null }
+
+/**
+ * Which proposal an acceptance refers to: only pending, current-version proposals of this PPE shown in this conversation.
+ * Several candidates without an explicit id → ask; never pick "the latest" from another context.
+ */
+export function pickAcceptance(cands: PendingProposal[], ppeId: string, rowUpdatedAt: string, shownIds: string[], explicitId?: string | null):
+  { ok: true; id: string } | { ok: false; reason: 'none' | 'ambiguous' | 'unknown'; ids: string[] } {
+  const same = (a: string, b: string) => new Date(a).getTime() === new Date(b).getTime();
+  const valid = cands.filter(c => c.analysis_id === ppeId && same(c.base_updated_at, rowUpdatedAt) && shownIds.includes(c.id));
+  if (explicitId) return valid.some(c => c.id === explicitId) ? { ok: true, id: explicitId } : { ok: false, reason: 'unknown', ids: valid.map(c => c.id) };
+  if (valid.length === 1) return { ok: true, id: valid[0].id };
+  return { ok: false, reason: valid.length ? 'ambiguous' : 'none', ids: valid.map(c => c.id) };
+}
+
+const ISO = /^\d{4}-\d{2}-\d{2}$/;
+const KIND_FIELDS: Record<string, RegExp> = {
+  period: /^period_(from|to)$/,
+  estimate: /^(consumption_(before|after)_zone[123]_mwh|capacity_charge_before|reactive_energy_cost_before)$/,
+  estimate_replace: /^(consumption_(before|after)_zone[123]_mwh|capacity_charge_before|reactive_energy_cost_before)$/,
+};
+
+/** Validates app-computed changes (period/estimates) before they are stored as a proposal. */
+export function validateAppChanges(kind: string, changes: { field: string; value: unknown }[]): string[] {
+  const re = KIND_FIELDS[kind];
+  if (!re) return ['Nieznany rodzaj operacji.'];
+  if (!changes.length) return ['Brak zmian do zapisania.'];
+  const errs: string[] = [];
+  for (const c of changes) {
+    if (!re.test(c.field)) errs.push(`Pole „${c.field}” jest niedozwolone dla tej operacji.`);
+    else if (kind === 'period' ? !(typeof c.value === 'string' && ISO.test(c.value)) : !(typeof c.value === 'number' && Number.isFinite(c.value) && c.value >= 0 && c.value < 1e9)) errs.push(`Nieprawidłowa wartość pola „${c.field}”.`);
+  }
+  if (kind === 'period') {
+    const f = changes.find(c => c.field === 'period_from')?.value as string | undefined, t = changes.find(c => c.field === 'period_to')?.value as string | undefined;
+    if (!f || !t || f > t) errs.push('Nieprawidłowy okres.');
+  }
+  return errs;
 }
