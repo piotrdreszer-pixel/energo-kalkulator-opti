@@ -870,7 +870,7 @@ function AnalysisForm() {
           )}
 
           {/* Step 3: Power - Taryfy i moce */}
-          {currentStep === 'power' && access.aiAssistant && <div className="flex justify-end mb-3"><AssistantContextButton label="Omów wariant" prompt="Omów wariant taryfy i mocy umownej PRZED i PO dla tego PPE. Rozróżnij dane potwierdzone od symulacji." /></div>}
+          {currentStep === 'power' && access.aiAssistant && <div className="flex flex-wrap justify-end gap-2 mb-3"><AssistantContextButton label="Porównaj taryfy" prompt="Porównaj dostępne taryfy PO dla tego PPE (bez zapisu). Pokaż tabelę i wskaż najtańszy poprawnie przeliczony wariant z warunkami." /><AssistantContextButton label="Omów wariant" prompt="Omów wariant taryfy i mocy umownej PRZED i PO dla tego PPE. Rozróżnij dane potwierdzone od symulacji." /></div>}
           {currentStep === 'power' && (
             <Card>
               <CardHeader>
