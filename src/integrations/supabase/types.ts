@@ -14,6 +14,115 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_conversations: {
+        Row: {
+          analysis_group_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          analysis_group_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          analysis_group_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_conversations_analysis_group_id_fkey"
+            columns: ["analysis_group_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          ppe_id: string | null
+          ppe_label: string | null
+          role: string
+          scope: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          ppe_id?: string | null
+          ppe_label?: string | null
+          role: string
+          scope?: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          ppe_id?: string | null
+          ppe_label?: string | null
+          role?: string
+          scope?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_usage_log: {
+        Row: {
+          analysis_group_id: string | null
+          created_at: string
+          id: string
+          input_chars: number
+          input_tokens: number | null
+          model: string
+          output_chars: number
+          output_tokens: number | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          analysis_group_id?: string | null
+          created_at?: string
+          id?: string
+          input_chars?: number
+          input_tokens?: number | null
+          model: string
+          output_chars?: number
+          output_tokens?: number | null
+          status: string
+          user_id: string
+        }
+        Update: {
+          analysis_group_id?: string | null
+          created_at?: string
+          id?: string
+          input_chars?: number
+          input_tokens?: number | null
+          model?: string
+          output_chars?: number
+          output_tokens?: number | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       analysis_documents: {
         Row: {
           analysis_group_id: string
@@ -923,18 +1032,21 @@ export type Database = {
       }
       user_feature_access: {
         Row: {
+          ai_assistant: boolean
           invoice_import: boolean
           multi_ppe: boolean
           updated_at: string
           user_id: string
         }
         Insert: {
+          ai_assistant?: boolean
           invoice_import?: boolean
           multi_ppe?: boolean
           updated_at?: string
           user_id: string
         }
         Update: {
+          ai_assistant?: boolean
           invoice_import?: boolean
           multi_ppe?: boolean
           updated_at?: string
