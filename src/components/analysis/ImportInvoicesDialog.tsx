@@ -295,7 +295,6 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
             ))}
           </div>
         )}
-        </div>}
 
         {docsQuery.data?.length ? (
           <div className="space-y-2 mt-2">
