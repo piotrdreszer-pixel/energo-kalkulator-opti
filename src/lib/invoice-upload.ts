@@ -49,3 +49,20 @@ export function storageErrorMessage(e: { message?: string; statusCode?: string |
   if (/too large|payload/i.test(m)) return 'Plik jest za duży.';
   return m || 'Nieznany błąd przesyłania.';
 }
+
+export interface DocsSummary { total: number; approved: number; toReview: number; reading: number; errors: number; allApproved: boolean }
+
+/** Trwałe podsumowanie listy dokumentów importu. */
+export function summarizeDocs(docs: { status: string }[]): DocsSummary {
+  const c = (s: string[]) => docs.filter((d) => s.includes(d.status)).length;
+  const approved = c(['approved']);
+  return {
+    total: docs.length, approved, toReview: c(['needs_review']), reading: c(['pending', 'processing']), errors: c(['error']),
+    allApproved: docs.length > 0 && approved === docs.length,
+  };
+}
+
+/** Cel przycisku „Przejdź do analizy”: jeden PPE → formularz, kilka/zero → lista PPE analizy. */
+export function analysisTarget(projectId: string, groupId: string, ppeIds: string[]): string {
+  return ppeIds.length === 1 ? `/projects/${projectId}/analysis/${ppeIds[0]}` : `/projects/${projectId}/analyses/${groupId}`;
+}
