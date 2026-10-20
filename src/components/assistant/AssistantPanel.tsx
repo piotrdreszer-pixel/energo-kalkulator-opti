@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Bot, Loader2, RotateCcw, Send, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { assistantDraftDiff, assistantResultSummary, AI_MAX_MESSAGE } from '@/lib/assistant-context';
 import { calculateEnergyCosts } from '@/lib/calculation-utils';
 import { ProposalCard } from './ProposalCard';
@@ -158,7 +159,7 @@ export function AssistantPanel(p: AssistantPanelProps) {
       {msgs.map((m, i) => <div key={m.id} className={m.role === 'user' ? 'ml-8 rounded-lg bg-primary/10 p-3' : `mr-4 rounded-lg p-3 ${m.error ? 'border border-destructive text-destructive' : 'bg-muted'}`}>
         {m.ppe_label && <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">{m.ppe_label}</p>}
         {m.role === 'assistant' && !m.error && m.content
-          ? <div className="min-w-0 max-w-full text-sm break-words space-y-2 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5 [&_strong]:font-semibold [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold"><ReactMarkdown skipHtml>{m.content}</ReactMarkdown></div>
+          ? <div className="min-w-0 max-w-full text-sm break-words space-y-2 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5 [&_strong]:font-semibold [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_table]:block [&_table]:overflow-x-auto [&_table]:text-xs [&_th]:border [&_td]:border [&_th]:px-1 [&_td]:px-1 [&_th]:text-left"><ReactMarkdown skipHtml remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown></div>
           : <p className="text-sm whitespace-pre-wrap break-words">{m.content || (busy ? '…' : '')}</p>}
         {m.proposal_id && !msgs.slice(0, i).some(x => x.proposal_id === m.proposal_id) && <ProposalCard proposalId={m.proposal_id} dirtyFor={p.currentPpeId && assistantDraftDiff(p.saved, p.draft).length ? p.currentPpeId : null} onSaveForm={p.onSaveForm} />}
       </div>)}
