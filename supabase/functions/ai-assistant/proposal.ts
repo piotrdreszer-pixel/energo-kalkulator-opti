@@ -68,7 +68,7 @@ export function numbersInText(text: string): number[] {
 }
 
 const IMPERATIVE = /(^|\s)(ustaw|zmień|zmien|wpisz|zapisz|popraw|podmień|zastąp|zastap|daj|wstaw|uzupełnij|uzupelnij|oszacuj)(\s|$|[,.:])/i;
-const QUESTION = /\?\s*$|\b(co da|co by|jak by|ile by|dlaczego|czy)\b/i;
+const QUESTION = /\?\s*$|(^|[.!]\s*)(co da|co by|jak by|ile by|dlaczego|czy)\b/i;
 
 /** Imperative, not a question/simulation. */
 export function isCommand(message: string): boolean {
