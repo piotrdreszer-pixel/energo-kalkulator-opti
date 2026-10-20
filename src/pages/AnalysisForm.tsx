@@ -671,7 +671,7 @@ function AnalysisForm() {
 
   return (
     <AppLayout>
-      <div className="content-container max-w-7xl">
+      <div className="content-container min-w-0 max-w-7xl">
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div className="flex min-w-0 items-center gap-4">
@@ -967,12 +967,12 @@ function AnalysisForm() {
                 <CardContent className="space-y-6">
                   {/* Podsumowanie wybranej taryfy i mocy */}
                   <div className="p-3 bg-muted/50 rounded-lg space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap gap-3 items-center justify-between">
                       <div>
                         <p className="text-sm text-muted-foreground">Wybrana taryfa</p>
                         <p className="font-semibold">{formData.tariff_code_before}</p>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex flex-wrap items-center gap-4">
                         <Select
                           value={formData.tariff_code_before}
                           onValueChange={(v) => handleTariffChange('tariff_code_before', v)}
@@ -1078,12 +1078,12 @@ function AnalysisForm() {
                 <CardContent className="space-y-6">
                   {/* Podsumowanie wybranej taryfy i mocy */}
                   <div className="p-3 bg-primary/5 rounded-lg space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap gap-3 items-center justify-between">
                       <div>
                         <p className="text-sm text-muted-foreground">Wybrana taryfa</p>
                         <p className="font-semibold">{formData.tariff_code_after}</p>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex flex-wrap items-center gap-4">
                         <Select
                           value={formData.tariff_code_after}
                           onValueChange={(v) => handleTariffChange('tariff_code_after', v)}
