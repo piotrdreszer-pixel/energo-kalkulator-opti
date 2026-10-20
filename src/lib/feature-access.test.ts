@@ -15,7 +15,7 @@ describe('individual feature permissions', () => {
   });
   it('missing or null access denies both features', () => {
     for (const access of [undefined, null, {}, { invoice_import: null, multi_ppe: null }]) {
-      expect(featureRules(access, 1)).toEqual({ multiPpe: false, readOnly: false, canImport: false, canAddPpe: false });
+      expect(featureRules(access, 1)).toEqual({ multiPpe: false, readOnly: false, canImport: false, canAddPpe: false, aiAssistant: false });
     }
   });
   it('both disabled allows first PPE in each independent analysis', () => {

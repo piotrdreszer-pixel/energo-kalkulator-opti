@@ -18,7 +18,7 @@ export function useFeatureAccess(count = 0) {
     queryKey: ['feature-access', user?.id], enabled: !!user,
     queryFn: async () => {
       if (!user) return null;
-      const { data, error } = await supabase.from('user_feature_access').select('invoice_import,multi_ppe').eq('user_id', user.id).maybeSingle();
+      const { data, error } = await supabase.from('user_feature_access').select('invoice_import,multi_ppe,ai_assistant').eq('user_id', user.id).maybeSingle();
       if (error) throw error;
       return data;
     },
