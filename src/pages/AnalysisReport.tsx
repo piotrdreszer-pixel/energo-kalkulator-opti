@@ -163,6 +163,7 @@ export default function AnalysisReport() {
             results={results}
             preparerName={preparerName}
             preparerEmail={preparerEmail}
+            estimates={estimates.data}
           />
         </div>
       </div>
