@@ -1185,8 +1185,8 @@ function AnalysisForm() {
 
           {/* Step 6: Summary */}
           {currentStep === 'summary' && access.aiAssistant && <div className="flex justify-end mb-3"><AssistantContextButton label="Wyjaśnij wynik" prompt="Wyjaśnij wynik kalkulatora: z czego wynikają sumy PRZED i PO oraz oszczędność, i jakie braki ograniczają ocenę." /></div>}
+          {currentStep === 'summary' && <div className="mb-3"><IncompletePoNotice row={formData as Record<string, unknown>} /></div>}
           {currentStep === 'summary' && (
-            <IncompletePoNotice row={formData as Record<string, unknown>} />
             <ComparisonSummary
               costBefore={results.totalCostBefore}
               costAfter={results.totalCostAfter}
