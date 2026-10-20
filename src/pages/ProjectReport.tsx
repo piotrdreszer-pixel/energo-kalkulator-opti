@@ -29,7 +29,7 @@ export default function ProjectReport() {
       return (data ?? []) as (PdfEstimate & { analysis_id: string })[];
     },
   });
-  const estimatesOf = (id: string) => (groupEstimates.data ?? []).filter((e) => e.analysis_id === id);
+  const estimatesOf = React.useCallback((id: string) => (groupEstimates.data ?? []).filter((e) => e.analysis_id === id), [groupEstimates.data]);
   const pdfRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
