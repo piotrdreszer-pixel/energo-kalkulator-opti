@@ -5,7 +5,7 @@ import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { createOpenAI } from 'npm:@ai-sdk/openai@2';
 import { streamText, tool, stepCountIs } from 'npm:ai@5';
-import { validateProposal, commandGuard, isAcceptance, isCommand, pickAcceptance, validateAppChanges, PROPOSAL_FIELD_NAMES, PROPOSAL_SOURCES } from './proposal.ts';
+import { validateProposal, commandGuard, isAcceptance, isCommand, pickAcceptance, validateAppChanges, PROPOSAL_FIELD_NAMES, PROPOSAL_SOURCES, PROPOSAL_FIELDS } from './proposal.ts';
 import { z } from 'npm:zod@3';
 
 const MODEL = 'openai/gpt-6-astra';
@@ -171,7 +171,7 @@ Deno.serve(async (req) => {
     if (error || (st !== 'applied' && st !== 'already_applied')) return { ok: false, errors: [st === 'stale' ? 'Dane PPE zmieniły się w międzyczasie — nic nie zapisano. Powtórz polecenie.' : 'Zapis nie powiódł się — nic nie zmieniono.'] };
     const { data: after } = await userClient.from('energy_analyses').select('*').eq('id', current!.id as string).single();
     const confirmed = changes.every(c => typeof c.value === 'string' ? String((after as any)?.[c.field]).slice(0, 10) === c.value : Math.abs(Number((after as any)?.[c.field]) - c.value) < 1e-6);
-    if (!confirmed) return { ok: false, errors: ['Nie udało się potwierdzić zapisu odczytem z bazy.'] };
+    if (!confirmed) { applied = { fields: changes.map(c => c.field), changeId: (r as any).change_id }; confirmedChanges = changes; return { ok: true, info: 'Operacja zapisu zakończona, lecz odczyt wartości nie został potwierdzony. Brak aktualnego wyniku; odśwież stronę.' }; }
     applied = { fields: changes.map(c => c.field), changeId: (r as any).change_id };
     confirmedAfter = after as unknown as Record<string, unknown>;
     confirmedChanges = changes;
@@ -311,7 +311,7 @@ Deno.serve(async (req) => {
         if (applied && confirmedAfter) {
           const fmtValue = (v: number | string) => typeof v === 'number' ? v.toLocaleString('pl-PL', { maximumFractionDigits: 4 }) : v;
           const labels: Record<string, string> = { consumption_before_zone1_mwh: 'Zużycie PRZED — strefa 1 (MWh)', consumption_before_zone2_mwh: 'Zużycie PRZED — strefa 2 (MWh)', consumption_before_zone3_mwh: 'Zużycie PRZED — strefa 3 (MWh)', period_from: 'Okres od', period_to: 'Okres do', capacity_charge_before: 'Opłata mocowa PRZED', reactive_energy_cost_before: 'Energia bierna PRZED' };
-          text = 'Zmieniono i potwierdzono zapis: ' + confirmedChanges.map(c => `${labels[c.field] ?? c.field}: ${fmtValue(c.value)}`).join('; ') + '.';
+          text = 'Zmieniono i potwierdzono zapis: ' + confirmedChanges.map(c => `${labels[c.field] ?? PROPOSAL_FIELDS[c.field as keyof typeof PROPOSAL_FIELDS]?.label ?? c.field}: ${fmtValue(c.value)}`).join('; ') + '.';
           if (confirmedResult) {
             text += `\n\nAktualny wynik (${confirmedAfter.period_from} – ${confirmedAfter.period_to}): PRZED **${formatCurrency(confirmedResult.totalCostBefore)}**, PO **${formatCurrency(confirmedResult.totalCostAfter)}**.`;
             text += confirmedResult.savingsAvailable ? ` Oszczędność **${formatCurrency(confirmedResult.savingsValue)}** (${formatPercent(confirmedResult.savingsPercent)}).` : ` ${INCOMPLETE_PO_MESSAGE}.`;
@@ -322,6 +322,7 @@ Deno.serve(async (req) => {
             }
           } else text += '\nNie udało się przeliczyć aktualnego wyniku. Potwierdzam wyłącznie zapisane zmiany.';
         }
+        if (applied && !confirmedAfter) text = 'Operacja zapisu zakończona, lecz nie udało się potwierdzić aktualnych wartości odczytem. Nie podaję wyniku — odśwież stronę przed kolejną zmianą.';
         if (streamError && !applied) throw streamError;
         if (!text.trim() && !proposalId) throw new Error('empty');
         if (!text.trim()) text = 'Przygotowałem propozycję zmiany PO.';

@@ -283,7 +283,7 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
           </thead>
           <tbody>
             {costRows.map((row, i) => {
-              const diff = row.before - row.after;
+              const diff = results.savingsAvailable ? row.before - row.after : NaN;
               return (
                 <tr key={i} style={{ background: i % 2 === 0 ? '#f8fafb' : '#fff' }}>
                   <td style={tdStyle}>{row.label}</td>
@@ -297,7 +297,7 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
                       color: diff > 0 ? '#1a8a5a' : diff < 0 ? '#d32f2f' : '#333',
                     }}
                   >
-                    {diff > 0 ? '−' : diff < 0 ? '+' : ''}{formatCurrency(Math.abs(diff))}
+                    {results.savingsAvailable ? formatCurrency(Math.abs(diff)) : '—'}
                   </td>
                 </tr>
               );

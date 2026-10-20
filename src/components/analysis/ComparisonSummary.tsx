@@ -84,7 +84,7 @@ export function ComparisonSummary({
   };
 
   const renderDeltaRow = (key: ReportComponentKey, label: string, before: number, after: number) => {
-    const diff = before - after;
+    const diff = savingsAvailable ? before - after : NaN;
     const visible = !hiddenComponents.includes(key);
     const included = !excludedComponents.includes(key);
     return (
@@ -112,7 +112,7 @@ export function ComparisonSummary({
           <span className="text-muted-foreground">→</span>
           <span className="w-24 text-right">{formatCurrency(after)}</span>
           <span className={`w-24 text-right font-medium ${getSavingsColor(diff)}`}>
-            {formatCurrency(Math.abs(diff))}
+            {savingsAvailable ? formatCurrency(Math.abs(diff)) : '—'}
           </span>
         </div>
       </div>
@@ -150,7 +150,7 @@ export function ComparisonSummary({
               </p>
             </div>
             <p className="text-xs text-muted-foreground">
-              {savingsValue > 0 ? 'oszczędność' : savingsValue < 0 ? 'wzrost kosztu' : 'bez zmian'}
+              {!savingsAvailable ? 'brak wyniku' : savingsValue > 0 ? 'oszczędność' : savingsValue < 0 ? 'wzrost kosztu' : 'bez zmian'}
             </p>
           </CardContent>
         </Card>
@@ -167,12 +167,12 @@ export function ComparisonSummary({
       </div>
 
       {/* Detailed breakdown */}
-      <Card>
+      <Card className="min-w-0">
         <CardHeader>
           <CardTitle className="text-base font-medium">Szczegółowe zestawienie</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="divide-y">
+        <CardContent className="overflow-x-auto">
+          <div className="divide-y min-w-[580px]">
             <div className="flex items-center justify-between py-2 font-medium text-sm">
               <span>Składnik <span className="font-normal text-muted-foreground">(1. pole: widoczny w raporcie, 2. pole: uwzględniony w wyliczeniach)</span></span>
               <div className="flex items-center gap-4">
@@ -192,7 +192,7 @@ export function ComparisonSummary({
 
           </div>
           
-          <div className="flex items-center justify-between py-3 mt-2 border-t-2 font-bold">
+          <div className="flex items-center justify-between py-3 mt-2 border-t-2 font-bold min-w-[580px]">
             <span>RAZEM</span>
             <div className="flex items-center gap-4">
               <span className="w-24 text-right">{formatCurrency(costBefore)}</span>
