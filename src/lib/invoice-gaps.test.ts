@@ -31,12 +31,13 @@ describe('szacunek zużycia sierpnia', () => {
   it('średnia dobowa lipca i września osobno dla każdej strefy', () => {
     expect(p.errors).toEqual([]);
     // strefa 1: (3,1 + 3,0) / 61 dni × 31 = 3,1000 MWh; strefa 2: (6,2 + 6,0) / 61 × 31 = 6,2000
-    expect(p.estimates.find(e => e.field === 'consumption_before_zone1_mwh')!.value).toBeCloseTo(3.1, 4);
-    expect(p.estimates.find(e => e.field === 'consumption_before_zone2_mwh')!.value).toBeCloseTo(6.2, 4);
-    expect(p.changes.find(c => c.field === 'consumption_before_zone1_mwh')!.value).toBeCloseTo(12.3, 4);
+    expect(p.estimates.find(e => e.field === 'consumption_before_zone1_mwh')?.value).toBeCloseTo(3.1, 4);
+    expect(p.estimates.find(e => e.field === 'consumption_before_zone2_mwh')?.value).toBeCloseTo(6.2, 4);
+    expect(p.changes.find(c => c.field === 'consumption_before_zone1_mwh')?.value).toBeCloseTo(12.3, 4);
   });
-  it('PO aktualizowane tylko gdy było kopią PRZED', () => {
-    expect(p.changes.some(c => c.field === 'consumption_after_zone1_mwh')).toBe(true);
+  it('zgodne taryfy i zużycie nie upoważniają do zmiany PO', () => {
+    expect(p.changes.map(c => c.field)).toEqual(['consumption_before_zone1_mwh', 'consumption_before_zone2_mwh']);
+    expect(p.estimates.every(e => e.field.startsWith('consumption_before_'))).toBe(true);
     const q = planConsumptionEstimate({ ...row, consumption_after_zone1_mwh: 5 }, s, s.gaps[0]);
     expect(q.changes.some(c => c.field === 'consumption_after_zone1_mwh')).toBe(false);
   });

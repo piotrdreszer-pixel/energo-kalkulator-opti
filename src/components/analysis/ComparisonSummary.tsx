@@ -9,6 +9,7 @@ import { REPORT_COMPONENTS, type ReportComponentKey } from '@/lib/report-compone
 
 
 interface ComparisonSummaryProps {
+  savingsAvailable?: boolean;
   costBefore: number;
   costAfter: number;
   periodMonths: number;
@@ -38,6 +39,7 @@ interface ComparisonSummaryProps {
 }
 
 export function ComparisonSummary({
+  savingsAvailable = true,
   costBefore,
   costAfter,
   periodMonths,
@@ -58,8 +60,8 @@ export function ComparisonSummary({
   };
 
   const delta = costAfter - costBefore;
-  const savingsValue = -delta; // Positive means savings
-  const savingsPercent = costBefore !== 0 ? (savingsValue / costBefore) * 100 : 0;
+  const savingsValue = savingsAvailable ? -delta : NaN; // Positive means savings
+  const savingsPercent = !savingsAvailable ? NaN : costBefore !== 0 ? (savingsValue / costBefore) * 100 : 0;
 
   const getTrendIcon = (value: number) => {
     if (value > 0) return <TrendingDown className="h-5 w-5 text-green-600" />;
@@ -82,7 +84,7 @@ export function ComparisonSummary({
   };
 
   const renderDeltaRow = (key: ReportComponentKey, label: string, before: number, after: number) => {
-    const diff = before - after;
+    const diff = savingsAvailable ? before - after : NaN;
     const visible = !hiddenComponents.includes(key);
     const included = !excludedComponents.includes(key);
     return (
@@ -110,7 +112,7 @@ export function ComparisonSummary({
           <span className="text-muted-foreground">→</span>
           <span className="w-24 text-right">{formatCurrency(after)}</span>
           <span className={`w-24 text-right font-medium ${getSavingsColor(diff)}`}>
-            {formatCurrency(Math.abs(diff))}
+            {savingsAvailable ? formatCurrency(Math.abs(diff)) : '—'}
           </span>
         </div>
       </div>
@@ -143,12 +145,12 @@ export function ComparisonSummary({
             <p className="text-sm text-muted-foreground mb-1">Różnica</p>
             <div className="flex items-center justify-center gap-2">
               {getTrendIcon(savingsValue)}
-              <p className={`text-2xl font-bold ${getSavingsColor(savingsValue)}`}>
+              <p className={`${savingsAvailable ? 'text-2xl' : 'text-sm'} font-bold ${getSavingsColor(savingsValue)}`}>
                 {formatCurrency(Math.abs(savingsValue))}
               </p>
             </div>
             <p className="text-xs text-muted-foreground">
-              {savingsValue > 0 ? 'oszczędność' : savingsValue < 0 ? 'wzrost kosztu' : 'bez zmian'}
+              {!savingsAvailable ? 'brak wyniku' : savingsValue > 0 ? 'oszczędność' : savingsValue < 0 ? 'wzrost kosztu' : 'bez zmian'}
             </p>
           </CardContent>
         </Card>
@@ -156,7 +158,7 @@ export function ComparisonSummary({
         <Card className={savingsValue > 0 ? 'border-green-500/30 bg-green-500/5' : savingsValue < 0 ? 'border-red-500/30 bg-red-500/5' : ''}>
           <CardContent className="pt-6 text-center">
             <p className="text-sm text-muted-foreground mb-1">Zmiana</p>
-            <p className={`text-2xl font-bold ${getSavingsColor(savingsValue)}`}>
+            <p className={`${savingsAvailable ? 'text-2xl' : 'text-sm'} font-bold ${getSavingsColor(savingsValue)}`}>
               {formatPercent(Math.abs(savingsPercent))}
             </p>
             <p className="text-xs text-muted-foreground">procentowo</p>
@@ -165,12 +167,12 @@ export function ComparisonSummary({
       </div>
 
       {/* Detailed breakdown */}
-      <Card>
+      <Card className="min-w-0">
         <CardHeader>
           <CardTitle className="text-base font-medium">Szczegółowe zestawienie</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="divide-y">
+        <CardContent className="overflow-x-auto">
+          <div className="divide-y min-w-[580px]">
             <div className="flex items-center justify-between py-2 font-medium text-sm">
               <span>Składnik <span className="font-normal text-muted-foreground">(1. pole: widoczny w raporcie, 2. pole: uwzględniony w wyliczeniach)</span></span>
               <div className="flex items-center gap-4">
@@ -190,13 +192,13 @@ export function ComparisonSummary({
 
           </div>
           
-          <div className="flex items-center justify-between py-3 mt-2 border-t-2 font-bold">
+          <div className="flex items-center justify-between py-3 mt-2 border-t-2 font-bold min-w-[580px]">
             <span>RAZEM</span>
             <div className="flex items-center gap-4">
               <span className="w-24 text-right">{formatCurrency(costBefore)}</span>
               <span className="w-4"></span>
               <span className="w-24 text-right">{formatCurrency(costAfter)}</span>
-              <span className={`w-24 text-right ${getSavingsColor(savingsValue)}`}>
+              <span className={`w-24 text-right text-xs ${getSavingsColor(savingsValue)}`}>
                 {formatCurrency(Math.abs(savingsValue))}
               </span>
             </div>

@@ -4,7 +4,7 @@
 
 import { mapConsumptionZones } from './invoice-import';
 import { toStored, type Interval, type Settlement, type SettlementEntry } from './invoice-settlement';
-import { calculateEnergyCosts } from './calculation-utils';
+import { missingPoFields } from '../../supabase/functions/_shared/po-completeness';
 
 const dayMs = 86400000;
 const toDay = (s: string) => Math.round(Date.parse(s.slice(0, 10) + 'T00:00:00Z') / dayMs);
@@ -47,7 +47,6 @@ export function planConsumptionEstimate(row: Record<string, unknown>, s: Settlem
   if (nb.length < 1) { p.errors.push('Brak rozliczeń bezpośrednio przed lub po luce — nie ma podstawy do szacunku.'); return p; }
   if (nb.length < 2) p.notes.push('Szacunek oparty tylko na jednym sąsiednim rozliczeniu.');
   const gapDays = daysOf(gap);
-  const copyAfter = Number(row.zones_count_after) === zones && String(row.tariff_code_after || '').toUpperCase() === String(row.tariff_code_before || '').toUpperCase();
   for (let z = 1; z <= zones; z++) {
     const zs = s.zoneSummaries.find(x => x.zone === z);
     const field = `consumption_before_zone${z}_mwh`;
@@ -72,11 +71,7 @@ export function planConsumptionEstimate(row: Record<string, unknown>, s: Settlem
     const value = toStored(field, base + est);
     p.changes.push({ field, value });
     p.estimates.push({ field, period_from: gap.from, period_to: gap.to, value: est, base_value: base, unit: 'MWh', method: METHOD_DAILY, basis });
-    const af = `consumption_after_zone${z}_mwh`;
-    if (copyAfter && close(row[af], zs.mwh, af)) {
-      p.changes.push({ field: af, value });
-      p.estimates.push({ field: af, period_from: gap.from, period_to: gap.to, value: est, base_value: base, unit: 'MWh', method: METHOD_DAILY, basis });
-    }
+
   }
   p.notes.push(`Szacunek ${fmtD(gap.from)}–${fmtD(gap.to)} (${gapDays} dni): ${METHOD_LABEL}. Nie potwierdza Pmax ani bezpiecznej mocy umownej.`);
   if (p.errors.length) { p.changes = []; p.estimates = []; }
@@ -91,6 +86,7 @@ const COST_FIELDS: { kind: 'capacity' | 'reactive'; field: string; label: string
 /** Szacunek kwot za okres (opłata mocowa, energia bierna) tą samą metodą dobową — tylko gdy pole równa się sumie z faktur. */
 export function planCostEstimate(row: Record<string, unknown>, s: Settlement, gap: Interval): Plan {
   const p = empty();
+  if (s.blocked.length) { p.errors.push(...s.blocked); return p; }
   const nb = neighbours(s, gap, false);
   if (!nb.length) { p.errors.push('Brak rozliczeń bezpośrednio przed lub po luce — nie ma podstawy do szacunku kosztów.'); return p; }
   const gapDays = daysOf(gap);
@@ -102,7 +98,9 @@ export function planCostEstimate(row: Record<string, unknown>, s: Settlement, ga
     if (!close(row[cf.field], cost.total, cf.field)) { p.notes.push(`${cf.label}: wartość w formularzu nie jest sumą z faktur — nie zmieniam.`); continue; }
     let sum = 0, days = 0; const basis: EstimateRow['basis'] = [];
     for (const e of nb) {
-      const v = cost.components.filter(c => c.recordId === e.record.id).reduce((a, c) => a + Number(c.value || 0), 0);
+      const components = cost.components.filter(c => c.recordId === e.record.id);
+      if (!components.length) continue;
+      const v = components.reduce((a, c) => a + Number(c.value || 0), 0);
       const d = daysOf({ from: e.record.period_from!, to: e.record.period_to! });
       sum += v; days += d;
       basis.push({ record_id: e.record.id, document: e.doc.file_name, period_from: e.record.period_from!, period_to: e.record.period_to!, days: d, value: v });
@@ -113,6 +111,7 @@ export function planCostEstimate(row: Record<string, unknown>, s: Settlement, ga
     p.estimates.push({ field: cf.field, period_from: gap.from, period_to: gap.to, value: est, base_value: toStored(cf.field, cost.total), unit: 'zł', method: METHOD_DAILY, basis });
   }
   if (!p.changes.length && !p.notes.length) p.notes.push('Brak kosztów z faktur, które można oszacować tą metodą.');
+  p.notes.push('Średnia dobowa kwot jest uproszczeniem, nie odtworzeniem rzeczywistego naliczenia opłaty mocowej ani energii biernej. Każdy składnik wymaga osobnej zgody.');
   p.notes.push('Koszty liczone ze stawek (energia czynna, składnik zmienny) przeliczają się automatycznie z zużycia. „Suma pozostałych opłat” i opłata handlowa nie są szacowane automatycznie.');
   return p;
 }
@@ -138,22 +137,8 @@ export function planReplaceEstimates(row: Record<string, unknown>, s: Settlement
   return p;
 }
 
-const PO_PAIRS: [keyof ReturnType<typeof calculateEnergyCosts>, keyof ReturnType<typeof calculateEnergyCosts>, string][] = [
-  ['activeEnergyCostBefore', 'activeEnergyCostAfter', 'energia czynna'],
-  ['distributionCostBefore', 'distributionCostAfter', 'dystrybucja'],
-  ['handlingFeeBefore', 'handlingFeeAfter', 'opłata handlowa'],
-  ['contractedPowerChargeBefore', 'contractedPowerChargeAfter', 'opłata za moc umowną'],
-  ['capacityChargeBefore', 'capacityChargeAfter', 'opłata mocowa'],
-  ['reactiveEnergyCostBefore', 'reactiveEnergyCostAfter', 'energia bierna'],
-];
-
-/** Składniki, które mają koszt w PRZED, a w PO są zerowe/puste — wtedy oszczędność jest pozorna (wariant PO niepełny). */
-export function incompletePo(row: Record<string, unknown>): string[] {
-  const r = calculateEnergyCosts(row as never);
-  const excluded = (row.report_excluded_components as string[] | null) ?? [];
-  const keyOf: Record<string, string> = { 'energia czynna': 'activeEnergy', dystrybucja: 'distribution', 'opłata handlowa': 'handling', 'opłata za moc umowną': 'contractedPower', 'opłata mocowa': 'capacity', 'energia bierna': 'reactive' };
-  return PO_PAIRS.filter(([b, a, l]) => !excluded.includes(keyOf[l]) && Number(r[b]) > 0 && !Number(r[a])).map(([, , l]) => l);
-}
+export const incompletePo = missingPoFields;
+export { INCOMPLETE_PO_MESSAGE } from '../../supabase/functions/_shared/po-completeness';
 
 export const ESTIMATE_FIELD_LABELS: Record<string, string> = {
   consumption_before_zone1_mwh: 'Zużycie PRZED – strefa 1', consumption_before_zone2_mwh: 'Zużycie PRZED – strefa 2', consumption_before_zone3_mwh: 'Zużycie PRZED – strefa 3',

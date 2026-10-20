@@ -5,7 +5,7 @@ export const AI_MAX_MESSAGE = 2000;
 
 const IGNORED = new Set(['updated_at', 'created_at']);
 
-const r2 = (v: number) => Math.round((Number(v) || 0) * 100) / 100;
+const r2 = (v: number) => Number.isFinite(v) ? Math.round(v * 100) / 100 : null;
 
 /** Calculator output handed to the assistant — same numbers as the UI (calculateEnergyCosts), never recomputed by the model. */
 export function assistantResultSummary(a: Record<string, unknown>, r: CalculationResult, source: 'zapisane' | 'robocze') {
@@ -18,7 +18,8 @@ export function assistantResultSummary(a: Record<string, unknown>, r: Calculatio
     oszczednosc_zl: r2(r.savingsValue),
     oszczednosc_proc: r.totalCostBefore ? r2(r.savingsPercent) : null,
     skladniki_wylaczone_z_wyliczen: excluded,
-    po_niepelne: incompletePo(a),
+    po_niepelne: r.missingPo,
+    wersja_danych: a.updated_at ?? null,
     rozbicie_zl: {
       energia_czynna: { przed: r2(r.activeEnergyCostBefore), po: r2(r.activeEnergyCostAfter) },
       dystrybucja: { przed: r2(r.distributionCostBefore), po: r2(r.distributionCostAfter) },
@@ -45,13 +46,6 @@ export function assistantIssues(a: Record<string, unknown>): string[] {
   if (empty(a.osd_id)) out.push('Brak wybranego OSD');
   const zb = Number(a.zones_count_before) || 1, za = Number(a.zones_count_after) || 1;
   for (let z = 1; z <= zb; z++) if (empty(a[`consumption_before_zone${z}_mwh`]) || Number(a[`consumption_before_zone${z}_mwh`]) === 0) out.push(`PRZED: brak zużycia w strefie ${z}`);
-  for (let z = 1; z <= za; z++) if (!Number(a[`active_energy_price_after_zone${z}`])) out.push(`PO: brak ceny energii w strefie ${z}`);
-  const pairs: [string, string, string][] = [
-    ['handling_fee_before', 'handling_fee_after', 'opłata handlowa'],
-    ['capacity_charge_before', 'capacity_charge_after', 'opłata mocowa'],
-    ['fixed_distribution_before_total', 'fixed_distribution_after_total', 'suma pozostałych opłat'],
-    ['reactive_energy_cost_before', 'reactive_energy_cost_after', 'energia bierna'],
-  ];
-  for (const [b, af, label] of pairs) if (Number(a[b]) > 0 && !Number(a[af])) out.push(`Koszt „${label}” występuje w PRZED, a w PO jest pusty`);
+  out.push(...incompletePo(a));
   return out;
 }

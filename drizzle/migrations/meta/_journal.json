@@ -99,6 +99,13 @@
       "when": 1792514560187,
       "tag": "0013_ai_undo_jsonb_compare",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792516322358,
+      "tag": "0014_ai_estimate_scope_guard",
+      "breakpoints": true
     }
   ]
 }

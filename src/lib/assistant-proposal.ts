@@ -10,7 +10,7 @@ export interface ProposalChange { field: string; value: number | string }
 
 /** Preview of a proposal on a copy of the saved row — the same engine as the UI, nothing is saved. */
 export function buildProposalPreview(row: Record<string, unknown>, changes: ProposalChange[]) {
-  const copy = { ...row, ...Object.fromEntries(changes.map(c => [c.field, c.value])) };
+  const copy: Record<string, unknown> = { ...row, ...Object.fromEntries(changes.map(c => [c.field, c.value])), value_sources: { ...(row.value_sources as object ?? {}), ...Object.fromEntries(changes.map(c => [c.field, { source: 'ai' }])) } };
   const cur = calculateEnergyCosts(row as never);
   const next = calculateEnergyCosts(copy as never);
   const sources = (row.value_sources ?? {}) as ValueSources;
@@ -25,12 +25,12 @@ export function buildProposalPreview(row: Record<string, unknown>, changes: Prop
   if (changes.some(c => c.field === 'contracted_power_after_kw') && !Number(row.contracted_power_charge_rate_after))
     issues.push('PO: brak stawki opłaty za moc umowną — zmiana mocy nie wpływa na wynik');
   return {
-    fields, periodMonths: next.periodMonths, periodFrom: row.period_from ?? null, periodTo: row.period_to ?? null,
+    fields, periodMonths: next.periodMonths, periodFrom: copy.period_from ?? null, periodTo: copy.period_to ?? null,
     costBefore: next.totalCostBefore,
     currentAfter: cur.totalCostAfter, proposedAfter: next.totalCostAfter,
     extraBenefit: cur.totalCostAfter - next.totalCostAfter,
     savingsAfterChange: next.savingsValue, savingsPercentAfterChange: next.totalCostBefore ? next.savingsPercent : null,
-    issues,
+    issues, savingsAvailable: next.savingsAvailable,
   };
 }
 

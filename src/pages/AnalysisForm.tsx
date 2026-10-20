@@ -420,7 +420,7 @@ function AnalysisForm() {
   };
 
   const handleInputChange = useCallback((field: keyof EnergyAnalysis, value: string | number | boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => ({ ...prev, [field]: value, value_sources: typeof value === 'number' ? markSources((prev.value_sources || {}) as ValueSources, [String(field)], { source: 'manual' }) : prev.value_sources }));
   }, []);
 
   const fetchRates = async (scenario: 'before' | 'after', options?: { silent?: boolean }) => {
@@ -1188,6 +1188,7 @@ function AnalysisForm() {
           {currentStep === 'summary' && <div className="mb-3"><IncompletePoNotice row={formData as Record<string, unknown>} /></div>}
           {currentStep === 'summary' && (
             <ComparisonSummary
+              savingsAvailable={results.savingsAvailable}
               costBefore={results.totalCostBefore}
               costAfter={results.totalCostAfter}
               periodMonths={periodMonths}

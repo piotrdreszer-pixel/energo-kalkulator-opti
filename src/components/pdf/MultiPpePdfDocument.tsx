@@ -94,10 +94,10 @@ const PpeRow = ({ i, e, showTariff }: { i: number; e: PpeEntry; showTariff: bool
 };
 
 /* ── Cost table in the same style as page 2 of the single report ── */
-function CostTable({ rows, totalBefore, totalAfter, compact }: { rows: CostRow[]; totalBefore: number; totalAfter: number; compact?: boolean }) {
+function CostTable({ rows, totalBefore, totalAfter, compact, savingsAvailable = true }: { rows: CostRow[]; totalBefore: number; totalAfter: number; compact?: boolean; savingsAvailable?: boolean }) {
   const td = compact ? { ...tdStyle, padding: '7px 12px', fontSize: 11 } : tdStyle;
   const th = compact ? { ...thStyle, padding: '9px 12px', fontSize: 11 } : thStyle;
-  const sav = totalBefore - totalAfter;
+  const sav = savingsAvailable ? totalBefore - totalAfter : NaN;
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
       <thead>
@@ -110,13 +110,13 @@ function CostTable({ rows, totalBefore, totalAfter, compact }: { rows: CostRow[]
       </thead>
       <tbody>
         {rows.map((row, i) => {
-          const diff = row.before - row.after;
+          const diff = savingsAvailable ? row.before - row.after : NaN;
           return (
             <tr key={row.key} style={{ background: i % 2 === 0 ? '#f8fafb' : '#fff' }}>
               <td style={td}>{row.label}</td>
               <td style={{ ...td, textAlign: 'right' }}>{formatCurrency(row.before)}</td>
               <td style={{ ...td, textAlign: 'right' }}>{formatCurrency(row.after)}</td>
-              <td style={{ ...td, textAlign: 'right', fontWeight: 600, color: signColor(diff) }}>{diffText(diff)}</td>
+              <td style={{ ...td, textAlign: 'right', fontWeight: 600, color: signColor(diff) }}>{savingsAvailable ? diffText(diff) : '—'}</td>
             </tr>
           );
         })}
@@ -220,11 +220,11 @@ export default function MultiPpePdfDocument({ project, groupName, totals: t, osd
       )});
       b.push({ key: `cost-${a.id}`, section: 'details', kind: 'block', node: (
         <div style={{ marginTop: 12 }}>
-          <CostTable rows={buildCostRows(a, r).filter((row) => isVisible(row.key))} totalBefore={r.totalCostBefore} totalAfter={r.totalCostAfter} compact />
+          <CostTable rows={buildCostRows(a, r).filter((row) => isVisible(row.key))} totalBefore={r.totalCostBefore} totalAfter={r.totalCostAfter} savingsAvailable={r.savingsAvailable} compact />
           <div style={{ marginTop: 10, background: 'linear-gradient(135deg, #e8f5f0, #dff0ea)', border: '1px solid #c8e6d8', borderRadius: 12, padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
             <img src={iconSavings} alt="" style={{ width: 24, height: 24, opacity: 0.7 }} />
             <span style={{ fontSize: 12, color: '#666' }}>Oszczędność punktu za okres analizy</span>
-            <span style={{ marginLeft: 'auto', fontFamily: H_FONT, fontSize: 18, fontWeight: 800, color: r.savingsValue >= 0 ? '#0d6b42' : RED }}>
+            <span style={{ marginLeft: 'auto', fontFamily: H_FONT, fontSize: r.savingsAvailable ? 18 : 11, fontWeight: 800, color: r.savingsValue >= 0 ? '#0d6b42' : RED }}>
               {formatCurrency(Math.abs(r.savingsValue))} • {r.totalCostBefore ? formatPercent(Math.abs(r.savingsPercent)) : 'n/d'}
             </span>
           </div>
@@ -336,7 +336,7 @@ export default function MultiPpePdfDocument({ project, groupName, totals: t, osd
           <p style={{ fontSize: 12, color: '#777', marginBottom: 18, lineHeight: 1.5 }}>
             Suma składników kosztów energii wszystkich {entries.length} punktów poboru w wariantach PRZED i PO za okres analizy.
           </p>
-          <CostTable rows={aggRows} totalBefore={t.totalBefore} totalAfter={t.totalAfter} />
+          <CostTable rows={aggRows} totalBefore={t.totalBefore} totalAfter={t.totalAfter} savingsAvailable={t.canAggregate} />
           {someRowsOmitted && (
             <p style={{ fontSize: 10.5, color: '#888', margin: '8px 0 0' }}>Składniki pominięte w części punktów nie są pokazywane osobno; kwota RAZEM obejmuje wszystkie uwzględnione składniki.</p>
           )}

@@ -123,7 +123,8 @@ export function AssistantPanel(p: AssistantPanelProps) {
       }
       const reader = res.body.getReader(); const dec = new TextDecoder(); let acc = '';
       for (;;) { const { done, value } = await reader.read(); if (done) break; acc += dec.decode(value, { stream: true });
-        setPending(prev => prev.map(m => m.id === aId ? { ...m, content: acc.split('[[BŁĄD]]')[0] } : m)); }
+        // Publish the answer only after all affected views read the confirmed saved row.
+ }
       if (acc.includes('[[BŁĄD]]')) throw new Error(acc.split('[[BŁĄD]]')[1].trim());
       // A chat command may have saved PO values: reload form, PPE card and summary from the database.
       await Promise.all(['ai-messages', 'ai-proposal', 'analysis', 'ai-group-ppes', 'group-ppe', 'analyses', 'ai-history', 'analysis-estimates', 'invoice-facts']
@@ -146,8 +147,8 @@ export function AssistantPanel(p: AssistantPanelProps) {
         {p.allowAll && p.ppes.length > 1 && <option value="all">Wszystkie PPE</option>}
       </select>
       {dirty.length > 0 && <p className="text-xs text-muted-foreground">Formularz ma niezapisane zmiany — asystent zobaczy je jako wersję roboczą. Nic nie zostanie zapisane bez Twojej zgody.</p>}
-      {(changes.data?.length ?? 0) > 0 && <details className="text-xs"><summary className="cursor-pointer text-muted-foreground">Historia zmian asystenta ({changes.data!.length})</summary>
-        <ul className="mt-1 space-y-1 max-h-40 overflow-y-auto">{changes.data!.map(c => <li key={c.id} className="border-b pb-1">
+      {(changes.data?.length ?? 0) > 0 && <details className="text-xs"><summary className="cursor-pointer text-muted-foreground">Historia zmian asystenta ({(changes.data ?? []).length})</summary>
+        <ul className="mt-1 space-y-1 max-h-40 overflow-y-auto">{(changes.data ?? []).map(c => <li key={c.id} className="border-b pb-1">
           {new Date(c.created_at).toLocaleString('pl-PL')} · {p.ppes.find(x => x.id === c.analysis_id)?.ppe_number || p.ppes.find(x => x.id === c.analysis_id)?.name || 'PPE'}{c.undone_at ? ' · cofnięta' : ''}
           <span className="block text-muted-foreground">{Object.entries(c.fields).map(([f, v]) => `${fieldLabel(f)}: ${v.before ?? 'brak'} → ${v.after}`).join('; ')}</span></li>)}</ul></details>}
     </header>

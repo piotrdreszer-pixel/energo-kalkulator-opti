@@ -26,7 +26,7 @@ export function IncompletePoNotice({ row }: { row: Record<string, unknown> }) {
   const missing = incompletePo(row);
   if (!missing.length) return null;
   return <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm" data-testid="incomplete-po">
-    <p className="font-medium text-destructive">Wariant PO jest niepełny — oszczędność może być pozorna.</p>
-    <p>Koszt występuje w PRZED, a w PO jest pusty: {missing.join(', ')}. Uzupełnij wariant PO albo wyłącz te składniki z wyliczeń.</p>
+    <p className="font-medium text-destructive">Nie można wyznaczyć oszczędności — uzupełnij wariant PO</p>
+    <p>Brakujące dane lub niepotwierdzone zera PO: {missing.join(', ')}. Uzupełnij wariant PO albo wyłącz te składniki z wyliczeń.</p>
   </div>;
 }

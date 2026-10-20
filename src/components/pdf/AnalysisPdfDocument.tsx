@@ -283,7 +283,7 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
           </thead>
           <tbody>
             {costRows.map((row, i) => {
-              const diff = row.before - row.after;
+              const diff = results.savingsAvailable ? row.before - row.after : NaN;
               return (
                 <tr key={i} style={{ background: i % 2 === 0 ? '#f8fafb' : '#fff' }}>
                   <td style={tdStyle}>{row.label}</td>
@@ -297,7 +297,7 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
                       color: diff > 0 ? '#1a8a5a' : diff < 0 ? '#d32f2f' : '#333',
                     }}
                   >
-                    {diff > 0 ? '−' : diff < 0 ? '+' : ''}{formatCurrency(Math.abs(diff))}
+                    {results.savingsAvailable ? formatCurrency(Math.abs(diff)) : '—'}
                   </td>
                 </tr>
               );
@@ -346,13 +346,13 @@ export default function AnalysisPdfDocument({ analysis, project, results, prepar
           <img src={iconSavings} alt="" style={{ width: 38, height: 38, opacity: 0.7 }} />
           <div>
             <p style={{ fontSize: 12, color: '#666', margin: 0, fontWeight: 500 }}>Szacowana oszczędność za okres analizy</p>
-            <p style={{ fontSize: 30, fontWeight: 800, color: results.savingsValue > 0 ? '#0d6b42' : '#d32f2f', margin: '4px 0 0', fontFamily: "'Plus Jakarta Sans'" }}>
+            <p style={{ fontSize: results.savingsAvailable ? 30 : 13, fontWeight: 800, color: results.savingsValue > 0 ? '#0d6b42' : '#d32f2f', margin: '4px 0 0', fontFamily: "'Plus Jakarta Sans'" }}>
               {formatCurrency(Math.abs(results.savingsValue))}
             </p>
           </div>
           <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
             <p style={{ fontSize: 12, color: '#666', margin: 0, fontWeight: 500 }}>Procentowo</p>
-            <p style={{ fontSize: 26, fontWeight: 800, color: results.savingsValue > 0 ? '#0d6b42' : '#d32f2f', margin: '4px 0 0', fontFamily: "'Plus Jakarta Sans'" }}>
+            <p style={{ fontSize: results.savingsAvailable ? 26 : 13, fontWeight: 800, color: results.savingsValue > 0 ? '#0d6b42' : '#d32f2f', margin: '4px 0 0', fontFamily: "'Plus Jakarta Sans'" }}>
               {formatPercent(results.savingsPercent)}
             </p>
           </div>
@@ -573,7 +573,7 @@ function ParamNotes({ analysis, estimates }: { analysis: Partial<EnergyAnalysis>
   return (
     <div style={{ marginTop: 12, padding: '8px 12px', border: '1px solid #e0b84c', borderRadius: 6, background: '#fff8e6', fontSize: 9, lineHeight: 1.45, color: '#5a4a1a' }} data-testid="pdf-estimates">
       {!!estimates?.length && <p style={{ margin: 0 }}><b>* Wartości szacunkowe</b> (średnia dobowa z sąsiednich rozliczeń, nie z faktur): {estimates.map((e) => `${ESTIMATE_FIELD_LABELS[e.field] ?? e.field} — w tym ${formatNumber(Number(e.value), e.unit === 'MWh' ? 4 : 2)} ${e.unit} za ${pdfDate(e.period_from)}–${pdfDate(e.period_to)}`).join('; ')}. Szacunek nie potwierdza Pmax ani bezpiecznej mocy umownej.</p>}
-      {missing.length > 0 && <p style={{ margin: estimates?.length ? '4px 0 0' : 0, color: '#a12a2a' }}><b>Wariant PO niepełny:</b> koszt w PRZED, brak w PO — {missing.join(', ')}. Oszczędność może być zawyżona.</p>}
+      {missing.length > 0 && <p style={{ margin: estimates?.length ? '4px 0 0' : 0, color: '#a12a2a' }}><b>Wariant PO niepełny:</b> koszt w PRZED, brak w PO — {missing.join(', ')}. Nie można wyznaczyć oszczędności — uzupełnij wariant PO.</p>}
     </div>
   );
 }
@@ -740,7 +740,7 @@ export function ResultTile({
       <p style={{ fontSize: 12, color: textColor ? 'rgba(255,255,255,0.7)' : '#777', margin: '0 0 8px', fontWeight: 500 }}>
         {label}
       </p>
-      <p style={{ fontSize: 28, fontWeight: 800, color: tc, margin: '0 0 6px', fontFamily: "'Plus Jakarta Sans'" }}>
+      <p style={{ fontSize: value.length > 45 ? 13 : 28, fontWeight: 800, color: tc, margin: '0 0 6px', fontFamily: "'Plus Jakarta Sans'" }}>
         {value}
       </p>
       <p style={{ fontSize: 11, color: textColor ? 'rgba(255,255,255,0.55)' : '#999', margin: 0 }}>

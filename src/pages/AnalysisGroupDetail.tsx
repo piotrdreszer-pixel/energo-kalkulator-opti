@@ -298,9 +298,9 @@ export default function AnalysisGroupDetail() {
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground mb-1">OSZCZĘDNOŚĆ</p>
-                          <p className={`font-bold ${r.savingsValue > 0 ? 'text-success' : r.savingsValue < 0 ? 'text-destructive' : ''}`}>
+                          <p className={`font-bold ${r.savingsAvailable ? '' : 'text-xs max-w-48'} ${r.savingsValue > 0 ? 'text-success' : r.savingsValue < 0 ? 'text-destructive' : ''}`}>
                             {formatCurrency(r.savingsValue)}
-                            <span className="block text-xs">({formatPercent(r.savingsPercent)})</span>
+                            {r.savingsAvailable && <span className="block text-xs">({formatPercent(r.savingsPercent)})</span>}
                           </p>
                         </div>
                       </div>
