@@ -217,8 +217,8 @@ function AnalysisForm() {
         setFormData(cur => ({ ...cur, ...Object.fromEntries(changed.map(k => [k, analysis[k]])), updated_at: analysis.updated_at }));
         if (changed.includes('rates_overridden_after')) setOverriddenAfter((analysis.rates_overridden_after as Record<string, number>) || {});
         if (changed.includes('rates_overridden_before')) setOverriddenBefore((analysis.rates_overridden_before as Record<string, number>) || {});
-        if (changed.includes('rates_year_after') && analysis.rates_year_after) setRatesYearAfter(String(analysis.rates_year_after) as any);
-        lastFetchedAfterRef.current = ratesSignature(analysis.osd_id, analysis.tariff_code_after, analysis.season_after, (analysis.rates_year_after ?? ratesYearAfter) as any);
+        if (changed.includes('rates_year_after') && analysis.rates_year_after) setRatesYearAfter(String(analysis.rates_year_after));
+        lastFetchedAfterRef.current = ratesSignature(analysis.osd_id, analysis.tariff_code_after, analysis.season_after, String(analysis.rates_year_after ?? ratesYearAfter));
         return;
       }
       // Kody taryf zapisane inną wielkością liter (np. „C22B” z importu) → kod ze słownika i jego liczba stref.
