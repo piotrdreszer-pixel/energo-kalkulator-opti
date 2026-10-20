@@ -168,7 +168,8 @@ Deno.serve(async (req) => {
   let applied: { fields: string[]; changeId: string } | null = null;
   let confirmedAfter: Record<string, unknown> | null = null;
   let confirmedResult: ReturnType<typeof calculateEnergyCosts> | null = null;
-  let confirmedChanges: { field: string; value: number | string }[] = [];
+  let confirmedChanges: { field: string; value: any }[] = [];
+  let extraNote = '';
   // A chat command replaces the unsaved draft value of the same field; other draft fields stay in the form (merged client-side).
   const draftConflict = (_fields: string[]): string[] => [];
   // Saves via the user's own JWT (permission + version checked in ai_apply_proposal), then confirms by reading back.
@@ -327,6 +328,7 @@ Deno.serve(async (req) => {
         const literal = moc_kw == null || numbersInText(b.message).some(n => Math.abs(n - moc_kw) < 1e-9);
         const cmd = tryb === 'polecenie' && isCommand(b.message) && new RegExp(code, 'i').test(b.message) && literal && /\bPO\b|po zmianie|wariant(ie)? po/i.test(b.message);
         const r = await appOp('tariff_po', plan.changes, null, `Taryfa PO ${code}, moc ${power} kW; stawki: ${plan.rateCard}${plan.missing.length ? `; do uzupełnienia: ${plan.missing.join(', ')}` : ''}`, cmd);
+        if (applied) extraNote = `\n\nStawki: ${plan.rateCard}.${plan.missing.length ? ` Do uzupełnienia: ${plan.missing.join(', ')} — bez tych danych wynik nie jest wiarygodną oszczędnością.` : ''}${plan.conditions.length ? ` ${plan.conditions.join(' ')}` : ''}`;
         return { ...r, stawki: plan.rateCard, warunki_do_potwierdzenia: plan.conditions, do_uzupelnienia: plan.missing };
       },
     }),
@@ -396,6 +398,7 @@ Deno.serve(async (req) => {
             }
           } else text += '\nNie udało się przeliczyć aktualnego wyniku. Potwierdzam wyłącznie zapisane zmiany.';
         }
+        if (applied && confirmedAfter) text += extraNote;
         if (applied && !confirmedAfter) text = 'Operacja zapisu zakończona, lecz nie udało się potwierdzić aktualnych wartości odczytem. Nie podaję wyniku — odśwież stronę przed kolejną zmianą.';
         if (streamError && !applied) throw streamError;
         if (!text.trim() && !proposalId) throw new Error('empty');
