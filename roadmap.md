@@ -2,7 +2,8 @@
 
 ## Asystent: zmiana pól i porównanie taryf
 - [x] Reguły: taryfa+moc razem, dostępność dla OSD, warunki zmiany grupy, strefy wg znaczenia, brak stawki ≠ 0, najtańszy/remis (testy).
-- [ ] Operacje zapisu w bazie (taryfa+moc+stawki, pola, wybór PPE, zaznaczenia importu) z historią i cofaniem.
+- [x] Operacje zapisu w bazie: taryfa+moc+stawki PO, pola PRZED, wybór PPE do zestawienia — z historią (polecenie, wynik przed/po) i cofaniem.
+- [ ] Zmiana zaznaczeń importu przez asystenta (przez istniejący mechanizm ponownej edycji).
 - [ ] Narzędzia asystenta i scalanie z niezapisanym formularzem.
 - [ ] Przycisk „Porównaj taryfy” i tabela wyniku.
 - [ ] Test w przeglądarce (sekcja 10).
