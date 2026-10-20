@@ -50,7 +50,7 @@ export function AssistantPanel(p: AssistantPanelProps) {
   const [busy, setBusy] = useState(false);
   const [lastFailed, setLastFailed] = useState<string | null>(null);
   const qc = useQueryClient();
-  const endRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { document.documentElement.classList.toggle('assistant-open', open); return () => document.documentElement.classList.remove('assistant-open'); }, [open]);
   useEffect(() => { if (p.currentPpeId) setScope(p.currentPpeId); }, [p.currentPpeId]);
@@ -77,7 +77,7 @@ export function AssistantPanel(p: AssistantPanelProps) {
     },
   });
   const msgs = [...(history.data ?? []), ...pending];
-  useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [msgs.length, pending]);
+  useEffect(() => { const el = messagesRef.current; if (el) el.scrollTop = el.scrollHeight; }, [msgs.length, pending]);
 
   const isAll = scope === 'all';
   const ppe = p.ppes.find(x => x.id === scope);
@@ -137,12 +137,12 @@ export function AssistantPanel(p: AssistantPanelProps) {
   };
 
   if (!open) return null;
-  return <aside className="fixed inset-0 sm:inset-auto sm:top-0 sm:right-0 sm:bottom-0 sm:w-[420px] z-50 bg-background border-l shadow-xl flex flex-col" aria-label="Asystent AI">
-    <header className="p-4 border-b space-y-2">
+  return <aside className="assistant-panel fixed top-0 right-0 bottom-0 min-w-0 z-50 bg-background border-l shadow-xl flex flex-col" aria-label="Asystent AI">
+    <header className="shrink-0 min-w-0 max-h-[45dvh] overflow-y-auto p-4 border-b space-y-2 assistant-copy">
       <div className="flex items-center justify-between"><h2 className="font-display font-semibold flex items-center gap-2"><Bot className="h-5 w-5 text-primary" />Asystent AI</h2>
         <Button variant="ghost" size="icon" onClick={() => setOpen(false)} aria-label="Zamknij asystenta"><X className="h-4 w-4" /></Button></div>
       <p className="text-xs text-muted-foreground">{p.clientName || 'Klient'} → {p.groupName || 'Analiza'} → {isAll ? 'Wszystkie PPE' : (ppe?.ppe_number || ppe?.name || 'PPE')}</p>
-      <select className="w-full border rounded-md bg-background px-2 py-1 text-sm" value={scope} onChange={e => setScope(e.target.value)} aria-label="Zakres rozmowy">
+      <select className="min-w-0 max-w-full w-full border rounded-md bg-background px-2 py-1 text-sm" value={scope} onChange={e => setScope(e.target.value)} aria-label="Zakres rozmowy">
         {p.ppes.map(x => <option key={x.id} value={x.id}>{x.ppe_number ? `PPE ${x.ppe_number}` : x.name}</option>)}
         {p.allowAll && p.ppes.length > 1 && <option value="all">Wszystkie PPE</option>}
       </select>
@@ -152,20 +152,19 @@ export function AssistantPanel(p: AssistantPanelProps) {
           {new Date(c.created_at).toLocaleString('pl-PL')} · {p.ppes.find(x => x.id === c.analysis_id)?.ppe_number || p.ppes.find(x => x.id === c.analysis_id)?.name || 'PPE'}{c.undone_at ? ' · cofnięta' : ''}
           <span className="block text-muted-foreground">{Object.entries(c.fields).map(([f, v]) => `${fieldLabel(f)}: ${v.before ?? 'brak'} → ${v.after}`).join('; ')}</span></li>)}</ul></details>}
     </header>
-    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+    <div ref={messagesRef} className="flex-1 min-h-0 min-w-0 overflow-y-auto p-4 space-y-3 assistant-copy">
       {history.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : history.error ? <p className="text-sm text-destructive">Nie udało się wczytać rozmowy.</p> :
         msgs.length === 0 && <p className="text-sm text-muted-foreground">Zapytaj o pola, źródła sum, braki danych lub różnice PRZED/PO. Możesz poprosić o wariant PO (np. inna cena energii) — zobaczysz podgląd i sam zdecydujesz o zastosowaniu.</p>}
       {msgs.map((m, i) => <div key={m.id} className={m.role === 'user' ? 'ml-8 rounded-lg bg-primary/10 p-3' : `mr-4 rounded-lg p-3 ${m.error ? 'border border-destructive text-destructive' : 'bg-muted'}`}>
         {m.ppe_label && <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">{m.ppe_label}</p>}
         {m.role === 'assistant' && !m.error && m.content
-          ? <div className="text-sm break-words space-y-2 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5 [&_strong]:font-semibold [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold"><ReactMarkdown skipHtml>{m.content}</ReactMarkdown></div>
+          ? <div className="min-w-0 max-w-full text-sm break-words space-y-2 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5 [&_strong]:font-semibold [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold"><ReactMarkdown skipHtml>{m.content}</ReactMarkdown></div>
           : <p className="text-sm whitespace-pre-wrap break-words">{m.content || (busy ? '…' : '')}</p>}
         {m.proposal_id && !msgs.slice(0, i).some(x => x.proposal_id === m.proposal_id) && <ProposalCard proposalId={m.proposal_id} dirtyFor={p.currentPpeId && assistantDraftDiff(p.saved, p.draft).length ? p.currentPpeId : null} onSaveForm={p.onSaveForm} />}
       </div>)}
       {lastFailed && !busy && <Button variant="outline" size="sm" onClick={() => send(lastFailed)}><RotateCcw className="h-4 w-4 mr-2" />Ponów</Button>}
-      <div ref={endRef} />
     </div>
-    <form className="p-4 border-t space-y-2" onSubmit={e => { e.preventDefault(); send(input); }}>
+    <form className="shrink-0 min-w-0 p-4 border-t space-y-2" onSubmit={e => { e.preventDefault(); send(input); }}>
       <Textarea value={input} maxLength={AI_MAX_MESSAGE} onChange={e => setInput(e.target.value)} placeholder="Napisz pytanie…" rows={3}
         onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); } }} />
       <div className="flex justify-between items-center"><span className="text-xs text-muted-foreground">{input.length}/{AI_MAX_MESSAGE}</span>

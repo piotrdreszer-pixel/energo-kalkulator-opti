@@ -209,14 +209,14 @@ export default function AnalysisGroupDetail() {
         </div>
 
         {access.readOnly && <p role="status" className="mb-4 border-l-4 border-primary pl-3 text-muted-foreground">{MULTI_PPE_LOCK_MESSAGE}</p>}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+        <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
           <div>
             <h2 className="text-xl font-display font-semibold">{access.multiPpe ? 'Punkty poboru (PPE)' : 'Punkt poboru (PPE)'}</h2>
             {access.multiPpe && <p className="text-sm text-muted-foreground mt-1">
               Dodaj każdy punkt poboru tej analizy. Zaznacz punkty, które chcesz uwzględnić w raporcie analizy.
             </p>}
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {access.aiAssistant && <Button variant="outline" onClick={() => openAssistant()}><Bot className="h-4 w-4 mr-2" />Asystent AI</Button>}
             {access.canImport && <ImportInvoicesDialog projectId={projectId!} groupId={groupId!} ppes={ppes || []} onApplied={invalidate} />}
             {access.canImport && <InvoiceSettlementDialog projectId={projectId!} groupId={groupId!} ppes={ppes || []} onApplied={invalidate} />}
@@ -253,22 +253,22 @@ export default function AnalysisGroupDetail() {
             {ppes?.map((a) => {
               const r = calculateEnergyCosts(a);
               return (
-                <Card key={a.id} className={`card-interactive ${highlighted.has(a.id) ? 'ring-2 ring-primary' : ''}`}>
+                <Card key={a.id} className={`ppe-card min-w-0 card-interactive ${highlighted.has(a.id) ? 'ring-2 ring-primary' : ''}`}>
                   {highlighted.has(a.id) && (
                     <div className="px-4 pt-3 sm:px-6"><span className="text-xs font-medium text-primary">Zaimportowano z faktury</span></div>
                   )}
                   <CardContent className="p-4 sm:p-6">
-                    <div className="flex flex-col xl:flex-row xl:items-center gap-4">
-                      <div className="flex-1 min-w-0 xl:min-w-[16rem]">
-                        <h3 className="font-semibold text-lg mb-1 break-words">{a.name}</h3>
+                    <div className="ppe-card-body flex flex-col gap-4">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-lg mb-1 break-words [overflow-wrap:anywhere]">{a.name}</h3>
                         {(a.ppe_number || a.ppe_address) && (
-                          <p className="text-sm text-muted-foreground break-words mb-1">
-                            {a.ppe_number && <>PPE: <span className="font-medium text-foreground">{a.ppe_number}</span></>}
+                          <p className="text-sm text-muted-foreground mb-1 min-w-0">
+                            {a.ppe_number && <>PPE: <span className="inline-block max-w-full overflow-x-auto align-bottom whitespace-nowrap font-medium text-foreground">{a.ppe_number}</span></>}
                             {a.ppe_number && a.ppe_address && ' • '}
-                            {a.ppe_address}
+                            <span className="break-words [overflow-wrap:anywhere]">{a.ppe_address}</span>
                           </p>
                         )}
-                        {access.multiPpe && <label className="flex items-center gap-2 text-sm mb-1 cursor-pointer">
+                        {access.multiPpe && <label className="flex items-start gap-2 text-sm mb-1 cursor-pointer">
                           <Checkbox
                             disabled={access.readOnly}
                             checked={!!a.include_in_project_report}
@@ -287,25 +287,25 @@ export default function AnalysisGroupDetail() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2 sm:gap-4 xl:gap-6 text-center shrink-0">
+                      <div className="ppe-costs grid min-w-0 gap-4 text-left">
                         <div>
                           <p className="text-xs text-muted-foreground mb-1">PRZED</p>
-                          <p className="font-semibold">{formatCurrency(r.totalCostBefore)}</p>
+                          <p className="font-semibold whitespace-nowrap">{formatCurrency(r.totalCostBefore)}</p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground mb-1">PO</p>
-                          <p className="font-semibold">{formatCurrency(r.totalCostAfter)}</p>
+                          <p className="font-semibold whitespace-nowrap">{formatCurrency(r.totalCostAfter)}</p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground mb-1">OSZCZĘDNOŚĆ</p>
-                          <p className={`font-bold ${r.savingsAvailable ? '' : 'text-xs max-w-48'} ${r.savingsValue > 0 ? 'text-success' : r.savingsValue < 0 ? 'text-destructive' : ''}`}>
+                          <p className={`font-bold ${r.savingsAvailable ? 'whitespace-nowrap' : 'text-xs'} ${r.savingsValue > 0 ? 'text-success' : r.savingsValue < 0 ? 'text-destructive' : ''}`}>
                             {formatCurrency(r.savingsValue)}
                             {r.savingsAvailable && <span className="block text-xs">({formatPercent(r.savingsPercent)})</span>}
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2 xl:ml-4 shrink-0">
+                      <div className="flex flex-wrap items-center gap-2 min-w-0">
                         <Button variant="outline" size="sm" asChild>
                           <Link to={`/projects/${projectId}/analysis/${a.id}`}>
                             <Edit className="h-4 w-4 mr-1" />

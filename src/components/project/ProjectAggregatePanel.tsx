@@ -26,7 +26,7 @@ export default function ProjectAggregatePanel({ scopeId, reportPath, analyses, r
   const savingsClass = t.savingsValue > 0 ? 'text-success' : t.savingsValue < 0 ? 'text-destructive' : '';
 
   return (
-    <Card className="mb-6">
+    <Card className="mb-6 min-w-0">
       <CardHeader className="pb-3">
         <CardTitle className="font-display flex items-center gap-2">
           <FileStack className="h-5 w-5" /> Zestawienie zbiorcze
@@ -60,7 +60,7 @@ export default function ProjectAggregatePanel({ scopeId, reportPath, analyses, r
         )}
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[640px] text-sm">
             <thead>
               <tr className="border-b text-left text-muted-foreground">
                 <th className="py-2 pr-2">Obiekt</th>
@@ -75,7 +75,7 @@ export default function ProjectAggregatePanel({ scopeId, reportPath, analyses, r
               {t.entries.map(({ analysis: a, result: r, missing }) => (
                 <tr key={a.id} className="border-b align-top">
                   <td className="py-2 pr-2 break-words">{a.name}{excludedLabels(a) && <div className="text-xs text-muted-foreground">Wyłączone: {excludedLabels(a)}</div>}</td>
-                  <td className="py-2 pr-2 break-words">{a.ppe_number || '—'}{a.ppe_address && <div className="text-xs text-muted-foreground">{a.ppe_address}</div>}</td>
+                  <td className="py-2 pr-2 whitespace-nowrap">{a.ppe_number || '—'}{a.ppe_address && <div className="max-w-64 whitespace-normal [overflow-wrap:anywhere] text-xs text-muted-foreground">{a.ppe_address}</div>}</td>
                   <td className="py-2 pr-2 whitespace-nowrap">{fmtDate(a.period_from)} – {fmtDate(a.period_to)}</td>
                   {missing.length ? (
                     <td colSpan={3} className="py-2 text-right text-muted-foreground">dane niekompletne</td>
@@ -93,7 +93,7 @@ export default function ProjectAggregatePanel({ scopeId, reportPath, analyses, r
         </div>
 
         {t.canAggregate && (
-          <div className="grid gap-3 sm:grid-cols-5 text-center bg-muted/50 rounded-lg p-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 text-center bg-muted/50 rounded-lg p-4">
             <Stat label="Liczba PPE" value={String(analyses.length)} />
             <Stat label="Wspólny okres" value={`${fmtDate(t.periodFrom)} – ${fmtDate(t.periodTo)}`} />
             <Stat label="Łącznie PRZED" value={formatCurrency(t.totalBefore)} />
@@ -117,7 +117,7 @@ export default function ProjectAggregatePanel({ scopeId, reportPath, analyses, r
 const Warn = ({ children }: { children: React.ReactNode }) => (
   <div className="flex gap-2 text-sm rounded-md border border-destructive/40 bg-destructive/5 p-3">
     <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-    <span>{children}</span>
+    <span className="min-w-0 [overflow-wrap:anywhere]">{children}</span>
   </div>
 );
 

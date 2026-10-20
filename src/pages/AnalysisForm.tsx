@@ -673,14 +673,14 @@ function AnalysisForm() {
     <AppLayout>
       <div className="content-container max-w-7xl">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div className="flex min-w-0 items-center gap-4">
             <Button variant="ghost" size="icon" asChild aria-label="Wróć do listy PPE">
               <Link to={groupPath}>
                 <ArrowLeft className="h-5 w-5" />
               </Link>
             </Button>
-            <div>
+            <div className="min-w-0 [overflow-wrap:anywhere]">
               <h1 className="text-xl sm:text-2xl font-display font-bold text-foreground">
                 {formData.name || 'Analiza'}
               </h1>
@@ -691,7 +691,7 @@ function AnalysisForm() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {access.aiAssistant && <Button variant="outline" onClick={() => openAssistant()}><Bot className="h-4 w-4 mr-2" />Asystent AI</Button>}
             <Button variant="outline" asChild>
               <Link to={`/projects/${projectId}/analysis/${analysisId}/report`}>
@@ -1220,7 +1220,7 @@ function AnalysisForm() {
         </div>
 
         {/* Navigation */}
-        <div className="flex items-center justify-between mt-8 pt-6 border-t">
+        <div className="flex flex-wrap gap-3 items-center justify-between mt-8 pt-6 border-t">
           <Button
             variant="outline"
             onClick={goPrev}
@@ -1230,7 +1230,7 @@ function AnalysisForm() {
             Wstecz
           </Button>
           
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" asChild>
               <Link to={groupPath}>Wróć do listy PPE</Link>
             </Button>
