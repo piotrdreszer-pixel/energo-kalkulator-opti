@@ -60,3 +60,29 @@ export function validateProposal(input: ProposalInput, row: Record<string, unkno
     isSimulation: changes.some(c => c.field === 'contracted_power_after_kw'),
   } };
 }
+
+/** Numbers written by the user ("500", "0,62", "1 200,5"). */
+export function numbersInText(text: string): number[] {
+  return (text.match(/\d[\d\s\u00a0]*(?:[.,]\d+)?/g) ?? [])
+    .map(s => Number(s.replace(/[\s\u00a0]/g, '').replace(',', '.'))).filter(Number.isFinite);
+}
+
+const IMPERATIVE = /\b(ustaw|zmień|zmien|wpisz|zapisz|popraw|podmień|zastąp|zastap|daj|wstaw)\b/i;
+const QUESTION = /\?\s*$|\b(co da|co by|jak by|ile by|dlaczego|czy)\b/i;
+
+/** Server-side check that a "command" really is one: imperative, not a question, every value literally given by the user. Returns a reason when not. */
+export function commandGuard(message: string, changes: { value: number }[], source: string): string | null {
+  if (source !== 'polecenie_uzytkownika') return 'wartość nie pochodzi od użytkownika';
+  if (!IMPERATIVE.test(message)) return 'brak polecenia';
+  if (QUESTION.test(message)) return 'pytanie lub symulacja';
+  const nums = numbersInText(message);
+  if (!changes.every(c => nums.some(n => Math.abs(n - c.value) < 1e-9))) return 'wartości nie podane w poleceniu';
+  return null;
+}
+
+/** Explicit acceptance of the latest proposal in chat. */
+export function isAcceptance(message: string): boolean {
+  const m = message.trim().toLowerCase();
+  if (m.includes('?') || /\b(nie|anuluj|odrzuć|odrzuc)\b/.test(m)) return false;
+  return /\b(zastosuj|zatwierdzam|zatwierdź|zatwierdz|akceptuję|akceptuje|tak,? (zapisz|zastosuj|wprowadź|wprowadz)|wprowadź|wprowadz)\b/.test(m);
+}
