@@ -2,10 +2,11 @@ import { calculateEnergyCosts } from './calculation-utils';
 import { assistantIssues } from './assistant-context';
 import { PROPOSAL_FIELDS, type ProposalField } from '../../supabase/functions/ai-assistant/proposal';
 import type { ValueSources } from './value-sources';
+import { ESTIMATE_FIELD_LABELS } from './invoice-gaps';
 
 export { PROPOSAL_FIELDS, PROPOSAL_SOURCE_LABELS, validateProposal } from '../../supabase/functions/ai-assistant/proposal';
 
-export interface ProposalChange { field: string; value: number }
+export interface ProposalChange { field: string; value: number | string }
 
 /** Preview of a proposal on a copy of the saved row — the same engine as the UI, nothing is saved. */
 export function buildProposalPreview(row: Record<string, unknown>, changes: ProposalChange[]) {
@@ -16,7 +17,7 @@ export function buildProposalPreview(row: Record<string, unknown>, changes: Prop
   const fields = changes.map(c => {
     const meta = PROPOSAL_FIELDS[c.field as ProposalField];
     const src = sources[c.field]?.source;
-    return { field: c.field, label: meta?.label ?? c.field, unit: meta?.unit ?? '', current: row[c.field] ?? null, proposed: c.value,
+    return { field: c.field, label: meta?.label ?? ESTIMATE_FIELD_LABELS[c.field] ?? c.field, unit: meta?.unit ?? (/_mwh$/.test(c.field) ? 'MWh' : /^period_/.test(c.field) ? '' : 'zł'), current: row[c.field] ?? null, proposed: c.value,
       replaces: src === 'manual' ? 'ręczną korektę' : src === 'document' ? 'wartość z faktury' : src === 'ai' ? 'wcześniejszą zmianę asystenta' : null };
   });
   // Gaps that remain after the change; a missing value is never shown as an exact result.

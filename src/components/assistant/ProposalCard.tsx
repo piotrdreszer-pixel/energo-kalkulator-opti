@@ -5,9 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Check, Loader2, RefreshCw, Undo2, X } from 'lucide-react';
 import { buildProposalPreview, isProposalStale, PROPOSAL_FIELDS, PROPOSAL_SOURCE_LABELS } from '@/lib/assistant-proposal';
 import { formatCurrency, formatNumber } from '@/lib/calculation-utils';
+import { ESTIMATE_FIELD_LABELS } from '@/lib/invoice-gaps';
+
+const KIND_TITLE: Record<string, string> = { po: 'Propozycja zmiany PO', period: 'Zmiana okresu analizy (z faktur)', estimate: 'Szacunek brakującego okresu', estimate_replace: 'Zastąpienie szacunku fakturą' };
+const label = (f: string) => PROPOSAL_FIELDS[f as keyof typeof PROPOSAL_FIELDS]?.label ?? ESTIMATE_FIELD_LABELS[f] ?? f;
 
 const db = supabase as any;
-const fmt = (v: unknown) => (v === null || v === undefined || v === '' ? 'brak' : formatNumber(Number(v), 2));
+const fmt = (v: unknown) => (v === null || v === undefined || v === '' ? 'brak' : typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10).split('-').reverse().join('.') : formatNumber(Number(v), /_mwh$/.test('') ? 4 : 4).replace(/,?0+$/, (m) => m.startsWith(',') ? '' : m));
 
 export function ProposalCard({ proposalId, dirtyFor, onSaveForm }: { proposalId: string; dirtyFor?: string | null; onSaveForm?: () => Promise<boolean> }) {
   const qc = useQueryClient();
@@ -73,7 +77,7 @@ export function ProposalCard({ proposalId, dirtyFor, onSaveForm }: { proposalId:
     const { data, error } = await db.rpc('ai_undo_change', { _id: ch.id });
     if (error) throw new Error(error.message);
     await refresh();
-    if (data?.status === 'conflict') setMsg({ text: `Nie cofnięto: pola zmieniono później (${(data.fields as string[]).map(f => PROPOSAL_FIELDS[f as keyof typeof PROPOSAL_FIELDS]?.label ?? f).join(', ')}). Nowsza praca pozostała bez zmian.`, error: true });
+    if (data?.status === 'conflict') setMsg({ text: `Nie cofnięto: pola zmieniono później (${(data.fields as string[]).map(label).join(', ')}). Nowsza praca pozostała bez zmian.`, error: true });
     else setMsg({ text: 'Cofnięto zmianę — przywrócono poprzednie wartości tych pól.' });
   });
 
@@ -82,11 +86,12 @@ export function ProposalCard({ proposalId, dirtyFor, onSaveForm }: { proposalId:
     current: ch?.fields?.[c.field]?.before ?? p.before?.[c.field], proposed: c.value, replaces: null as string | null }));
 
   return <div className="mt-3 rounded-md border bg-background p-3 text-xs space-y-2" data-testid="ai-proposal">
-    <div className="flex justify-between gap-2"><span className="font-semibold">Propozycja zmiany PO</span><span className="text-muted-foreground">{status}</span></div>
+    <div className="flex justify-between gap-2"><span className="font-semibold">{KIND_TITLE[p.kind ?? 'po'] ?? KIND_TITLE.po}</span><span className="text-muted-foreground">{status}</span></div>
     <p className="text-muted-foreground">PPE {String(row.ppe_number || row.name || '')}</p>
     <ul className="space-y-1">{fields.map(f => <li key={f.field}>{f.label}: <b>{fmt(f.current)} → {fmt(f.proposed)}</b> {f.unit}
       {f.replaces && <span className="block text-destructive">Zastąpi {f.replaces}.</span>}</li>)}</ul>
     <p>Źródło: {PROPOSAL_SOURCE_LABELS[p.source as keyof typeof PROPOSAL_SOURCE_LABELS] ?? p.source}{p.assumption ? ` — ${p.assumption}` : ''}</p>
+    {(p.kind === 'estimate') && <p className="text-destructive">Wartość szacunkowa (średnia dobowa z sąsiednich rozliczeń) — przechowywana osobno od danych z faktur; nie potwierdza Pmax ani bezpiecznej mocy umownej.</p>}
     {p.is_simulation && <p className="text-destructive">Zmiana mocy to symulacja — jej wystarczalność nie została potwierdzona.</p>}
     {p.status === 'pending' && <div className="space-y-0.5 border-t pt-2">
       <p>Okres: {String(preview.periodFrom ?? 'brak')} – {String(preview.periodTo ?? 'brak')} ({preview.periodMonths} mies.)</p>
@@ -103,7 +108,7 @@ export function ProposalCard({ proposalId, dirtyFor, onSaveForm }: { proposalId:
       <div className="flex gap-2"><Button size="sm" onClick={saveThenApply} disabled={busy}>Zapisz formularz</Button><Button size="sm" variant="outline" onClick={() => setAskSave(false)} disabled={busy}>Nie stosuj teraz</Button></div></div>}
     {p.status === 'pending' && !askSave && <div className="flex flex-wrap gap-2 pt-1">
       {stale ? <Button size="sm" onClick={rebase} disabled={busy}><RefreshCw className="h-3 w-3 mr-1" />Przelicz na aktualnych danych</Button>
-        : <Button size="sm" onClick={apply} disabled={busy}>{busy ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Check className="h-3 w-3 mr-1" />}Zastosuj do PO</Button>}
+        : <Button size="sm" onClick={apply} disabled={busy}>{busy ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Check className="h-3 w-3 mr-1" />}{(p.kind ?? 'po') === 'po' ? 'Zastosuj do PO' : 'Zastosuj'}</Button>}
       <Button size="sm" variant="outline" onClick={reject} disabled={busy}><X className="h-3 w-3 mr-1" />Odrzuć</Button></div>}
     {p.status === 'applied' && ch && !ch.undone_at && <Button size="sm" variant="outline" onClick={undo} disabled={busy}><Undo2 className="h-3 w-3 mr-1" />Cofnij zmianę</Button>}
   </div>;
