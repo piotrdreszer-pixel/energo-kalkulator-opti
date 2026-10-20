@@ -38,6 +38,7 @@ import { RatesInputPanel } from '@/components/analysis/RatesInputPanel';
 import { ConsumptionMapping } from '@/components/analysis/ConsumptionMapping';
 import { ConsumptionMappingBefore } from '@/components/analysis/ConsumptionMappingBefore';
 import { ComparisonSummary } from '@/components/analysis/ComparisonSummary';
+import { InvoiceGapsNotice, IncompletePoNotice } from '@/components/analysis/InvoiceGapsNotice';
 import { useOsdOperators } from '@/hooks/useOsdOperators';
 import { useRatesResolver } from '@/hooks/useRatesResolver';
 import { useVisibleTariffsForOsd } from '@/hooks/useVisibleTariffsForOsd';
@@ -842,6 +843,7 @@ function AnalysisForm() {
                     />
                   </div>
                 </div>
+                <InvoiceGapsNotice groupId={analysis?.analysis_group_id} row={analysis as unknown as Record<string, unknown>} canImport={access.canImport} />
                 {formData.period_from && formData.period_to && (
                   <div className="p-4 bg-muted/50 rounded-lg">
                     <p className="text-sm">
@@ -1184,6 +1186,7 @@ function AnalysisForm() {
           {/* Step 6: Summary */}
           {currentStep === 'summary' && access.aiAssistant && <div className="flex justify-end mb-3"><AssistantContextButton label="Wyjaśnij wynik" prompt="Wyjaśnij wynik kalkulatora: z czego wynikają sumy PRZED i PO oraz oszczędność, i jakie braki ograniczają ocenę." /></div>}
           {currentStep === 'summary' && (
+            <IncompletePoNotice row={formData as Record<string, unknown>} />
             <ComparisonSummary
               costBefore={results.totalCostBefore}
               costAfter={results.totalCostAfter}
