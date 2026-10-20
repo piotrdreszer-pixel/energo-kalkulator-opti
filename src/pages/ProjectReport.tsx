@@ -9,7 +9,7 @@ import { calculateProjectTotals } from '@/lib/project-totals';
 import { exportElementToPdf } from '@/lib/pdf-export';
 import { useAuth } from '@/contexts/AuthContext';
 import { NO_PPE_CONFIRM_KEY } from '@/components/project/ProjectAggregatePanel';
-import AnalysisPdfDocument from '@/components/pdf/AnalysisPdfDocument';
+import AnalysisPdfDocument, { type PdfEstimate } from '@/components/pdf/AnalysisPdfDocument';
 import MultiPpePdfDocument from '@/components/pdf/MultiPpePdfDocument';
 import { useGroupFeatureAccess } from '@/hooks/useFeatureAccess';
 import { MULTI_PPE_LOCK_MESSAGE } from '@/lib/feature-access';
@@ -21,6 +21,15 @@ export default function ProjectReport() {
   const { projectId, groupId } = useParams<{ projectId: string; groupId: string }>();
   const { profile, user } = useAuth();
   const access = useGroupFeatureAccess(groupId);
+  const groupEstimates = useQuery({
+    queryKey: ['analysis-estimates', 'group', groupId], enabled: !!groupId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from('analysis_estimates').select('analysis_id,field,period_from,period_to,value,unit').eq('analysis_group_id', groupId).eq('status', 'active');
+      if (error) throw error;
+      return (data ?? []) as (PdfEstimate & { analysis_id: string })[];
+    },
+  });
+  const estimatesOf = (id: string) => (groupEstimates.data ?? []).filter((e) => e.analysis_id === id);
   const pdfRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
@@ -123,6 +132,7 @@ export default function ProjectReport() {
                 results={single.result}
                 preparerName={preparerName}
                 preparerEmail={preparerEmail}
+                estimates={estimatesOf(single.analysis.id as string)}
                 coverSubtitle={<>{group.name}<br /><span style={{ fontSize: 13, opacity: 0.8 }}>{single.analysis.name}{single.analysis.ppe_number ? ` • PPE: ${single.analysis.ppe_number}` : ''}{single.analysis.ppe_address ? ` • ${single.analysis.ppe_address}` : ''}</span></>}
               />
             ) : (
@@ -133,6 +143,7 @@ export default function ProjectReport() {
                 osdNames={osdNames}
                 preparerName={preparerName}
                 preparerEmail={preparerEmail}
+                estimatesOf={estimatesOf}
                 onPaginated={() => setReady(true)}
               />
             )}

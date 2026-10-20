@@ -12,7 +12,7 @@ import iconChart from '@/assets/pdf/icon-chart.svg';
 import iconPower from '@/assets/pdf/icon-power.svg';
 import iconSavings from '@/assets/pdf/icon-savings.svg';
 import {
-  PAGE_W, PAGE_H, RODO_TEXT, pageBase, pageBreak, RodoFooter, InfoRow, CostBar, ParamCardsGrid,
+  PAGE_W, PAGE_H, RODO_TEXT, pageBase, pageBreak, RodoFooter, InfoRow, CostBar, ParamCardsGrid, type PdfEstimate,
   buildCostRows, thStyle, tdStyle, type CostRow,
 } from './AnalysisPdfDocument';
 
@@ -139,9 +139,10 @@ interface Props {
   preparerName: string;
   preparerEmail?: string;
   onPaginated?: () => void;
+  estimatesOf?: (analysisId: string) => PdfEstimate[];
 }
 
-export default function MultiPpePdfDocument({ project, groupName, totals: t, osdNames, preparerName, preparerEmail, onPaginated }: Props) {
+export default function MultiPpePdfDocument({ project, groupName, totals: t, osdNames, preparerName, preparerEmail, onPaginated, estimatesOf }: Props) {
   const dateStr = format(new Date(), 'd MMMM yyyy', { locale: pl });
   const entries = t.entries;
   const agg = t.canAggregate;
@@ -214,7 +215,7 @@ export default function MultiPpePdfDocument({ project, groupName, totals: t, osd
             </p>
             <p style={{ fontSize: 11, margin: '4px 0 0', color: 'rgba(255,255,255,0.65)', wordBreak: 'break-word' }}>{meta}</p>
           </div>
-          <ParamCardsGrid analysis={a} results={r} isVisible={isVisible} />
+          <ParamCardsGrid analysis={a} results={r} isVisible={isVisible} estimates={estimatesOf?.(a.id as string)} />
         </div>
       )});
       b.push({ key: `cost-${a.id}`, section: 'details', kind: 'block', node: (
