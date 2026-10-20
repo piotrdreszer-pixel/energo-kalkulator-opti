@@ -78,6 +78,13 @@
       "when": 1792480658035,
       "tag": "0010_ai_assistant_stage_a",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792482240334,
+      "tag": "0011_ai_assistant_proposals",
+      "breakpoints": true
     }
   ]
 }
