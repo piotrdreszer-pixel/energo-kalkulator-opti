@@ -154,12 +154,12 @@ export function AssistantPanel(p: AssistantPanelProps) {
     <div className="flex-1 overflow-y-auto p-4 space-y-3">
       {history.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : history.error ? <p className="text-sm text-destructive">Nie udało się wczytać rozmowy.</p> :
         msgs.length === 0 && <p className="text-sm text-muted-foreground">Zapytaj o pola, źródła sum, braki danych lub różnice PRZED/PO. Możesz poprosić o wariant PO (np. inna cena energii) — zobaczysz podgląd i sam zdecydujesz o zastosowaniu.</p>}
-      {msgs.map(m => <div key={m.id} className={m.role === 'user' ? 'ml-8 rounded-lg bg-primary/10 p-3' : `mr-4 rounded-lg p-3 ${m.error ? 'border border-destructive text-destructive' : 'bg-muted'}`}>
+      {msgs.map((m, i) => <div key={m.id} className={m.role === 'user' ? 'ml-8 rounded-lg bg-primary/10 p-3' : `mr-4 rounded-lg p-3 ${m.error ? 'border border-destructive text-destructive' : 'bg-muted'}`}>
         {m.ppe_label && <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">{m.ppe_label}</p>}
         {m.role === 'assistant' && !m.error && m.content
           ? <div className="text-sm break-words space-y-2 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5 [&_strong]:font-semibold [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold"><ReactMarkdown skipHtml>{m.content}</ReactMarkdown></div>
           : <p className="text-sm whitespace-pre-wrap break-words">{m.content || (busy ? '…' : '')}</p>}
-        {m.proposal_id && <ProposalCard proposalId={m.proposal_id} dirtyFor={p.currentPpeId && assistantDraftDiff(p.saved, p.draft).length ? p.currentPpeId : null} onSaveForm={p.onSaveForm} />}
+        {m.proposal_id && !msgs.slice(0, i).some(x => x.proposal_id === m.proposal_id) && <ProposalCard proposalId={m.proposal_id} dirtyFor={p.currentPpeId && assistantDraftDiff(p.saved, p.draft).length ? p.currentPpeId : null} onSaveForm={p.onSaveForm} />}
       </div>)}
       {lastFailed && !busy && <Button variant="outline" size="sm" onClick={() => send(lastFailed)}><RotateCcw className="h-4 w-4 mr-2" />Ponów</Button>}
       <div ref={endRef} />
