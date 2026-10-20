@@ -1,12 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ToastAction } from '@/components/ui/toast';
 import { useOsdOperators } from '@/hooks/useOsdOperators';
 import { matchOsd } from '@/lib/osd-match';
 import { supabase } from '@/integrations/supabase/client';
 import { requireFeature, useGroupFeatureAccess } from '@/hooks/useFeatureAccess';
-import { STAGE_LABELS, isAllowedFile, functionErrorMessage, storageErrorMessage, type UploadItem } from '@/lib/invoice-upload';
+import { STAGE_LABELS, isAllowedFile, functionErrorMessage, storageErrorMessage, summarizeDocs, analysisTarget, type UploadItem } from '@/lib/invoice-upload';
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
@@ -235,6 +234,7 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
   });
 
   const reviewDoc = docsQuery.data?.find((d) => d.id === reviewDocId) || null;
+  const summary = summarizeDocs(docsQuery.data || []);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
