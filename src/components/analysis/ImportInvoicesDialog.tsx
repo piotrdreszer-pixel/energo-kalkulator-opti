@@ -147,60 +147,92 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
 
   const invalidateDocs = () => queryClient.invalidateQueries({ queryKey: ['analysis-documents', groupId] });
 
-  const handleUpload = async (files: FileList | null) => {
-    if (!files?.length) return;
-    setUploading(true);
+  const [items, setItems] = useState<UploadItem[]>([]);
+  const patch = (key: string, p: Partial<UploadItem>) => setItems((list) => list.map((i) => (i.key === key ? { ...i, ...p } : i)));
+  const [hadImport, setHadImport] = useState(false);
+  useEffect(() => { if (open && access.canImport) setHadImport(true); if (!open) setHadImport(false); }, [open, access.canImport]);
+  const revoked = open && hadImport && !access.loading && !access.canImport;
+
+  const processItem = async (item: UploadItem) => {
+    const { key, file, docId } = item;
+    const path = `${groupId}/${docId}/${file.name}`;
     try {
+      patch(key, { stage: item.uploaded ? 'saving' : 'uploading', message: undefined });
       await requireFeature('invoice_import', groupId);
-      const existing = docsQuery.data || [];
-      for (const file of Array.from(files)) {
-        await requireFeature('invoice_import', groupId);
-        const ext = file.name.toLowerCase();
-        if (!ext.endsWith('.pdf') && !ext.endsWith('.jpg') && !ext.endsWith('.jpeg') && !ext.endsWith('.png')) {
-          toast({ variant: 'destructive', title: 'Nieobsługiwany format', description: `${file.name}: dozwolone PDF, JPG, PNG` });
-          continue;
-        }
-        const hash = await sha256(file);
-        if (existing.some((d) => d.file_hash === hash)) {
-          toast({ variant: 'destructive', title: 'Duplikat pliku', description: `${file.name} został już przesłany do tej analizy.` });
-          continue;
-        }
-        const docId = crypto.randomUUID();
-        const path = `${groupId}/${docId}/${file.name}`;
-        const { error: upError } = await supabase.storage.from('invoice-documents').upload(path, file);
-        if (upError) throw upError;
-        const { error: insError } = await supabase.from('analysis_documents').insert({
-          id: docId,
-          analysis_group_id: groupId,
-          file_path: path,
-          file_name: file.name,
-          file_hash: hash,
-          mime_type: file.type || null,
-          status: 'pending',
+      const hash = item.hash ?? (await sha256(file));
+      patch(key, { hash });
+      if (!item.saved) {
+        const { data: dup } = await supabase.from('analysis_documents').select('id').eq('analysis_group_id', groupId).eq('file_hash', hash).neq('id', docId).limit(1);
+        if (dup?.length) { patch(key, { stage: 'error', message: 'Ten plik został już przesłany do tej analizy.' }); return; }
+      }
+      if (!item.uploaded) {
+        const { error } = await supabase.storage.from('invoice-documents').upload(path, file, { upsert: false });
+        if (error && !/exists|duplicate/i.test(error.message)) throw new Error(storageErrorMessage(error));
+        item = { ...item, uploaded: true }; patch(key, { uploaded: true, stage: 'saving' });
+      }
+      if (!item.saved) {
+        const { error } = await supabase.from('analysis_documents').insert({
+          id: docId, analysis_group_id: groupId, file_path: path, file_name: file.name, file_hash: hash, mime_type: file.type || null, status: 'pending',
         } as never);
-        if (insError) throw insError;
-        // Odczyt AI
-        const { error: fnError } = await supabase.functions.invoke('parse-invoice', { body: { documentId: docId } });
-        if (fnError) {
-          toast({ variant: 'destructive', title: 'Błąd odczytu', description: `${file.name}: sprawdź status dokumentu i spróbuj ponownie.` });
-        }
+        if (error && error.code !== '23505') throw new Error(storageErrorMessage(error));
+        item = { ...item, saved: true }; patch(key, { saved: true });
       }
       invalidateDocs();
+      patch(key, { stage: 'reading' });
+      await requireFeature('invoice_import', groupId);
+      const { error: fnError } = await supabase.functions.invoke('parse-invoice', { body: { documentId: docId } });
+      if (fnError) {
+        const res = (fnError as { context?: Response }).context;
+        let body: unknown = null;
+        try { body = res && typeof res.json === 'function' ? await res.json() : null; } catch { /* brak treści */ }
+        throw new Error(functionErrorMessage(res?.status, body));
+      }
+      patch(key, { stage: 'done' });
     } catch (e) {
-      toast({ variant: 'destructive', title: 'Błąd przesyłania', description: e instanceof Error ? e.message : 'Nieznany błąd' });
+      patch(key, { stage: 'error', message: e instanceof Error ? e.message : 'Nieznany błąd' });
+    } finally {
+      invalidateDocs();
+    }
+  };
+
+  const handleUpload = async (fileList: FileList | null) => {
+    // Kopia przed wyczyszczeniem pola — reset value opróżnia FileList (wcześniej import kończył się po cichu).
+    const files = fileList ? Array.from(fileList) : [];
+    if (!files.length) return;
+    const fresh: UploadItem[] = [];
+    for (const file of files) {
+      const key = crypto.randomUUID();
+      if (!isAllowedFile(file.name)) {
+        fresh.push({ key, file, name: file.name, docId: key, stage: 'error', uploaded: false, saved: false, message: 'Nieobsługiwany format — dozwolone PDF, JPG, PNG.' });
+      } else fresh.push({ key, file, name: file.name, docId: crypto.randomUUID(), stage: 'queued', uploaded: false, saved: false });
+    }
+    setItems((list) => [...fresh, ...list]);
+    setUploading(true);
+    try {
+      for (const it of fresh) if (it.stage === 'queued') await processItem(it);
     } finally {
       setUploading(false);
     }
+  };
+
+  const retryItem = async (item: UploadItem) => {
+    setUploading(true);
+    try { await processItem(item); } finally { setUploading(false); }
   };
 
   const retryMutation = useMutation({
     mutationFn: async (documentId: string) => {
       await requireFeature('invoice_import', groupId);
       const { error } = await supabase.functions.invoke('parse-invoice', { body: { documentId } });
-      if (error) throw error;
+      if (error) {
+        const res = (error as { context?: Response }).context;
+        let body: unknown = null;
+        try { body = res && typeof res.json === 'function' ? await res.json() : null; } catch { /* brak treści */ }
+        throw new Error(functionErrorMessage(res?.status, body));
+      }
     },
     onSuccess: invalidateDocs,
-    onError: () => toast({ variant: 'destructive', title: 'Błąd', description: 'Ponowny odczyt nie powiódł się' }),
+    onError: (e) => { invalidateDocs(); toast({ variant: 'destructive', title: 'Ponowny odczyt nie powiódł się', description: e instanceof Error ? e.message : undefined }); },
   });
 
   const reviewDoc = docsQuery.data?.find((d) => d.id === reviewDocId) || null;
@@ -221,16 +253,44 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
           </DialogDescription>
         </DialogHeader>
 
+        {revoked && (
+          <div role="alert" className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+            Uprawnienie „Import faktur” zostało odebrane. Przesyłanie i odczyt nowych faktur są zablokowane.
+          </div>
+        )}
+
         {access.canImport && <div className="flex items-center gap-3">
           <Input
             type="file"
             accept=".pdf,.jpg,.jpeg,.png"
             multiple
             disabled={uploading || !access.canImport}
-            onChange={(e) => { handleUpload(e.target.files); e.target.value = ''; }}
+            onChange={(e) => { const f = e.target.files; handleUpload(f ? (Array.from(f) as unknown as FileList) : null); e.target.value = ''; }}
             aria-label="Wybierz pliki faktur"
           />
           {uploading && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
+        </div>}
+
+        {items.length > 0 && (
+          <div className="space-y-2" aria-label="Postęp przesyłania">
+            {items.map((it) => (
+              <div key={it.key} className="flex flex-wrap items-center gap-2 rounded-md border border-dashed p-2 text-sm">
+                {it.stage === 'error' ? <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
+                  : it.stage === 'done' ? <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                  : <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />}
+                <span className="font-medium truncate max-w-[45%]">{it.name}</span>
+                <Badge variant={it.stage === 'error' ? 'destructive' : 'secondary'}>{STAGE_LABELS[it.stage]}</Badge>
+                {it.message && <span className="text-destructive text-xs flex-1 min-w-[200px]">{it.message}</span>}
+                {it.stage === 'error' && access.canImport && isAllowedFile(it.name) && (
+                  <Button size="sm" variant="outline" onClick={() => retryItem(it)} disabled={uploading}>
+                    <RefreshCw className="h-4 w-4 mr-1" /> Ponów
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         </div>}
 
         {docsQuery.data?.length ? (
