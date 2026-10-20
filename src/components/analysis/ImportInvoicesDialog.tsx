@@ -100,31 +100,31 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
     }
   }, [searchParams, setSearchParams]);
 
-  const handleDocApplied = async (docId: string, analysisIds: string[]) => {
+  // Pozycja przewinięcia listy zapamiętana przy otwarciu weryfikacji i przywracana po powrocie.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const listScroll = useRef(0);
+  const openReview = (id: string) => { listScroll.current = scrollRef.current?.scrollTop ?? 0; setReviewDocId(id); };
+  const closeReview = () => {
+    setReviewDocId(null);
+    requestAnimationFrame(() => requestAnimationFrame(() => { if (scrollRef.current) scrollRef.current.scrollTop = listScroll.current; }));
+  };
+
+  const handleDocApplied = async (docId: string) => {
+    // Po udanym zapisie: wróć do listy importu w tej samej analizie i odśwież statusy.
+    closeReview();
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['analysis-documents', groupId] }),
       queryClient.invalidateQueries({ queryKey: ['document-ppe', docId] }),
       queryClient.invalidateQueries({ queryKey: ['group-ppe-records', groupId] }),
-      ...analysisIds.map((id) => queryClient.invalidateQueries({ queryKey: ['analysis', id] })),
+      queryClient.invalidateQueries({ queryKey: ['analysis'] }),
     ]);
     onApplied();
-    const { data: docs } = await supabase
-      .from('analysis_documents').select('id,status').eq('analysis_group_id', groupId);
-    const pending = (docs || []).filter((d) => d.id !== docId && (d.status === 'needs_review' || d.status === 'pending' || d.status === 'processing')).length;
+  };
+
+  const goToAnalysis = () => {
     setReviewDocId(null);
     setOpen(false);
-    const back = `/projects/${projectId}/analyses/${groupId}?import=1`;
-    toast({
-      title: 'Zaimportowano dane z faktury',
-      description: pending
-        ? `Zastosowano dane dla ${analysisIds.length} PPE. ${pending} dokument(y) nadal czeka na zatwierdzenie.`
-        : `Zastosowano dane dla ${analysisIds.length} PPE.`,
-      action: pending ? (
-        <ToastAction altText="Wróć do importu" onClick={() => navigate(back)}>Wróć do importu</ToastAction>
-      ) : undefined,
-    });
-    if (analysisIds.length === 1) navigate(`/projects/${projectId}/analysis/${analysisIds[0]}`);
-    else navigate(`/projects/${projectId}/analyses/${groupId}?highlight=${analysisIds.join(',')}`, { replace: true });
+    navigate(analysisTarget(projectId, groupId, ppes.map((p) => p.id)));
   };
 
   const docsQuery = useQuery({
@@ -244,7 +244,8 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
           {access.canImport ? 'Importuj faktury' : 'Podgląd faktur'}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
+        <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4">
         <DialogHeader>
           <DialogTitle>{access.canImport ? 'Import faktur energetycznych' : 'Podgląd faktur'}</DialogTitle>
           <DialogDescription>
@@ -296,6 +297,16 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
           </div>
         )}
 
+        {summary.total > 0 && (
+          <div role="status" aria-live="polite" className="rounded-md border bg-muted/40 p-3 text-sm space-y-0.5">
+            {summary.allApproved
+              ? <p className="font-medium text-success flex items-center gap-2"><CheckCircle2 className="h-4 w-4" />Wszystkie dokumenty zostały zatwierdzone</p>
+              : <p className="font-medium">Zatwierdzono {summary.approved} z {summary.total} dokumentów. Do sprawdzenia: {summary.toReview}</p>}
+            {summary.reading > 0 && <p className="text-muted-foreground">W trakcie odczytu: {summary.reading}</p>}
+            {summary.errors > 0 && <p className="text-destructive">Błędy odczytu: {summary.errors}</p>}
+          </div>
+        )}
+
         {docsQuery.data?.length ? (
           <div className="space-y-2 mt-2">
             {docsQuery.data.map((d) => (
@@ -313,10 +324,10 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
                   {STATUS_LABELS[d.status]}
                 </Badge>
                 {d.status === 'needs_review' && (
-                  <Button size="sm" onClick={() => setReviewDocId(d.id)}>{access.canImport ? 'Sprawdź i zatwierdź' : 'Podgląd'}</Button>
+                  <Button size="sm" onClick={() => openReview(d.id)}>{access.canImport ? 'Sprawdź i zatwierdź' : 'Podgląd'}</Button>
                 )}
                 {d.status === 'approved' && (
-                  <Button size="sm" variant="outline" onClick={() => setReviewDocId(d.id)}>{access.canImport ? 'Przejrzyj i zmień' : 'Podgląd'}</Button>
+                  <Button size="sm" variant="outline" onClick={() => openReview(d.id)}>{access.canImport ? 'Przejrzyj i zmień' : 'Podgląd'}</Button>
                 )}
                 {d.status === 'error' && access.canImport && (
                   <Button size="sm" variant="outline" onClick={() => retryMutation.mutate(d.id)} disabled={retryMutation.isPending}>
@@ -337,10 +348,15 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
             ppes={ppes}
             projectId={projectId}
             groupId={groupId}
-            onClose={() => { setReviewDocId(null); invalidateDocs(); onApplied(); }}
-            onApplied={(ids) => handleDocApplied(reviewDoc.id, ids)}
+            onClose={() => { closeReview(); invalidateDocs(); onApplied(); }}
+            onApplied={() => handleDocApplied(reviewDoc.id)}
           />
         )}
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t bg-background px-4 py-3 sm:px-6">
+          <p className="text-xs text-muted-foreground">Niezatwierdzone dokumenty pozostaną do sprawdzenia później.</p>
+          <Button onClick={goToAnalysis}>Przejdź do analizy</Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
