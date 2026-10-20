@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Check, Loader2, RefreshCw, Undo2, X } from 'lucide-react';
-import { buildProposalPreview, isProposalStale, PROPOSAL_SOURCE_LABELS } from '@/lib/assistant-proposal';
+import { buildProposalPreview, isProposalStale, PROPOSAL_FIELDS, PROPOSAL_SOURCE_LABELS } from '@/lib/assistant-proposal';
 import { formatCurrency, formatNumber } from '@/lib/calculation-utils';
 
 const db = supabase as any;
@@ -73,7 +73,7 @@ export function ProposalCard({ proposalId, dirtyFor, onSaveForm }: { proposalId:
     const { data, error } = await db.rpc('ai_undo_change', { _id: ch.id });
     if (error) throw new Error(error.message);
     await refresh();
-    if (data?.status === 'conflict') setMsg({ text: `Nie cofnięto: pola zmieniono później (${(data.fields as string[]).map(f => preview.fields.find(x => x.field === f)?.label ?? f).join(', ')}). Nowsza praca pozostała bez zmian.`, error: true });
+    if (data?.status === 'conflict') setMsg({ text: `Nie cofnięto: pola zmieniono później (${(data.fields as string[]).map(f => PROPOSAL_FIELDS[f as keyof typeof PROPOSAL_FIELDS]?.label ?? f).join(', ')}). Nowsza praca pozostała bez zmian.`, error: true });
     else setMsg({ text: 'Cofnięto zmianę — przywrócono poprzednie wartości tych pól.' });
   });
 
