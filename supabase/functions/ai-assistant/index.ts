@@ -134,26 +134,63 @@ Deno.serve(async (req) => {
 
   let streamError: unknown = null;
   let proposalId: string | null = null;
+  let applied: { fields: string[]; changeId: string } | null = null;
+  const draftConflict = (fields: string[]) => b.draftDirty && b.draft ? fields.filter(f => f in (b.draft ?? {})) : [];
+  // Saves via the user's own JWT (permission + version checked in ai_apply_proposal), then confirms by reading back.
+  const applyNow = async (id: string, expected: string, changes: { field: string; value: number }[]) => {
+    const { data: r, error } = await userClient.rpc('ai_apply_proposal', { _id: id, _expected_updated_at: expected });
+    const st = (r as any)?.status;
+    if (error || (st !== 'applied' && st !== 'already_applied')) return { ok: false, errors: [st === 'stale' ? 'Dane PPE zmieniły się w międzyczasie — nic nie zapisano. Powtórz polecenie.' : 'Zapis nie powiódł się — nic nie zmieniono.'] };
+    const { data: after } = await userClient.from('energy_analyses').select(changes.map(c => c.field).join(',')).eq('id', current!.id as string).single();
+    const confirmed = changes.every(c => Number((after as any)?.[c.field]) === c.value);
+    if (!confirmed) return { ok: false, errors: ['Nie udało się potwierdzić zapisu odczytem z bazy.'] };
+    applied = { fields: changes.map(c => c.field), changeId: (r as any).change_id };
+    return { ok: true, info: 'Zapisano i potwierdzono odczytem z bazy. Napisz „Zmieniono …” z wartościami. Użytkownik może cofnąć zmianę przyciskiem w karcie.' };
+  };
   const tools = b.scope === 'ppe' && current ? {
-    zaproponuj_zmiane_po: tool({
-      description: 'Przygotuj propozycję zmiany pól PO dla bieżącego PPE. Nic nie zapisuje — aplikacja pokaże podgląd do zatwierdzenia.',
+    zmien_po: tool({
+      description: 'Zmiana pól PO bieżącego PPE. tryb="polecenie" TYLKO gdy użytkownik w tej wiadomości jednoznacznie polecił ustawić konkretne wartości (np. „Ustaw cenę PO na 500 zł/MWh w strefie 1”) — zapisuje od razu. tryb="propozycja" gdy wartość lub metodę wybierasz sam albo użytkownik pyta „co da…” (symulacja) — nic nie zapisuje, użytkownik zatwierdzi. Przy pytaniach nie wywołuj.',
       inputSchema: z.object({
+        tryb: z.enum(['polecenie', 'propozycja']),
         changes: z.array(z.object({ field: z.enum(PROPOSAL_FIELD_NAMES as [string, ...string[]]), value: z.number() })).min(1).max(8),
         source: z.enum(PROPOSAL_SOURCES),
         assumption: z.string().nullable().describe('Opis założenia lub źródła wartości; null gdy wartość podał użytkownik'),
       }),
       execute: async (input) => {
-        if (proposalId) return { ok: false, errors: ['W jednej odpowiedzi można przygotować tylko jedną propozycję.'] };
+        if (proposalId) return { ok: false, errors: ['W jednej odpowiedzi można wykonać tylko jedną operację.'] };
         const v = validateProposal(input, current);
         if (!v.ok) return { ok: false, errors: v.errors };
+        let command = input.tryb === 'polecenie';
+        if (command) {
+          const why = commandGuard(b.message, v.proposal.changes, input.source);
+          if (why) command = false;
+          const conflict = draftConflict(v.proposal.changes.map(c => c.field));
+          if (conflict.length) return { ok: false, errors: [`Konflikt: formularz ma niezapisaną zmianę tych samych pól (${conflict.join(', ')}). Zapisz lub odrzuć ją i powtórz polecenie.`] };
+        }
         const { data: prop, error } = await admin.from('ai_proposals').insert({
           user_id: userId, analysis_group_id: b.groupId, analysis_id: current.id as string, changes: v.proposal.changes,
           before: v.proposal.before, base_updated_at: current.updated_at as string, source: v.proposal.source,
           assumption: v.proposal.assumption, is_simulation: v.proposal.isSimulation,
         }).select('id').single();
-        if (error || !prop) return { ok: false, errors: ['Nie udało się zapisać propozycji.'] };
+        if (error || !prop) return { ok: false, errors: ['Nie udało się przygotować operacji.'] };
         proposalId = prop.id;
-        return { ok: true, info: 'Propozycja gotowa. Użytkownik zobaczy podgląd i zdecyduje.' };
+        if (!command) return { ok: true, info: input.tryb === 'polecenie' ? 'Wartości nie wynikają wprost z polecenia — przygotowano propozycję do zatwierdzenia (nic nie zapisano).' : 'Propozycja gotowa, nic nie zapisano. Użytkownik zatwierdzi przyciskiem lub w czacie.' };
+        return applyNow(prop.id, current.updated_at as string, v.proposal.changes);
+      },
+    }),
+    zatwierdz_propozycje: tool({
+      description: 'Użyj TYLKO gdy użytkownik w tej wiadomości wyraźnie akceptuje ostatnią oczekującą propozycję (np. „tak, zastosuj”). Zapisuje ją.',
+      inputSchema: z.object({}),
+      execute: async () => {
+        if (proposalId) return { ok: false, errors: ['W jednej odpowiedzi można wykonać tylko jedną operację.'] };
+        if (!isAcceptance(b.message)) return { ok: false, errors: ['Wiadomość nie jest jednoznaczną akceptacją.'] };
+        const { data: p } = await admin.from('ai_proposals').select('id,changes,base_updated_at,status').eq('user_id', userId).eq('analysis_id', current.id as string).order('created_at', { ascending: false }).limit(1).maybeSingle();
+        if (!p || p.status !== 'pending') return { ok: false, errors: ['Brak oczekującej propozycji dla tego PPE.'] };
+        const ch = p.changes as { field: string; value: number }[];
+        const conflict = draftConflict(ch.map(c => c.field));
+        if (conflict.length) return { ok: false, errors: [`Konflikt z niezapisanymi zmianami formularza (${conflict.join(', ')}).`] };
+        proposalId = p.id;
+        return applyNow(p.id, current.updated_at as string, ch);
       },
     }),
   } : undefined;
