@@ -60,7 +60,7 @@ describe('calculateProjectTotals', () => {
   });
 
   it('treats a valid zero as data, not as missing', () => {
-    const t = calculateProjectTotals([base('a', { consumption_after_zone1_mwh: 0 })]);
+    const t = calculateProjectTotals([base('a', { consumption_after_zone1_mwh: 0, value_sources: { consumption_after_zone1_mwh: { source: 'manual' } } })]);
     expect(t.invalid).toHaveLength(0);
   });
 

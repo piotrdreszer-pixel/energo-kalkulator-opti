@@ -10,7 +10,7 @@ export interface ProposalChange { field: string; value: number | string }
 
 /** Preview of a proposal on a copy of the saved row — the same engine as the UI, nothing is saved. */
 export function buildProposalPreview(row: Record<string, unknown>, changes: ProposalChange[]) {
-  const copy = { ...row, ...Object.fromEntries(changes.map(c => [c.field, c.value])), value_sources: { ...(row.value_sources as object ?? {}), ...Object.fromEntries(changes.map(c => [c.field, { source: 'ai' }])) } };
+  const copy: Record<string, unknown> = { ...row, ...Object.fromEntries(changes.map(c => [c.field, c.value])), value_sources: { ...(row.value_sources as object ?? {}), ...Object.fromEntries(changes.map(c => [c.field, { source: 'ai' }])) } };
   const cur = calculateEnergyCosts(row as never);
   const next = calculateEnergyCosts(copy as never);
   const sources = (row.value_sources ?? {}) as ValueSources;

@@ -48,7 +48,7 @@ export function ProposalCard({ proposalId, dirtyFor, onSaveForm }: { proposalId:
       qc.invalidateQueries({ queryKey: ['ai-proposal', proposalId] }),
       qc.invalidateQueries({ queryKey: ['analysis', p.analysis_id] }),
       qc.invalidateQueries({ queryKey: ['ai-group-ppes'] }), qc.invalidateQueries({ queryKey: ['group-ppe'] }),
-      qc.invalidateQueries({ queryKey: ['analyses'] }), qc.invalidateQueries({ queryKey: ['ai-history'] }),
+      qc.invalidateQueries({ queryKey: ['analyses'] }), qc.invalidateQueries({ queryKey: ['analysis-estimates'] }), qc.invalidateQueries({ queryKey: ['invoice-facts'] }), qc.invalidateQueries({ queryKey: ['ai-history'] }),
     ]);
   };
   const run = async (fn: () => Promise<void>) => {
@@ -64,7 +64,7 @@ export function ProposalCard({ proposalId, dirtyFor, onSaveForm }: { proposalId:
     if (error) throw new Error(error.message);
     await refresh();
     if (data?.status === 'stale') setMsg({ text: 'Dane PPE zmieniły się od przygotowania propozycji. Przelicz podgląd i zatwierdź ponownie.', error: true });
-    else if (data?.status === 'applied' || data?.status === 'already_applied') setMsg({ text: 'Zastosowano do PO. Wynik poniżej odczytano ponownie z zapisanych danych.' });
+    else if (data?.status === 'applied' || data?.status === 'already_applied') setMsg({ text: 'Zastosowano zmianę. Wynik poniżej odczytano ponownie z zapisanych danych.' });
   });
   const saveThenApply = () => run(async () => {
     const saved = await onSaveForm?.();
@@ -100,7 +100,7 @@ export function ProposalCard({ proposalId, dirtyFor, onSaveForm }: { proposalId:
       <p>Obecny koszt PO: {formatCurrency(preview.currentAfter)}</p>
       <p>Proponowany koszt PO: <b>{formatCurrency(preview.proposedAfter)}</b></p>
       <p>Różnica względem obecnego PO: <b className={preview.extraBenefit >= 0 ? 'text-success' : 'text-destructive'}>{formatCurrency(Math.abs(preview.extraBenefit))} {preview.extraBenefit >= 0 ? 'mniej' : 'więcej'}</b></p>
-      <p>Łączna oszczędność względem PRZED po zmianie: <b className={preview.savingsAfterChange >= 0 ? 'text-success' : 'text-destructive'}>{formatCurrency(Math.abs(preview.savingsAfterChange))}{preview.savingsPercentAfterChange !== null ? ` (${formatNumber(Math.abs(preview.savingsPercentAfterChange), 2)}%)` : ''}</b></p>
+      <p>{preview.savingsAvailable ? 'Łączna oszczędność względem PRZED po zmianie:' : ''} <b className={preview.savingsAfterChange >= 0 ? 'text-success' : 'text-destructive'}>{formatCurrency(Math.abs(preview.savingsAfterChange))}{preview.savingsPercentAfterChange !== null ? ` (${formatNumber(Math.abs(preview.savingsPercentAfterChange), 2)}%)` : ''}</b></p>
       {preview.issues.length > 0 && <div className="text-destructive"><p>Braki danych — wynik niepełny:</p><ul className="list-disc pl-4">{preview.issues.map(i => <li key={i}>{i}</li>)}</ul></div>}
     </div>}
     {appliedPreview && <div className="border-t pt-2"><p>Potwierdzony wynik po zapisie: PO {formatCurrency(appliedPreview.currentAfter)}, oszczędność względem PRZED {formatCurrency(Math.abs(appliedPreview.savingsAfterChange))}</p></div>}

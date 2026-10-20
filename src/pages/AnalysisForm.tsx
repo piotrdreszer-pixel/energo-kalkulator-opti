@@ -1188,6 +1188,7 @@ function AnalysisForm() {
           {currentStep === 'summary' && <div className="mb-3"><IncompletePoNotice row={formData as Record<string, unknown>} /></div>}
           {currentStep === 'summary' && (
             <ComparisonSummary
+              savingsAvailable={results.savingsAvailable}
               costBefore={results.totalCostBefore}
               costAfter={results.totalCostAfter}
               periodMonths={periodMonths}

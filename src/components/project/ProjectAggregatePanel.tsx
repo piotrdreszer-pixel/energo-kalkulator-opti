@@ -40,7 +40,7 @@ export default function ProjectAggregatePanel({ scopeId, reportPath, analyses, r
           <Warn>Wybrane PPE mają różne okresy. Wyniki punktów pokazano osobno — ujednolić okresy, aby otrzymać sumę.</Warn>
         )}
         {t.invalid.length > 0 && (
-          <Warn>Niekompletne dane: {t.invalid.map((e) => `${e.analysis.name} (${e.missing.join(', ')})`).join('; ')}. Brakujące wartości nie są zastępowane zerem — uzupełnij dane lub odznacz te PPE, aby otrzymać podsumowanie i raport.</Warn>
+          <Warn>Nie można wyznaczyć oszczędności — uzupełnij wariant PO. Niekompletne dane: {t.invalid.map((e) => `${e.analysis.name} (${e.missing.join(', ')})`).join('; ')}. Brakujące wartości nie są zastępowane zerem — uzupełnij dane lub odznacz te PPE, aby otrzymać podsumowanie i raport.</Warn>
         )}
         {!t.sameExclusions && (
           <Warn>Wybrane PPE mają różny zakres wyłączonych składników — suma obejmuje różne zakresy kosztów.</Warn>
@@ -72,7 +72,7 @@ export default function ProjectAggregatePanel({ scopeId, reportPath, analyses, r
               </tr>
             </thead>
             <tbody>
-              {[...t.entries, ...t.invalid].map(({ analysis: a, result: r, missing }) => (
+              {t.entries.map(({ analysis: a, result: r, missing }) => (
                 <tr key={a.id} className="border-b align-top">
                   <td className="py-2 pr-2 break-words">{a.name}{excludedLabels(a) && <div className="text-xs text-muted-foreground">Wyłączone: {excludedLabels(a)}</div>}</td>
                   <td className="py-2 pr-2 break-words">{a.ppe_number || '—'}{a.ppe_address && <div className="text-xs text-muted-foreground">{a.ppe_address}</div>}</td>

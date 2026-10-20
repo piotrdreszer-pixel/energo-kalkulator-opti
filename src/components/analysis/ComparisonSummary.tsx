@@ -9,6 +9,7 @@ import { REPORT_COMPONENTS, type ReportComponentKey } from '@/lib/report-compone
 
 
 interface ComparisonSummaryProps {
+  savingsAvailable?: boolean;
   costBefore: number;
   costAfter: number;
   periodMonths: number;
@@ -38,6 +39,7 @@ interface ComparisonSummaryProps {
 }
 
 export function ComparisonSummary({
+  savingsAvailable = true,
   costBefore,
   costAfter,
   periodMonths,
@@ -58,8 +60,8 @@ export function ComparisonSummary({
   };
 
   const delta = costAfter - costBefore;
-  const savingsValue = -delta; // Positive means savings
-  const savingsPercent = costBefore !== 0 ? (savingsValue / costBefore) * 100 : 0;
+  const savingsValue = savingsAvailable ? -delta : NaN; // Positive means savings
+  const savingsPercent = !savingsAvailable ? NaN : costBefore !== 0 ? (savingsValue / costBefore) * 100 : 0;
 
   const getTrendIcon = (value: number) => {
     if (value > 0) return <TrendingDown className="h-5 w-5 text-green-600" />;
@@ -143,7 +145,7 @@ export function ComparisonSummary({
             <p className="text-sm text-muted-foreground mb-1">Różnica</p>
             <div className="flex items-center justify-center gap-2">
               {getTrendIcon(savingsValue)}
-              <p className={`text-2xl font-bold ${getSavingsColor(savingsValue)}`}>
+              <p className={`${savingsAvailable ? 'text-2xl' : 'text-sm'} font-bold ${getSavingsColor(savingsValue)}`}>
                 {formatCurrency(Math.abs(savingsValue))}
               </p>
             </div>
@@ -156,7 +158,7 @@ export function ComparisonSummary({
         <Card className={savingsValue > 0 ? 'border-green-500/30 bg-green-500/5' : savingsValue < 0 ? 'border-red-500/30 bg-red-500/5' : ''}>
           <CardContent className="pt-6 text-center">
             <p className="text-sm text-muted-foreground mb-1">Zmiana</p>
-            <p className={`text-2xl font-bold ${getSavingsColor(savingsValue)}`}>
+            <p className={`${savingsAvailable ? 'text-2xl' : 'text-sm'} font-bold ${getSavingsColor(savingsValue)}`}>
               {formatPercent(Math.abs(savingsPercent))}
             </p>
             <p className="text-xs text-muted-foreground">procentowo</p>
@@ -196,7 +198,7 @@ export function ComparisonSummary({
               <span className="w-24 text-right">{formatCurrency(costBefore)}</span>
               <span className="w-4"></span>
               <span className="w-24 text-right">{formatCurrency(costAfter)}</span>
-              <span className={`w-24 text-right ${getSavingsColor(savingsValue)}`}>
+              <span className={`w-24 text-right text-xs ${getSavingsColor(savingsValue)}`}>
                 {formatCurrency(Math.abs(savingsValue))}
               </span>
             </div>
