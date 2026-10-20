@@ -1,7 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { commandGuard, isAcceptance, numbersInText, pickAcceptance, validateAppChanges, isCommand } from '../../supabase/functions/ai-assistant/proposal';
+import { requestedEstimateScope } from '../../supabase/functions/_shared/estimate-scope';
 
 describe('chat command guard', () => {
+  it('a prohibition mentioning costs does not authorize them or turn a command into a question', () => {
+    const text = 'Oszacuj zużycie PRZED za sierpień średnią dobową. Nie zmieniaj PO ani opłaty mocowej czy energii biernej.';
+    expect(isCommand(text)).toBe(true);
+    expect(requestedEstimateScope(text, 'zuzycie', null)).toBe(true);
+    expect(requestedEstimateScope(text, 'koszty', 'mocowa')).toBe(false);
+    expect(requestedEstimateScope(text, 'koszty', 'bierna')).toBe(false);
+    expect(requestedEstimateScope('Zaproponuj opłatę mocową PRZED', 'koszty', 'mocowa')).toBe(true);
+  });
   it('explicit command with the value saves', () => {
     expect(commandGuard('Ustaw cenę PO na 500 zł/MWh w strefie 1', [{ value: 500 }], 'polecenie_uzytkownika')).toBeNull();
   });
