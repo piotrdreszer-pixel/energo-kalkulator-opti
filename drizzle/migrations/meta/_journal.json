@@ -85,6 +85,13 @@
       "when": 1792482240334,
       "tag": "0011_ai_assistant_proposals",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792514541981,
+      "tag": "0012_ai_period_estimates",
+      "breakpoints": true
     }
   ]
 }
