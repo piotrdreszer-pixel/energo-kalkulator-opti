@@ -16,3 +16,21 @@ describe('invoice upload errors', () => {
     expect(isAllowedFile('a.docx')).toBe(false);
   });
 });
+
+import { summarizeDocs, analysisTarget } from './invoice-upload';
+describe('summarizeDocs', () => {
+  it('liczy zatwierdzone, do sprawdzenia, odczyt i błędy osobno', () => {
+    const s = summarizeDocs([{ status: 'approved' }, { status: 'needs_review' }, { status: 'processing' }, { status: 'pending' }, { status: 'error' }]);
+    expect(s).toMatchObject({ total: 5, approved: 1, toReview: 1, reading: 2, errors: 1, allApproved: false });
+  });
+  it('wszystkie zatwierdzone', () => {
+    expect(summarizeDocs([{ status: 'approved' }, { status: 'approved' }]).allApproved).toBe(true);
+    expect(summarizeDocs([]).allApproved).toBe(false);
+  });
+});
+describe('analysisTarget', () => {
+  it('jeden PPE → formularz, kilka → lista', () => {
+    expect(analysisTarget('p', 'g', ['a'])).toBe('/projects/p/analysis/a');
+    expect(analysisTarget('p', 'g', ['a', 'b'])).toBe('/projects/p/analyses/g');
+  });
+});
