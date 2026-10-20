@@ -1,5 +1,12 @@
 # Roadmap
 
+## Asystent: zmiana pól i porównanie taryf
+- [x] Reguły: taryfa+moc razem, dostępność dla OSD, warunki zmiany grupy, strefy wg znaczenia, brak stawki ≠ 0, najtańszy/remis (testy).
+- [ ] Operacje zapisu w bazie (taryfa+moc+stawki, pola, wybór PPE, zaznaczenia importu) z historią i cofaniem.
+- [ ] Narzędzia asystenta i scalanie z niezapisanym formularzem.
+- [ ] Przycisk „Porównaj taryfy” i tabela wyniku.
+- [ ] Test w przeglądarce (sekcja 10).
+
 ## Układ Asystenta AI
 - [x] Panel obok treści na szerokich ekranach, nakładany na mniejszych; brak nadmiaru szerokości.
 - [x] Zawijanie kart PPE, akcji i wszystkich kroków formularza.
