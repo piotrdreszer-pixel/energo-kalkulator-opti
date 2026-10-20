@@ -1,5 +1,11 @@
 # Roadmap
 
+## Asystent AI
+- [x] Etap A: przełącznik dostępu, panel rozmowy (tylko odczyt), kontekst, limity, rejestr użycia.
+- [ ] Odbiór Etapu A na żywo — czeka na włączenie przełącznika „Asystent AI” na koncie testowym przez administratora.
+- [ ] Etap B: propozycje zmian PO z podglądem z kalkulatora.
+- [ ] Etap C: „Zastosuj do PO”, historia i „Cofnij zmianę”.
+
 ## Regresje uprawnień
 - [x] Odtworzenie i naprawa transakcyjnego usuwania z kolejką sprzątania plików.
 - [x] Ukrycie niedostępnych akcji i sprawdzenie egzekwowania aktualnych flag.
