@@ -45,3 +45,16 @@ describe('tariff PO operation fields', () => {
     expect(validateAppChanges('tariff_po', [{ field: 'tariff_code_before', value: 'B23' }]).length).toBe(1);
   });
 });
+
+import { manualRateCorrections, rateChanges } from '../../supabase/functions/ai-assistant/tariff-ops';
+describe('tariff change rates', () => {
+  it('manual PO rate corrections are detected, not silently replaced', () => {
+    expect(manualRateCorrections({ value_sources: { variable_distribution_after_zone1_rate: { source: 'manual' } }, rates_overridden_after: {} })).toEqual(['variable_distribution_after_zone1_rate']);
+  });
+  it('missing base rate stays null, not 0', () => {
+    const r = rateChanges({ rateCardId: 'x', rateCardName: 'T', validFrom: '2025-01-01', validTo: null, rates: { fixedNetworkRate: null, variableRates: [{ zone: 1, rate: 50 }], capacityFee: null } }, 3, 2025);
+    expect(r.contracted_power_charge_rate_after).toBeNull();
+    expect(r.variable_distribution_after_zone2_rate).toBeNull();
+    expect(r.variable_distribution_after_zone1_rate).toBe(50);
+  });
+});
