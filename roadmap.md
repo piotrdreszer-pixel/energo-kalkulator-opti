@@ -1,5 +1,11 @@
 # Roadmap
 
+## Stabilizacja ostatniego wdrożenia
+- [ ] Spójny wynik po zapisie: odczyt, przeliczenie, odpowiedź i karta.
+- [ ] Szacunki zużycia wyłącznie PRZED; osobna zgoda na każdy koszt.
+- [ ] Niepełne PO bez kwoty/procentu oszczędności we wszystkich widokach; świadome zero.
+- [ ] Pełny test przeglądarkowy na osobnym projekcie, cofanie, ponowne otwarcie, zastępowanie i PDF.
+
 ## Asystent AI
 - [x] Etap A: przełącznik dostępu, panel rozmowy (tylko odczyt), kontekst, limity, rejestr użycia.
 - [x] Odbiór Etapu A na żywo — czeka na włączenie przełącznika „Asystent AI” na koncie testowym przez administratora.
