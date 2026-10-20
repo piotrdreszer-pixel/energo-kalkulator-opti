@@ -9,11 +9,11 @@ export function missingPoFields(row: Record<string, unknown>): string[] {
   const known = (f: string) => !blank(f) && (Number(row[f]) !== 0 || ['manual', 'document', 'ai', 'rate_base'].includes(sources[f]?.source ?? ''));
   const require = (f: string, label: string) => { if (!known(f)) missing.push(label); };
   const zones = Number(row.zones_count_after) || 1;
-  const usesConsumption = !excluded.includes('activeEnergy') || !excluded.includes('distribution');
+  const usesConsumption = Boolean(row.tariff_code_after || row.consumption_before_zone1_mwh != null) && (!excluded.includes('activeEnergy') || !excluded.includes('distribution'));
   for (let z = 1; z <= zones; z++) {
     const consumption = `consumption_after_zone${z}_mwh`;
     if (usesConsumption) require(consumption, `zużycie PO S${z}`);
-    if (Number(row[consumption]) > 0) {
+    if (usesConsumption && Number(row[consumption]) > 0) {
       if (!excluded.includes('activeEnergy')) require(`active_energy_price_after_zone${z}`, `cena energii PO S${z}`);
       if (!excluded.includes('distribution') && Number(row[`variable_distribution_before_zone${z}_rate`]) > 0)
         require(`variable_distribution_after_zone${z}_rate`, `stawka sieciowa PO S${z}`);

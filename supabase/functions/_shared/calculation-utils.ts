@@ -1,0 +1,228 @@
+import { missingPoFields, INCOMPLETE_PO_MESSAGE } from './po-completeness.ts';
+import { calculatePeriodMonths, getVariableDistributionMultiplier } from './tariff-utils.ts';
+
+export interface CalculationResult {
+  distributionCostBefore: number;
+  distributionCostAfter: number;
+  activeEnergyCostBefore: number;
+  activeEnergyCostAfter: number;
+  handlingFeeBefore: number;
+  handlingFeeAfter: number;
+  totalCostBefore: number;
+  totalCostAfter: number;
+  savingsValue: number;
+  savingsPercent: number;
+  missingPo: string[];
+  savingsAvailable: boolean;
+  // Additional breakdowns for display
+  contractedPowerChargeBefore: number;
+  contractedPowerChargeAfter: number;
+  reactiveEnergyCostBefore: number;
+  reactiveEnergyCostAfter: number;
+  capacityChargeBefore: number;
+  capacityChargeAfter: number;
+  periodMonths: number;
+}
+
+export function calculateEnergyCosts(analysis: Record<string, any>): CalculationResult {
+  const zonesCountBefore = analysis.zones_count_before || 1;
+  const zonesCountAfter = analysis.zones_count_after || 1;
+  
+  // Calculate period length in months
+  const periodMonths = calculatePeriodMonths(
+    analysis.period_from || null, 
+    analysis.period_to || null
+  );
+
+  // Contracted power charge - monthly rate scaled to period
+  const contractedPowerBefore = Number(analysis.contracted_power_before_kw) || 0;
+  const contractedPowerAfter = Number(analysis.contracted_power_after_kw) || 0;
+  const monthlyRateBefore = Number(analysis.contracted_power_charge_rate_before) || 0;
+  const monthlyRateAfter = Number(analysis.contracted_power_charge_rate_after) || 0;
+  
+  const contractedPowerChargeBefore = contractedPowerBefore * monthlyRateBefore * periodMonths;
+  const contractedPowerChargeAfter = contractedPowerAfter * monthlyRateAfter * periodMonths;
+
+  // Reactive energy cost - depends on input mode
+  let reactiveEnergyCostBefore: number;
+  let reactiveEnergyCostAfter: number;
+  
+  if (analysis.reactive_monthly_mode_before) {
+    // Sum of 12 monthly values
+    reactiveEnergyCostBefore = [
+      analysis.reactive_energy_before_month_1,
+      analysis.reactive_energy_before_month_2,
+      analysis.reactive_energy_before_month_3,
+      analysis.reactive_energy_before_month_4,
+      analysis.reactive_energy_before_month_5,
+      analysis.reactive_energy_before_month_6,
+      analysis.reactive_energy_before_month_7,
+      analysis.reactive_energy_before_month_8,
+      analysis.reactive_energy_before_month_9,
+      analysis.reactive_energy_before_month_10,
+      analysis.reactive_energy_before_month_11,
+      analysis.reactive_energy_before_month_12,
+    ].reduce((sum, val) => sum + (Number(val) || 0), 0);
+  } else {
+    reactiveEnergyCostBefore = Number(analysis.reactive_energy_cost_before) || 0;
+  }
+  
+  if (analysis.reactive_monthly_mode_after) {
+    // Sum of 12 monthly values
+    reactiveEnergyCostAfter = [
+      analysis.reactive_energy_after_month_1,
+      analysis.reactive_energy_after_month_2,
+      analysis.reactive_energy_after_month_3,
+      analysis.reactive_energy_after_month_4,
+      analysis.reactive_energy_after_month_5,
+      analysis.reactive_energy_after_month_6,
+      analysis.reactive_energy_after_month_7,
+      analysis.reactive_energy_after_month_8,
+      analysis.reactive_energy_after_month_9,
+      analysis.reactive_energy_after_month_10,
+      analysis.reactive_energy_after_month_11,
+      analysis.reactive_energy_after_month_12,
+    ].reduce((sum, val) => sum + (Number(val) || 0), 0);
+  } else {
+    reactiveEnergyCostAfter = Number(analysis.reactive_energy_cost_after) || 0;
+  }
+
+  // Get multipliers based on tariff type (C tariffs: zł/kWh → x1000, B/A tariffs: zł/MWh → x1)
+  const multiplierBefore = getVariableDistributionMultiplier(analysis.tariff_code_before || 'C11');
+  const multiplierAfter = getVariableDistributionMultiplier(analysis.tariff_code_after || 'C11');
+
+  // Distribution BEFORE - uses consumption_before_zone*_mwh fields
+  const fixedDistBefore = Number(analysis.fixed_distribution_before_total) || 0;
+  const varDistBefore1 = (Number(analysis.variable_distribution_before_zone1_rate) || 0) * 
+                          (Number(analysis.consumption_before_zone1_mwh) || 0) * multiplierBefore;
+  const varDistBefore2 = zonesCountBefore >= 2 
+    ? (Number(analysis.variable_distribution_before_zone2_rate) || 0) * 
+      (Number(analysis.consumption_before_zone2_mwh) || 0) * multiplierBefore 
+    : 0;
+  const varDistBefore3 = zonesCountBefore >= 3 
+    ? (Number(analysis.variable_distribution_before_zone3_rate) || 0) * 
+      (Number(analysis.consumption_before_zone3_mwh) || 0) * multiplierBefore 
+    : 0;
+  const capacityBefore = Number(analysis.capacity_charge_before) || 0;
+
+  // Distribution cost = ONLY fixed + variable distribution charges
+  // (reactive, capacity, contracted power are separate line items in the breakdown)
+  const distributionCostBefore = fixedDistBefore + varDistBefore1 + varDistBefore2 + varDistBefore3;
+
+  // Distribution AFTER - uses consumption_after_zone*_mwh for mapped consumption
+  const fixedDistAfter = Number(analysis.fixed_distribution_after_total) || 0;
+  // Variable distribution rates: C tariffs in PLN/kWh (x1000), B/A tariffs in PLN/MWh (x1)
+  const varDistAfter1 = (Number(analysis.variable_distribution_after_zone1_rate) || 0) * 
+                         (Number(analysis.consumption_after_zone1_mwh) || 0) * multiplierAfter;
+  const varDistAfter2 = zonesCountAfter >= 2 
+    ? (Number(analysis.variable_distribution_after_zone2_rate) || 0) * 
+      (Number(analysis.consumption_after_zone2_mwh) || 0) * multiplierAfter 
+    : 0;
+  const varDistAfter3 = zonesCountAfter >= 3 
+    ? (Number(analysis.variable_distribution_after_zone3_rate) || 0) * 
+      (Number(analysis.consumption_after_zone3_mwh) || 0) * multiplierAfter 
+    : 0;
+  const capacityAfter = Number(analysis.capacity_charge_after) || 0;
+
+  // Distribution cost = ONLY fixed + variable distribution charges
+  const distributionCostAfter = fixedDistAfter + varDistAfter1 + varDistAfter2 + varDistAfter3;
+
+  // Active energy BEFORE - rates are in PLN/MWh, consumption in MWh
+  const activeEnergy1Before = (Number(analysis.active_energy_price_before_zone1) || 0) * 
+                               (Number(analysis.consumption_before_zone1_mwh) || 0);
+  const activeEnergy2Before = zonesCountBefore >= 2 
+    ? (Number(analysis.active_energy_price_before_zone2) || 0) * 
+      (Number(analysis.consumption_before_zone2_mwh) || 0)
+    : 0;
+  const activeEnergy3Before = zonesCountBefore >= 3 
+    ? (Number(analysis.active_energy_price_before_zone3) || 0) * 
+      (Number(analysis.consumption_before_zone3_mwh) || 0)
+    : 0;
+
+  const activeEnergyCostBefore = activeEnergy1Before + activeEnergy2Before + activeEnergy3Before;
+
+  // Active energy AFTER - uses consumption_after_zone*_mwh for mapped consumption
+  // Rates are in PLN/MWh, consumption in MWh
+  const activeEnergy1After = (Number(analysis.active_energy_price_after_zone1) || 0) * 
+                              (Number(analysis.consumption_after_zone1_mwh) || 0);
+  const activeEnergy2After = zonesCountAfter >= 2 
+    ? (Number(analysis.active_energy_price_after_zone2) || 0) * 
+      (Number(analysis.consumption_after_zone2_mwh) || 0)
+    : 0;
+  const activeEnergy3After = zonesCountAfter >= 3 
+    ? (Number(analysis.active_energy_price_after_zone3) || 0) * 
+      (Number(analysis.consumption_after_zone3_mwh) || 0)
+    : 0;
+
+  const activeEnergyCostAfter = activeEnergy1After + activeEnergy2After + activeEnergy3After;
+
+  // Handling fees - monthly rate scaled to period
+  const handlingFeeBefore = (Number(analysis.handling_fee_before) || 0) * periodMonths;
+  const handlingFeeAfter = (Number(analysis.handling_fee_after) || 0) * periodMonths;
+
+  // Totals - include all cost components except those excluded from calculation
+  const excluded = (analysis.report_excluded_components || []) as string[];
+  const inc = (key: string, v: number) => (excluded.includes(key) ? 0 : v);
+  const totalCostBefore =
+    inc('distribution', distributionCostBefore - fixedDistBefore) + inc('fixedDistribution', fixedDistBefore) +
+    inc('activeEnergy', activeEnergyCostBefore) + inc('handling', handlingFeeBefore) +
+    inc('contractedPower', contractedPowerChargeBefore) + inc('reactive', reactiveEnergyCostBefore) +
+    inc('capacity', capacityBefore);
+  const totalCostAfter =
+    inc('distribution', distributionCostAfter - fixedDistAfter) + inc('fixedDistribution', fixedDistAfter) +
+    inc('activeEnergy', activeEnergyCostAfter) + inc('handling', handlingFeeAfter) +
+    inc('contractedPower', contractedPowerChargeAfter) + inc('reactive', reactiveEnergyCostAfter) +
+    inc('capacity', capacityAfter);
+
+  // Savings
+  const missingPo = missingPoFields(analysis);
+  const savingsValue = missingPo.length ? NaN : totalCostBefore - totalCostAfter;
+  const savingsPercent = totalCostBefore > 0 ? (savingsValue / totalCostBefore) * 100 : 0;
+
+  return {
+    missingPo, savingsAvailable: missingPo.length === 0,
+    distributionCostBefore,
+    distributionCostAfter,
+    activeEnergyCostBefore,
+    activeEnergyCostAfter,
+    handlingFeeBefore,
+    handlingFeeAfter,
+    totalCostBefore,
+    totalCostAfter,
+    savingsValue,
+    savingsPercent,
+    contractedPowerChargeBefore,
+    contractedPowerChargeAfter,
+    reactiveEnergyCostBefore,
+    reactiveEnergyCostAfter,
+    capacityChargeBefore: capacityBefore,
+    capacityChargeAfter: capacityAfter,
+    periodMonths,
+  };
+}
+
+export function formatCurrency(value: number): string {
+  if (!Number.isFinite(value)) return INCOMPLETE_PO_MESSAGE;
+  return new Intl.NumberFormat('pl-PL', {
+    style: 'currency',
+    currency: 'PLN',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+export function formatPercent(value: number): string {
+  if (!Number.isFinite(value)) return INCOMPLETE_PO_MESSAGE;
+  return new Intl.NumberFormat('pl-PL', {
+    style: 'percent',
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(value / 100);
+}
+
+export function formatNumber(value: number, decimals: number = 2): string {
+  return new Intl.NumberFormat('pl-PL', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(value);
+}
