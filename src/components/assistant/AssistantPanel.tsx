@@ -9,6 +9,10 @@ import { assistantDraftDiff, assistantResultSummary, AI_MAX_MESSAGE } from '@/li
 import { calculateEnergyCosts } from '@/lib/calculation-utils';
 import { ProposalCard } from './ProposalCard';
 import { PROPOSAL_FIELDS } from '@/lib/assistant-proposal';
+import { ESTIMATE_FIELD_LABELS } from '@/lib/invoice-gaps';
+import { computeInvoiceFacts } from '@/hooks/useInvoiceFacts';
+
+const fieldLabel = (f: string) => PROPOSAL_FIELDS[f as keyof typeof PROPOSAL_FIELDS]?.label ?? ESTIMATE_FIELD_LABELS[f] ?? f;
 
 export interface AssistantPpe { id: string; name: string; ppe_number?: string | null }
 export interface AssistantPanelProps {
@@ -18,6 +22,8 @@ export interface AssistantPanelProps {
   ppes: AssistantPpe[];
   currentPpeId?: string | null;
   allowAll: boolean;
+  /** Current Import faktur permission: enables period/estimate operations. */
+  invoiceImport?: boolean;
   step?: string;
   draft?: Record<string, unknown> | null;
   saved?: Record<string, unknown> | null;
@@ -97,6 +103,10 @@ export function AssistantPanel(p: AssistantPanelProps) {
         const id = row.id as string;
         results[id] = assistantResultSummary(row, calculateEnergyCosts(row as never), 'zapisane');
       }
+      let facts = null;
+      if (!isAll && p.invoiceImport && rows?.[0]) {
+        try { facts = (await computeInvoiceFacts(p.groupId, rows[0] as Record<string, unknown>)).facts; } catch { facts = null; }
+      }
       if (ownPpe && dirty.length && p.draft) {
         results[`${scope}__robocze`] = assistantResultSummary(p.draft, calculateEnergyCosts(p.draft as never), 'robocze');
       }
@@ -105,7 +115,7 @@ export function AssistantPanel(p: AssistantPanelProps) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.session?.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
         body: JSON.stringify({ groupId: p.groupId, ppeId: isAll ? null : scope, scope: isAll ? 'all' : 'ppe', step: p.step, message,
           draft: ownPpe && dirty.length ? Object.fromEntries(dirty.map(k => [k, p.draft?.[k] ?? null])) : null, draftDirty: ownPpe && dirty.length > 0,
-          results, issues: ownPpe ? p.issues : [] }),
+          results, issues: ownPpe ? p.issues : [], facts }),
       });
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({}));
@@ -116,7 +126,7 @@ export function AssistantPanel(p: AssistantPanelProps) {
         setPending(prev => prev.map(m => m.id === aId ? { ...m, content: acc.split('[[BŁĄD]]')[0] } : m)); }
       if (acc.includes('[[BŁĄD]]')) throw new Error(acc.split('[[BŁĄD]]')[1].trim());
       // A chat command may have saved PO values: reload form, PPE card and summary from the database.
-      await Promise.all(['ai-messages', 'ai-proposal', 'analysis', 'ai-group-ppes', 'group-ppe', 'analyses', 'ai-history']
+      await Promise.all(['ai-messages', 'ai-proposal', 'analysis', 'ai-group-ppes', 'group-ppe', 'analyses', 'ai-history', 'analysis-estimates', 'invoice-facts']
         .map(k => qc.invalidateQueries({ queryKey: [k] })));
       setPending([]);
     } catch (e) {
@@ -139,7 +149,7 @@ export function AssistantPanel(p: AssistantPanelProps) {
       {(changes.data?.length ?? 0) > 0 && <details className="text-xs"><summary className="cursor-pointer text-muted-foreground">Historia zmian asystenta ({changes.data!.length})</summary>
         <ul className="mt-1 space-y-1 max-h-40 overflow-y-auto">{changes.data!.map(c => <li key={c.id} className="border-b pb-1">
           {new Date(c.created_at).toLocaleString('pl-PL')} · {p.ppes.find(x => x.id === c.analysis_id)?.ppe_number || p.ppes.find(x => x.id === c.analysis_id)?.name || 'PPE'}{c.undone_at ? ' · cofnięta' : ''}
-          <span className="block text-muted-foreground">{Object.entries(c.fields).map(([f, v]) => `${PROPOSAL_FIELDS[f as keyof typeof PROPOSAL_FIELDS]?.label ?? f}: ${v.before ?? 'brak'} → ${v.after}`).join('; ')}</span></li>)}</ul></details>}
+          <span className="block text-muted-foreground">{Object.entries(c.fields).map(([f, v]) => `${fieldLabel(f)}: ${v.before ?? 'brak'} → ${v.after}`).join('; ')}</span></li>)}</ul></details>}
     </header>
     <div className="flex-1 overflow-y-auto p-4 space-y-3">
       {history.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : history.error ? <p className="text-sm text-destructive">Nie udało się wczytać rozmowy.</p> :
