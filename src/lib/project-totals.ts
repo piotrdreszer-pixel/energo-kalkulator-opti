@@ -1,4 +1,5 @@
 import type { EnergyAnalysis } from '@/types/database';
+import { incompletePo, INCOMPLETE_PO_MESSAGE } from './invoice-gaps';
 import { calculateEnergyCosts, type CalculationResult } from './calculation-utils';
 
 export interface PpeEntry {
@@ -45,7 +46,7 @@ export function findMissingFields(a: Partial<EnergyAnalysis>): string[] {
     if (isBlank((a as any)[`consumption_after_zone${z}_mwh`])) m.push(`zużycie PO S${z}`);
     if (isBlank((a as any)[`active_energy_price_after_zone${z}`])) m.push(`cena energii PO S${z}`);
   }
-  return m;
+  return [...new Set([...m, ...incompletePo(a as Record<string, unknown>)])];
 }
 
 const exclusionKey = (a: Partial<EnergyAnalysis>) =>
@@ -57,7 +58,7 @@ export function calculateProjectTotals(analyses: (Partial<EnergyAnalysis> & { id
     result: calculateEnergyCosts(analysis),
     missing: findMissingFields(analysis),
   }));
-  const entries = all.filter((e) => e.missing.length === 0);
+  const entries = all;
   const invalid = all.filter((e) => e.missing.length > 0);
 
   const counts = new Map<string, number>();
@@ -74,8 +75,8 @@ export function calculateProjectTotals(analyses: (Partial<EnergyAnalysis> & { id
 
   const totalBefore = entries.reduce((s, e) => s + e.result.totalCostBefore, 0);
   const totalAfter = entries.reduce((s, e) => s + e.result.totalCostAfter, 0);
-  const savingsValue = totalBefore - totalAfter;
-  const savingsPercent = totalBefore !== 0 ? (savingsValue / totalBefore) * 100 : null;
+  const savingsValue = invalid.length ? NaN : totalBefore - totalAfter;
+  const savingsPercent = invalid.length ? null : totalBefore !== 0 ? (savingsValue / totalBefore) * 100 : null;
 
   return {
     entries,
@@ -106,7 +107,7 @@ export function summarizeGroupCard(items: (Partial<EnergyAnalysis> & { id: strin
   const set = items.length === 1 ? items : chosen;
   if (set.length === 0) return { kind: 'message', message: 'Wybierz PPE do zestawienia' };
   const t = calculateProjectTotals(set);
-  if (t.invalid.length > 0) return { kind: 'message', message: 'Uzupełnij dane PPE' };
+  if (t.invalid.length > 0) return { kind: 'message', message: INCOMPLETE_PO_MESSAGE };
   if (!t.samePeriod) return { kind: 'message', message: 'Różne okresy — brak wspólnego wyniku' };
   if (t.duplicatePpe.length > 0) return { kind: 'message', message: 'Ten sam numer PPE wybrany kilka razy' };
   const label = items.length === 1 ? 'Wynik 1 PPE' : `Wynik ${set.length} z ${items.length} PPE wybranych do raportu`;
