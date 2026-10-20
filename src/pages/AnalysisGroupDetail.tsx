@@ -287,7 +287,7 @@ export default function AnalysisGroupDetail() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-4 xl:gap-6 text-center shrink-0">
+                      <div className="grid grid-cols-3 gap-2 sm:gap-4 xl:gap-6 text-center shrink-0">
                         <div>
                           <p className="text-xs text-muted-foreground mb-1">PRZED</p>
                           <p className="font-semibold">{formatCurrency(r.totalCostBefore)}</p>
@@ -300,7 +300,7 @@ export default function AnalysisGroupDetail() {
                           <p className="text-xs text-muted-foreground mb-1">OSZCZĘDNOŚĆ</p>
                           <p className={`font-bold ${r.savingsValue > 0 ? 'text-success' : r.savingsValue < 0 ? 'text-destructive' : ''}`}>
                             {formatCurrency(r.savingsValue)}
-                            <span className="text-xs ml-1">({formatPercent(r.savingsPercent)})</span>
+                            <span className="block text-xs">({formatPercent(r.savingsPercent)})</span>
                           </p>
                         </div>
                       </div>
