@@ -3,8 +3,7 @@
 // Szacunek zużycia nigdy nie potwierdza Pmax ani bezpiecznej mocy umownej.
 
 import { mapConsumptionZones } from './invoice-import';
-import { classifyItem } from './invoice-line-mapping';
-import { toStored, type Interval, type Settlement, type SettlementEntry, type SettlementItem } from './invoice-settlement';
+import { toStored, type Interval, type Settlement, type SettlementEntry } from './invoice-settlement';
 import { calculateEnergyCosts } from './calculation-utils';
 
 const dayMs = 86400000;
@@ -90,7 +89,7 @@ const COST_FIELDS: { kind: 'capacity' | 'reactive'; field: string; label: string
 ];
 
 /** Szacunek kwot za okres (opłata mocowa, energia bierna) tą samą metodą dobową — tylko gdy pole równa się sumie z faktur. */
-export function planCostEstimate(row: Record<string, unknown>, s: Settlement, items: SettlementItem[], gap: Interval): Plan {
+export function planCostEstimate(row: Record<string, unknown>, s: Settlement, gap: Interval): Plan {
   const p = empty();
   const nb = neighbours(s, gap, false);
   if (!nb.length) { p.errors.push('Brak rozliczeń bezpośrednio przed lub po luce — nie ma podstawy do szacunku kosztów.'); return p; }
@@ -113,7 +112,6 @@ export function planCostEstimate(row: Record<string, unknown>, s: Settlement, it
     p.changes.push({ field: cf.field, value: toStored(cf.field, cost.total + est) });
     p.estimates.push({ field: cf.field, period_from: gap.from, period_to: gap.to, value: est, base_value: toStored(cf.field, cost.total), unit: 'zł', method: METHOD_DAILY, basis });
   }
-  void items; void classifyItem;
   if (!p.changes.length && !p.notes.length) p.notes.push('Brak kosztów z faktur, które można oszacować tą metodą.');
   p.notes.push('Koszty liczone ze stawek (energia czynna, składnik zmienny) przeliczają się automatycznie z zużycia. „Suma pozostałych opłat” i opłata handlowa nie są szacowane automatycznie.');
   return p;
