@@ -4,7 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Bot, Loader2, RotateCcw, Send, X } from 'lucide-react';
-import { assistantDraftDiff, AI_MAX_MESSAGE } from '@/lib/assistant-context';
+import ReactMarkdown from 'react-markdown';
+import { assistantDraftDiff, assistantResultSummary, AI_MAX_MESSAGE } from '@/lib/assistant-context';
+import { calculateEnergyCosts } from '@/lib/calculation-utils';
 
 export interface AssistantPpe { id: string; name: string; ppe_number?: string | null }
 export interface AssistantPanelProps {
@@ -40,6 +42,7 @@ export function AssistantPanel(p: AssistantPanelProps) {
   const qc = useQueryClient();
   const endRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => { document.documentElement.classList.toggle('assistant-open', open); return () => document.documentElement.classList.remove('assistant-open'); }, [open]);
   useEffect(() => { if (p.currentPpeId) setScope(p.currentPpeId); }, [p.currentPpeId]);
   useEffect(() => {
     const h = (e: Event) => { setOpen(true); const prompt = (e as CustomEvent).detail?.prompt; if (prompt) setInput(prompt); };
@@ -73,12 +76,25 @@ export function AssistantPanel(p: AssistantPanelProps) {
     try {
       const { data: s } = await supabase.auth.getSession();
       const ownPpe = !isAll && scope === p.currentPpeId;
+      // Fresh calculator results for the exact rows the server will read (same engine as the UI).
+      let q = supabase.from('energy_analyses').select('*').eq('analysis_group_id', p.groupId);
+      if (!isAll) q = q.eq('id', scope);
+      const { data: rows, error: rowsErr } = await q;
+      if (rowsErr) throw new Error('Nie udało się odczytać danych PPE.');
+      const results: Record<string, unknown> = {};
+      for (const row of (rows ?? []) as Record<string, unknown>[]) {
+        const id = row.id as string;
+        results[id] = assistantResultSummary(row, calculateEnergyCosts(row as never), 'zapisane');
+      }
+      if (ownPpe && dirty.length && p.draft) {
+        results[`${scope}__robocze`] = assistantResultSummary(p.draft, calculateEnergyCosts(p.draft as never), 'robocze');
+      }
       const res = await fetch(`https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/ai-assistant`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.session?.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
         body: JSON.stringify({ groupId: p.groupId, ppeId: isAll ? null : scope, scope: isAll ? 'all' : 'ppe', step: p.step, message,
           draft: ownPpe && dirty.length ? Object.fromEntries(dirty.map(k => [k, p.draft?.[k] ?? null])) : null, draftDirty: ownPpe && dirty.length > 0,
-          results: ownPpe ? p.results : null, issues: ownPpe ? p.issues : [] }),
+          results, issues: ownPpe ? p.issues : [] }),
       });
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({}));
@@ -113,7 +129,9 @@ export function AssistantPanel(p: AssistantPanelProps) {
         msgs.length === 0 && <p className="text-sm text-muted-foreground">Zapytaj o pola, źródła sum, braki danych lub różnice PRZED/PO. Asystent nie zmienia danych.</p>}
       {msgs.map(m => <div key={m.id} className={m.role === 'user' ? 'ml-8 rounded-lg bg-primary/10 p-3' : `mr-4 rounded-lg p-3 ${m.error ? 'border border-destructive text-destructive' : 'bg-muted'}`}>
         {m.ppe_label && <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">{m.ppe_label}</p>}
-        <p className="text-sm whitespace-pre-wrap">{m.content || (busy ? '…' : '')}</p>
+        {m.role === 'assistant' && !m.error && m.content
+          ? <div className="text-sm break-words space-y-2 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5 [&_strong]:font-semibold [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold"><ReactMarkdown skipHtml>{m.content}</ReactMarkdown></div>
+          : <p className="text-sm whitespace-pre-wrap break-words">{m.content || (busy ? '…' : '')}</p>}
       </div>)}
       {lastFailed && !busy && <Button variant="outline" size="sm" onClick={() => send(lastFailed)}><RotateCcw className="h-4 w-4 mr-2" />Ponów</Button>}
       <div ref={endRef} />

@@ -276,3 +276,7 @@
     break-inside: avoid;
   }
 }
+
+@media (min-width: 640px) {
+  html.assistant-open body { padding-right: 420px; }
+}

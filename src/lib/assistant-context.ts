@@ -1,6 +1,32 @@
+import type { CalculationResult } from './calculation-utils';
+
 export const AI_MAX_MESSAGE = 2000;
 
 const IGNORED = new Set(['updated_at', 'created_at']);
+
+const r2 = (v: number) => Math.round((Number(v) || 0) * 100) / 100;
+
+/** Calculator output handed to the assistant — same numbers as the UI (calculateEnergyCosts), never recomputed by the model. */
+export function assistantResultSummary(a: Record<string, unknown>, r: CalculationResult, source: 'zapisane' | 'robocze') {
+  const excluded = (a.report_excluded_components as string[] | null) ?? [];
+  return {
+    zrodlo_danych: source === 'robocze' ? 'niezapisany formularz (wersja robocza)' : 'zapisane dane PPE',
+    okres: { od: a.period_from ?? null, do: a.period_to ?? null, miesiecy: r.periodMonths },
+    koszt_przed_zl: r2(r.totalCostBefore),
+    koszt_po_zl: r2(r.totalCostAfter),
+    oszczednosc_zl: r2(r.savingsValue),
+    oszczednosc_proc: r.totalCostBefore ? r2(r.savingsPercent) : null,
+    skladniki_wylaczone_z_wyliczen: excluded,
+    rozbicie_zl: {
+      energia_czynna: { przed: r2(r.activeEnergyCostBefore), po: r2(r.activeEnergyCostAfter) },
+      dystrybucja: { przed: r2(r.distributionCostBefore), po: r2(r.distributionCostAfter) },
+      w_tym_oplata_za_moc_umowna: { przed: r2(r.contractedPowerChargeBefore), po: r2(r.contractedPowerChargeAfter) },
+      oplata_handlowa: { przed: r2(r.handlingFeeBefore), po: r2(r.handlingFeeAfter) },
+      oplata_mocowa: { przed: r2(r.capacityChargeBefore), po: r2(r.capacityChargeAfter) },
+      energia_bierna: { przed: r2(r.reactiveEnergyCostBefore), po: r2(r.reactiveEnergyCostAfter) },
+    },
+  };
+}
 
 /** Fields whose draft value differs from the saved row (unsaved changes). */
 export function assistantDraftDiff(saved?: Record<string, unknown> | null, draft?: Record<string, unknown> | null): string[] {

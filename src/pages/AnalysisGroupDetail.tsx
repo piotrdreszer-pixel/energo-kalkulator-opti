@@ -258,8 +258,8 @@ export default function AnalysisGroupDetail() {
                     <div className="px-4 pt-3 sm:px-6"><span className="text-xs font-medium text-primary">Zaimportowano z faktury</span></div>
                   )}
                   <CardContent className="p-4 sm:p-6">
-                    <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                      <div className="flex-1 min-w-0">
+                    <div className="flex flex-col xl:flex-row xl:items-center gap-4">
+                      <div className="flex-1 min-w-0 xl:min-w-[16rem]">
                         <h3 className="font-semibold text-lg mb-1 break-words">{a.name}</h3>
                         {(a.ppe_number || a.ppe_address) && (
                           <p className="text-sm text-muted-foreground break-words mb-1">
@@ -276,18 +276,18 @@ export default function AnalysisGroupDetail() {
                           />
                           Uwzględnij w raporcie analizy
                         </label>}
-                        <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                        <div className="flex flex-wrap gap-x-2 gap-y-1 text-sm text-muted-foreground">
                           {a.period_from && a.period_to && (
-                            <span>
+                            <span className="whitespace-nowrap">
                               Okres: {format(new Date(a.period_from), 'd MMM yyyy', { locale: pl })} - {format(new Date(a.period_to), 'd MMM yyyy', { locale: pl })}
                             </span>
                           )}
                           <span>•</span>
-                          <span>Taryfa: {a.tariff_code_before} → {a.tariff_code_after}</span>
+                          <span className="whitespace-nowrap">Taryfa: {a.tariff_code_before} → {a.tariff_code_after}</span>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-4 lg:gap-6 text-center">
+                      <div className="grid grid-cols-3 gap-2 sm:gap-4 xl:gap-6 text-center shrink-0">
                         <div>
                           <p className="text-xs text-muted-foreground mb-1">PRZED</p>
                           <p className="font-semibold">{formatCurrency(r.totalCostBefore)}</p>
@@ -300,12 +300,12 @@ export default function AnalysisGroupDetail() {
                           <p className="text-xs text-muted-foreground mb-1">OSZCZĘDNOŚĆ</p>
                           <p className={`font-bold ${r.savingsValue > 0 ? 'text-success' : r.savingsValue < 0 ? 'text-destructive' : ''}`}>
                             {formatCurrency(r.savingsValue)}
-                            <span className="text-xs ml-1">({formatPercent(r.savingsPercent)})</span>
+                            <span className="block text-xs">({formatPercent(r.savingsPercent)})</span>
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 lg:ml-4">
+                      <div className="flex flex-wrap items-center gap-2 xl:ml-4 shrink-0">
                         <Button variant="outline" size="sm" asChild>
                           <Link to={`/projects/${projectId}/analysis/${a.id}`}>
                             <Edit className="h-4 w-4 mr-1" />
