@@ -184,6 +184,7 @@ Deno.serve(async (req) => {
     confirmedAfter = after as unknown as Record<string, unknown>;
     confirmedChanges = changes;
     try { confirmedResult = calculateEnergyCosts(confirmedAfter); } catch { confirmedResult = null; }
+    if (confirmedResult) { const r1 = confirmedResult; await admin.from('ai_applied_changes').update({ result_after: { przed: r1.totalCostBefore, po: r1.totalCostAfter, oszczednosc: r1.savingsAvailable ? r1.savingsValue : null } }).eq('id', (r as any).change_id); }
     return { ok: true, aktualny_wynik: confirmedResult, info: 'Zapisano i potwierdzono odczytem z bazy. Napisz „Zmieniono …” z wartościami. Użytkownik może cofnąć zmianę przyciskiem w karcie.' };
   };
   // Operations whose values are computed by the app from approved invoices (never by the model).
@@ -208,7 +209,6 @@ Deno.serve(async (req) => {
     proposalId = prop.id;
     if (!command) return { ok: true, info: 'Przygotowano propozycję do zatwierdzenia (nic nie zapisano).' };
     const done = await applyNow(prop.id, row.updated_at as string, changes, row.id as string);
-    if (confirmedResult) { const r1 = confirmedResult as ReturnType<typeof calculateEnergyCosts>; await admin.from('ai_applied_changes').update({ result_after: { przed: r1.totalCostBefore, po: r1.totalCostAfter, oszczednosc: r1.savingsAvailable ? r1.savingsValue : null } }).eq('proposal_id', prop.id); }
     return done;
   };
   const invoiceTools = () => {

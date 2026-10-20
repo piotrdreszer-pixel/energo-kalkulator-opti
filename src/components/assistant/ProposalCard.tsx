@@ -13,6 +13,9 @@ const label = (f: string) => PROPOSAL_FIELDS[f as keyof typeof PROPOSAL_FIELDS]?
 const db = supabase as any;
 const fmt = (v: unknown) => (v === null || v === undefined || v === '' ? 'brak'
   : typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10).split('-').reverse().join('.')
+  : typeof v === 'boolean' ? (v ? 'tak' : 'nie')
+  : typeof v === 'string' && !Number.isFinite(Number(v)) ? v
+  : typeof v === 'object' ? '—'
   : Number(v).toLocaleString('pl-PL', { minimumFractionDigits: 0, maximumFractionDigits: 4 }));
 
 export function ProposalCard({ proposalId, dirtyFor, onSaveForm }: { proposalId: string; dirtyFor?: string | null; onSaveForm?: () => Promise<boolean> }) {
@@ -84,7 +87,7 @@ export function ProposalCard({ proposalId, dirtyFor, onSaveForm }: { proposalId:
   });
 
   const status = { pending: stale ? 'Nieaktualna' : 'Oczekuje na decyzję', applied: 'Zastosowano', rejected: 'Odrzucona', undone: 'Cofnięta' }[p.status as string];
-  const fields = p.status === 'pending' ? preview.fields : changes.map(c => ({ field: c.field, label: buildProposalPreview(row, [c]).fields[0].label, unit: buildProposalPreview(row, [c]).fields[0].unit,
+  const fields = p.status === 'pending' ? preview.fields : changes.filter(c => buildProposalPreview(row, [c]).fields.length).map(c => ({ field: c.field, label: buildProposalPreview(row, [c]).fields[0].label, unit: buildProposalPreview(row, [c]).fields[0].unit,
     current: ch?.fields?.[c.field]?.before ?? p.before?.[c.field], proposed: c.value, replaces: null as string | null }));
 
   return <div className="mt-3 min-w-0 max-w-full rounded-md border bg-background p-3 text-xs space-y-2" data-testid="ai-proposal">
