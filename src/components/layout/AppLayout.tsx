@@ -133,7 +133,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         </div>
       )}
 
-      <main className="animate-fade-in md:pl-[230px]">{children}</main>
+      <main className="app-main min-w-0 md:ml-[230px]">{children}</main>
     </div>
   );
 }

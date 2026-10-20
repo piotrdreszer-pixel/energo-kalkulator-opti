@@ -277,6 +277,22 @@
   }
 }
 
+/* Reserve space only inside the application's available width, never on body. */
+.app-main { min-width: 0; }
+.assistant-panel { width: 100%; height: 100dvh; }
+.assistant-copy { overflow-wrap: anywhere; }
+.assistant-copy pre { max-width: 100%; overflow-x: auto; white-space: pre; }
+.assistant-copy table { display: block; max-width: 100%; overflow-x: auto; }
+.assistant-copy img { max-width: 100%; }
+.ppe-card { container-type: inline-size; }
+.ppe-costs { grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); }
+@container (min-width: 850px) {
+  .ppe-card-body { flex-direction: row; align-items: center; }
+  .ppe-costs { flex: 0 1 32rem; }
+}
 @media (min-width: 640px) {
-  html.assistant-open body { padding-right: 420px; }
+  .assistant-panel { width: 420px; max-width: 100%; }
+}
+@media (min-width: 1440px) {
+  html.assistant-open .app-main { margin-right: 420px; }
 }

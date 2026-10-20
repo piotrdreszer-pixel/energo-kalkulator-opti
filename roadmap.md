@@ -1,5 +1,10 @@
 # Roadmap
 
+## Układ Asystenta AI
+- [x] Panel obok treści na szerokich ekranach, nakładany na mniejszych; brak nadmiaru szerokości.
+- [x] Zawijanie kart PPE, akcji i wszystkich kroków formularza.
+- [x] Sprawdzenie wskazanych szerokości, powiększeń i długich treści; zrzuty.
+
 ## Stabilizacja ostatniego wdrożenia
 - [x] Spójny wynik po zapisie: odczyt, przeliczenie, odpowiedź i karta.
 - [x] Szacunki zużycia wyłącznie PRZED; osobna zgoda na każdy koszt.

@@ -87,7 +87,7 @@ export function ProposalCard({ proposalId, dirtyFor, onSaveForm }: { proposalId:
   const fields = p.status === 'pending' ? preview.fields : changes.map(c => ({ field: c.field, label: buildProposalPreview(row, [c]).fields[0].label, unit: buildProposalPreview(row, [c]).fields[0].unit,
     current: ch?.fields?.[c.field]?.before ?? p.before?.[c.field], proposed: c.value, replaces: null as string | null }));
 
-  return <div className="mt-3 rounded-md border bg-background p-3 text-xs space-y-2" data-testid="ai-proposal">
+  return <div className="mt-3 min-w-0 max-w-full rounded-md border bg-background p-3 text-xs space-y-2" data-testid="ai-proposal">
     <div className="flex justify-between gap-2"><span className="font-semibold">{KIND_TITLE[p.kind ?? 'po'] ?? KIND_TITLE.po}</span><span className="text-muted-foreground">{status}</span></div>
     <p className="text-muted-foreground">PPE {String(row.ppe_number || row.name || '')}</p>
     <ul className="space-y-1">{fields.map(f => <li key={f.field}>{f.label}: <b>{fmt(f.current)} → {fmt(f.proposed)}</b> {f.unit}
@@ -107,7 +107,7 @@ export function ProposalCard({ proposalId, dirtyFor, onSaveForm }: { proposalId:
     {stale && !msg && <p className="text-destructive">Dane PPE zmieniły się od przygotowania propozycji — przelicz podgląd i zatwierdź ponownie.</p>}
     {msg && <p role="status" className={msg.error ? 'text-destructive' : 'text-success'}>{msg.text}</p>}
     {p.status === 'pending' && askSave && <div className="rounded border p-2 space-y-2"><p>Formularz ma niezapisane zmiany. Zapisz je najpierw albo zrezygnuj z zastosowania.</p>
-      <div className="flex gap-2"><Button size="sm" onClick={saveThenApply} disabled={busy}>Zapisz formularz</Button><Button size="sm" variant="outline" onClick={() => setAskSave(false)} disabled={busy}>Nie stosuj teraz</Button></div></div>}
+      <div className="flex flex-wrap gap-2"><Button size="sm" onClick={saveThenApply} disabled={busy}>Zapisz formularz</Button><Button size="sm" variant="outline" onClick={() => setAskSave(false)} disabled={busy}>Nie stosuj teraz</Button></div></div>}
     {p.status === 'pending' && !askSave && <div className="flex flex-wrap gap-2 pt-1">
       {stale ? <Button size="sm" onClick={rebase} disabled={busy}><RefreshCw className="h-3 w-3 mr-1" />Przelicz na aktualnych danych</Button>
         : <Button size="sm" onClick={apply} disabled={busy}>{busy ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Check className="h-3 w-3 mr-1" />}{(p.kind ?? 'po') === 'po' ? 'Zastosuj do PO' : 'Zastosuj'}</Button>}
