@@ -42,6 +42,7 @@ export function AssistantPanel(p: AssistantPanelProps) {
   const qc = useQueryClient();
   const endRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => { document.documentElement.classList.toggle('assistant-open', open); return () => document.documentElement.classList.remove('assistant-open'); }, [open]);
   useEffect(() => { if (p.currentPpeId) setScope(p.currentPpeId); }, [p.currentPpeId]);
   useEffect(() => {
     const h = (e: Event) => { setOpen(true); const prompt = (e as CustomEvent).detail?.prompt; if (prompt) setInput(prompt); };
