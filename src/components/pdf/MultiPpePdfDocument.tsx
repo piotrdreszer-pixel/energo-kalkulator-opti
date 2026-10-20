@@ -243,7 +243,7 @@ export default function MultiPpePdfDocument({ project, groupName, totals: t, osd
     });
 
     return b;
-  }, [entries, agg, t, groupName, osdNames, dateStr]);
+  }, [entries, agg, t, groupName, osdNames, dateStr, estimatesOf]);
 
   // Pack measured blocks into A4 pages; repeat the PPE table header on every page with rows.
   useLayoutEffect(() => {
