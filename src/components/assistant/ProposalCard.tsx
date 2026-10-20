@@ -13,6 +13,9 @@ const label = (f: string) => PROPOSAL_FIELDS[f as keyof typeof PROPOSAL_FIELDS]?
 const db = supabase as any;
 const fmt = (v: unknown) => (v === null || v === undefined || v === '' ? 'brak'
   : typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10).split('-').reverse().join('.')
+  : typeof v === 'boolean' ? (v ? 'tak' : 'nie')
+  : typeof v === 'string' && !Number.isFinite(Number(v)) ? v
+  : typeof v === 'object' ? '—'
   : Number(v).toLocaleString('pl-PL', { minimumFractionDigits: 0, maximumFractionDigits: 4 }));
 
 export function ProposalCard({ proposalId, dirtyFor, onSaveForm }: { proposalId: string; dirtyFor?: string | null; onSaveForm?: () => Promise<boolean> }) {
