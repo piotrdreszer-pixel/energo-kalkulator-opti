@@ -1,7 +1,7 @@
 // Provenance of input values and rates-year selection rules.
 // Pure helpers so the behaviour is unit-testable and shared by the form.
 
-export type ValueSourceKind = 'manual' | 'rate_base' | 'document' | 'derived';
+export type ValueSourceKind = 'manual' | 'rate_base' | 'document' | 'derived' | 'ai';
 
 export interface ValueSource {
   source: ValueSourceKind;
@@ -10,6 +10,8 @@ export interface ValueSource {
   document_id?: string | null;
   page?: number | null;
   item_ref?: string | null;
+  // Approved assistant proposal (ai)
+  proposal_id?: string | null;
 }
 
 export type ValueSources = Record<string, ValueSource>;
@@ -30,6 +32,7 @@ export const VALUE_SOURCE_LABELS: Record<ValueSourceKind, string> = {
   rate_base: 'pobrana z bazy stawek',
   document: 'odczytana z dokumentu',
   derived: 'wyliczona lub oszacowana',
+  ai: 'z zatwierdzonej propozycji asystenta AI',
 };
 
 /** Fields filled from the rates base for a scenario. */
@@ -96,7 +99,7 @@ export function canAutoApplyRates(opts: {
   if (opts.overriddenCount > 0) return false;
   const protectedField = rateBaseFields(opts.prefix).some((f) => {
     const s = opts.sources[f]?.source;
-    return s === 'manual' || s === 'document';
+    return s === 'manual' || s === 'document' || s === 'ai';
   });
   return !protectedField;
 }

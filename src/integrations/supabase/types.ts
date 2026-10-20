@@ -14,6 +14,70 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_applied_changes: {
+        Row: {
+          analysis_group_id: string
+          analysis_id: string
+          assumption: string | null
+          created_at: string
+          fields: Json
+          id: string
+          proposal_id: string
+          source: string
+          undone_at: string | null
+          undone_by: string | null
+          user_id: string
+        }
+        Insert: {
+          analysis_group_id: string
+          analysis_id: string
+          assumption?: string | null
+          created_at?: string
+          fields: Json
+          id?: string
+          proposal_id: string
+          source: string
+          undone_at?: string | null
+          undone_by?: string | null
+          user_id: string
+        }
+        Update: {
+          analysis_group_id?: string
+          analysis_id?: string
+          assumption?: string | null
+          created_at?: string
+          fields?: Json
+          id?: string
+          proposal_id?: string
+          source?: string
+          undone_at?: string | null
+          undone_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_applied_changes_analysis_group_id_fkey"
+            columns: ["analysis_group_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_applied_changes_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "energy_analyses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_applied_changes_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: true
+            referencedRelation: "ai_proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_conversations: {
         Row: {
           analysis_group_id: string
@@ -51,6 +115,7 @@ export type Database = {
           id: string
           ppe_id: string | null
           ppe_label: string | null
+          proposal_id: string | null
           role: string
           scope: string
         }
@@ -61,6 +126,7 @@ export type Database = {
           id?: string
           ppe_id?: string | null
           ppe_label?: string | null
+          proposal_id?: string | null
           role: string
           scope?: string
         }
@@ -71,6 +137,7 @@ export type Database = {
           id?: string
           ppe_id?: string | null
           ppe_label?: string | null
+          proposal_id?: string | null
           role?: string
           scope?: string
         }
@@ -80,6 +147,79 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "ai_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_messages_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "ai_proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_proposals: {
+        Row: {
+          analysis_group_id: string
+          analysis_id: string
+          applied_change_id: string | null
+          assumption: string | null
+          base_updated_at: string
+          before: Json
+          changes: Json
+          created_at: string
+          id: string
+          is_simulation: boolean
+          source: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          analysis_group_id: string
+          analysis_id: string
+          applied_change_id?: string | null
+          assumption?: string | null
+          base_updated_at: string
+          before: Json
+          changes: Json
+          created_at?: string
+          id?: string
+          is_simulation?: boolean
+          source: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          analysis_group_id?: string
+          analysis_id?: string
+          applied_change_id?: string | null
+          assumption?: string | null
+          base_updated_at?: string
+          before?: Json
+          changes?: Json
+          created_at?: string
+          id?: string
+          is_simulation?: boolean
+          source?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_proposals_analysis_group_id_fkey"
+            columns: ["analysis_group_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_proposals_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "energy_analyses"
             referencedColumns: ["id"]
           },
         ]
@@ -1077,6 +1217,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      ai_allowed_po_fields: { Args: never; Returns: string[] }
+      ai_apply_proposal: {
+        Args: { _expected_updated_at: string; _id: string }
+        Returns: Json
+      }
+      ai_can_edit_analysis: { Args: { _analysis_id: string }; Returns: boolean }
+      ai_proposal_guard: {
+        Args: { _p: Database["public"]["Tables"]["ai_proposals"]["Row"] }
+        Returns: undefined
+      }
+      ai_refresh_proposal: { Args: { _id: string }; Returns: string }
+      ai_reject_proposal: { Args: { _id: string }; Returns: string }
+      ai_undo_change: { Args: { _id: string }; Returns: Json }
       apply_invoice_period: {
         Args: { _analysis_id: string; _from: string; _to: string }
         Returns: undefined
