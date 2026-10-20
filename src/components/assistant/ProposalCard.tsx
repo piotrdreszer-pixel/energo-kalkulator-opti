@@ -87,7 +87,7 @@ export function ProposalCard({ proposalId, dirtyFor, onSaveForm }: { proposalId:
   });
 
   const status = { pending: stale ? 'Nieaktualna' : 'Oczekuje na decyzję', applied: 'Zastosowano', rejected: 'Odrzucona', undone: 'Cofnięta' }[p.status as string];
-  const fields = p.status === 'pending' ? preview.fields : changes.map(c => ({ field: c.field, label: buildProposalPreview(row, [c]).fields[0].label, unit: buildProposalPreview(row, [c]).fields[0].unit,
+  const fields = p.status === 'pending' ? preview.fields : changes.filter(c => buildProposalPreview(row, [c]).fields.length).map(c => ({ field: c.field, label: buildProposalPreview(row, [c]).fields[0].label, unit: buildProposalPreview(row, [c]).fields[0].unit,
     current: ch?.fields?.[c.field]?.before ?? p.before?.[c.field], proposed: c.value, replaces: null as string | null }));
 
   return <div className="mt-3 min-w-0 max-w-full rounded-md border bg-background p-3 text-xs space-y-2" data-testid="ai-proposal">
