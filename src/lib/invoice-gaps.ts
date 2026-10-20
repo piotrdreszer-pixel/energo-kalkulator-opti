@@ -86,6 +86,7 @@ const COST_FIELDS: { kind: 'capacity' | 'reactive'; field: string; label: string
 /** Szacunek kwot za okres (opłata mocowa, energia bierna) tą samą metodą dobową — tylko gdy pole równa się sumie z faktur. */
 export function planCostEstimate(row: Record<string, unknown>, s: Settlement, gap: Interval): Plan {
   const p = empty();
+  if (s.blocked.length) { p.errors.push(...s.blocked); return p; }
   const nb = neighbours(s, gap, false);
   if (!nb.length) { p.errors.push('Brak rozliczeń bezpośrednio przed lub po luce — nie ma podstawy do szacunku kosztów.'); return p; }
   const gapDays = daysOf(gap);
@@ -97,7 +98,9 @@ export function planCostEstimate(row: Record<string, unknown>, s: Settlement, ga
     if (!close(row[cf.field], cost.total, cf.field)) { p.notes.push(`${cf.label}: wartość w formularzu nie jest sumą z faktur — nie zmieniam.`); continue; }
     let sum = 0, days = 0; const basis: EstimateRow['basis'] = [];
     for (const e of nb) {
-      const v = cost.components.filter(c => c.recordId === e.record.id).reduce((a, c) => a + Number(c.value || 0), 0);
+      const components = cost.components.filter(c => c.recordId === e.record.id);
+      if (!components.length) continue;
+      const v = components.reduce((a, c) => a + Number(c.value || 0), 0);
       const d = daysOf({ from: e.record.period_from!, to: e.record.period_to! });
       sum += v; days += d;
       basis.push({ record_id: e.record.id, document: e.doc.file_name, period_from: e.record.period_from!, period_to: e.record.period_to!, days: d, value: v });

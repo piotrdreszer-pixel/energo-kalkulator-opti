@@ -1,3 +1,4 @@
+import { requestedEstimateScope } from '../_shared/estimate-scope.ts';
 import { calculateEnergyCosts, formatCurrency, formatPercent } from '../_shared/calculation-utils.ts';
 import { INCOMPLETE_PO_MESSAGE } from '../_shared/po-completeness.ts';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
@@ -99,7 +100,7 @@ Deno.serve(async (req) => {
   // Saved data read with the user's own permissions (RLS).
   const { data: group } = await userClient.from('analysis_groups').select('id,name,client_project_id,client_projects(client_name)').eq('id', b.groupId).maybeSingle();
   if (!group) return json(403, { error: 'Brak dostępu do tej analizy' });
-  const { data: ppes } = await userClient.from('energy_analyses').select(PPE_FIELDS.join(',')).eq('analysis_group_id', b.groupId);
+  const { data: ppes } = await userClient.from('energy_analyses').select('*').eq('analysis_group_id', b.groupId);
   const list = (ppes ?? []) as Record<string, unknown>[];
   const current = b.ppeId ? list.find(p => p.id === b.ppeId) : null;
   if (b.ppeId && !current) return json(403, { error: 'Brak dostępu do tego PPE' });
@@ -119,7 +120,7 @@ Deno.serve(async (req) => {
     operatorzy_osd: osd ?? [],
     zapisane_dane_ppe: saved,
     dane_robocze_niezapisane: b.draftDirty ? (b.draft ?? null) : 'brak niezapisanych zmian',
-    wyniki_kalkulatora: Object.fromEntries(Object.entries(b.results ?? {}).filter(([k]) => saved.some(p => p.id === k.replace(/__robocze$/, '')))),
+    wyniki_kalkulatora: Object.fromEntries(saved.flatMap(p => { const r = calculateEnergyCosts(p); return [[p.id as string, { wersja_danych: p.updated_at, okres: { od: p.period_from, do: p.period_to, miesiecy: r.periodMonths }, koszt_przed_zl: r.totalCostBefore, koszt_po_zl: r.totalCostAfter, oszczednosc_zl: r.savingsAvailable ? r.savingsValue : null, oszczednosc_proc: r.savingsAvailable ? r.savingsPercent : null, po_niepelne: r.missingPo, rozbicie_zl: r }], ...Object.entries(b.results ?? {}).filter(([k]) => k === `${p.id}__robocze`)]; })),
     wykryte_braki_i_konflikty: b.issues ?? [],
     zatwierdzone_dane_faktur: invoices,
     faktury_okres_i_luki: inv === true && b.scope === 'ppe' && b.facts ? { okres_z_faktur: b.facts.period, luki: b.facts.gaps, pierwsza_luka: b.facts.gap, problemy: b.facts.issues,
@@ -219,11 +220,7 @@ Deno.serve(async (req) => {
         description: 'Szacuje pierwszą lukę w fakturach metodą średniej dobowej z sąsiednich rozliczeń (liczy aplikacja, osobno dla stref). zakres="zuzycie" lub "koszty" (opłata mocowa, energia bierna).',
         inputSchema: z.object({ zakres: z.enum(['zuzycie', 'koszty']), skladnik: z.enum(['mocowa', 'bierna']).nullable() }),
         execute: async ({ zakres, skladnik }) => {
-          const consumptionRequested = /(zuży|zuzy)/i.test(b.message);
-          const capacityRequested = /mocow/i.test(b.message);
-          const reactiveRequested = /biern/i.test(b.message);
-          if (zakres === 'koszty' && (!skladnik || (skladnik === 'mocowa' ? !capacityRequested : !reactiveRequested))) return { ok: false, errors: ['Wskaż osobno opłatę mocową lub energię bierną. Polecenie zużycia nie upoważnia do szacowania kosztów.'] };
-          if (zakres === 'zuzycie' && !consumptionRequested) return { ok: false, errors: ['Brak polecenia lub prośby dotyczącej szacowania zużycia.'] };
+          if (!requestedEstimateScope(b.message, zakres, skladnik)) return { ok: false, errors: ['Brak jednoznacznej prośby o ten składnik. Każdy koszt wymaga osobnej zgody; wzmianka w zakazie nie upoważnia do zmiany.'] };
           const rawPlan = f.plans[zakres === 'zuzycie' ? 'consumption' : 'costs'];
           const costField = skladnik === 'mocowa' ? 'capacity_charge_before' : 'reactive_energy_cost_before';
           const plan = rawPlan && zakres === 'koszty' ? { ...rawPlan, changes: rawPlan.changes.filter(c => c.field === costField), estimates: rawPlan.estimates.filter(e => e.field === costField) } : rawPlan;
@@ -231,7 +228,7 @@ Deno.serve(async (req) => {
           if (plan.errors.length || !plan.changes.length) return { ok: false, errors: plan.errors.length ? plan.errors : ['Brak wartości do oszacowania.'], uwagi: plan.notes };
           const methodNamed = /(średni|sredni|dobow)/i.test(b.message);
           const r = await appOp('estimate', plan.changes, { create: plan.estimates, gap: f.gap }, `Szacunek PRZED ${zakres === 'zuzycie' ? 'zużycia' : skladnik === 'mocowa' ? 'opłaty mocowej' : 'energii biernej'} ${f.gap.from} – ${f.gap.to}: średnia dobowa z sąsiednich rozliczeń; uproszczenie, nie rzeczywiste naliczenie. Źródła: ${plan.estimates.flatMap(e => (e.basis as any[] ?? []).map(v => v.document)).join(', ')}`, isCommand(b.message) && methodNamed);
-          return { ...r, uwagi: plan.notes, pozostale_luki: f.gaps.slice(1), pozostale_braki_kosztowe: zakres === 'zuzycie' ? f.plans.costs?.changes.map(c => c.field) ?? [] : [] };
+          return { ...r, szacunki: plan.estimates, proponowane_wartosci: plan.changes, uwagi: plan.notes, pozostale_luki: f.gaps.slice(1), pozostale_braki_kosztowe: zakres === 'zuzycie' ? f.plans.costs?.changes.map(c => c.field) ?? [] : [] };
         },
       }),
       zastap_szacunki: tool({
@@ -312,19 +309,20 @@ Deno.serve(async (req) => {
       try {
         for await (const chunk of result.textStream) { text += chunk; }
         if (applied && confirmedAfter) {
-          const labels: Record<string, string> = { period_from: 'Okres od', period_to: 'Okres do', capacity_charge_before: 'Opłata mocowa PRZED', reactive_energy_cost_before: 'Energia bierna PRZED' };
-          text = 'Zmieniono i potwierdzono zapis: ' + confirmedChanges.map(c => `${labels[c.field] ?? c.field}: ${c.value}`).join('; ') + '.';
+          const fmtValue = (v: number | string) => typeof v === 'number' ? v.toLocaleString('pl-PL', { maximumFractionDigits: 4 }) : v;
+          const labels: Record<string, string> = { consumption_before_zone1_mwh: 'Zużycie PRZED — strefa 1 (MWh)', consumption_before_zone2_mwh: 'Zużycie PRZED — strefa 2 (MWh)', consumption_before_zone3_mwh: 'Zużycie PRZED — strefa 3 (MWh)', period_from: 'Okres od', period_to: 'Okres do', capacity_charge_before: 'Opłata mocowa PRZED', reactive_energy_cost_before: 'Energia bierna PRZED' };
+          text = 'Zmieniono i potwierdzono zapis: ' + confirmedChanges.map(c => `${labels[c.field] ?? c.field}: ${fmtValue(c.value)}`).join('; ') + '.';
           if (confirmedResult) {
             text += `\n\nAktualny wynik (${confirmedAfter.period_from} – ${confirmedAfter.period_to}): PRZED **${formatCurrency(confirmedResult.totalCostBefore)}**, PO **${formatCurrency(confirmedResult.totalCostAfter)}**.`;
             text += confirmedResult.savingsAvailable ? ` Oszczędność **${formatCurrency(confirmedResult.savingsValue)}** (${formatPercent(confirmedResult.savingsPercent)}).` : ` ${INCOMPLETE_PO_MESSAGE}.`;
             if (confirmedChanges.some(c => c.field.startsWith('consumption_before_'))) {
               text += '\n\nUzupełniono wyłącznie zużycie PRZED. PO oraz opłata mocowa i energia bierna pozostają bez zmian.';
-              const diffs = Array.from({ length: Number(confirmedAfter.zones_count_before) || 1 }, (_, i) => { const z = i + 1; const b = confirmedAfter?.[`consumption_before_zone${z}_mwh`], a = confirmedAfter?.[`consumption_after_zone${z}_mwh`]; return Number(b) !== Number(a) ? `strefa ${z}: PRZED ${b}, PO ${a} MWh` : null; }).filter(Boolean);
+              const diffs = Array.from({ length: Number(confirmedAfter.zones_count_before) || 1 }, (_, i) => { const z = i + 1; const b = confirmedAfter?.[`consumption_before_zone${z}_mwh`], a = confirmedAfter?.[`consumption_after_zone${z}_mwh`]; return Number(b) !== Number(a) ? `strefa ${z}: PRZED ${fmtValue(Number(b))}, PO ${fmtValue(Number(a))} MWh` : null; }).filter(Boolean);
               if (diffs.length) text += ` Różnice zużycia: ${diffs.join('; ')}. Możemy omówić to założenie — niczego nie wyrównuję.`;
             }
           } else text += '\nNie udało się przeliczyć aktualnego wyniku. Potwierdzam wyłącznie zapisane zmiany.';
         }
-        if (streamError) throw streamError;
+        if (streamError && !applied) throw streamError;
         if (!text.trim() && !proposalId) throw new Error('empty');
         if (!text.trim()) text = 'Przygotowałem propozycję zmiany PO.';
         await admin.from('ai_messages').insert({ conversation_id: conv!.id, role: 'assistant', content: text, proposal_id: proposalId, ppe_id: b.scope === 'all' ? null : b.ppeId, ppe_label: ppeLabel, scope: b.scope });
