@@ -24,6 +24,8 @@ import type { AnalysisGroup, ClientProject, EnergyAnalysis } from '@/types/datab
 import { calculateEnergyCosts, formatCurrency, formatPercent } from '@/lib/calculation-utils';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
+import { AssistantPanel, openAssistant } from '@/components/assistant/AssistantPanel';
+import { Bot } from 'lucide-react';
 import ProjectAggregatePanel from '@/components/project/ProjectAggregatePanel';
 import ImportInvoicesDialog from '@/components/analysis/ImportInvoicesDialog';
 import InvoiceSettlementDialog from '@/components/analysis/InvoiceSettlementDialog';
@@ -215,6 +217,7 @@ export default function AnalysisGroupDetail() {
             </p>}
           </div>
           <div className="flex gap-2">
+            {access.aiAssistant && <Button variant="outline" onClick={() => openAssistant()}><Bot className="h-4 w-4 mr-2" />Asystent AI</Button>}
             {access.canImport && <ImportInvoicesDialog projectId={projectId!} groupId={groupId!} ppes={ppes || []} onApplied={invalidate} />}
             {access.canImport && <InvoiceSettlementDialog projectId={projectId!} groupId={groupId!} ppes={ppes || []} onApplied={invalidate} />}
             {access.canAddPpe && (ppes?.length ?? 0) > 0 && <Button onClick={addPpe} disabled={addPpeMutation.isPending}>
@@ -348,6 +351,8 @@ export default function AnalysisGroupDetail() {
           </div>
         )}
       </div>
+      {access.aiAssistant && (ppes?.length ?? 0) > 0 && <AssistantPanel groupId={groupId!} clientName={project.client_name} groupName={group.name}
+        ppes={(ppes || []).map(a => ({ id: a.id, name: a.name, ppe_number: a.ppe_number }))} currentPpeId={null} allowAll={access.multiPpe} step="Lista PPE" />}
     </AppLayout>
   );
 }
