@@ -205,8 +205,22 @@ function AnalysisForm() {
     },
   });
 
+  const prevAnalysisRef = React.useRef<EnergyAnalysis | null>(null);
   useEffect(() => {
     if (analysis) {
+      // Re-hydration after a saved change (e.g. assistant command): take DB values only for fields that changed
+      // in the database; keep the user's other unsaved draft values untouched.
+      const prev = prevAnalysisRef.current;
+      prevAnalysisRef.current = analysis;
+      if (prev && prev.id === analysis.id && hydratedRef.current) {
+        const changed = (Object.keys(analysis) as (keyof EnergyAnalysis)[]).filter(k => JSON.stringify(prev[k]) !== JSON.stringify(analysis[k]));
+        setFormData(cur => ({ ...cur, ...Object.fromEntries(changed.map(k => [k, analysis[k]])), updated_at: analysis.updated_at }));
+        if (changed.includes('rates_overridden_after')) setOverriddenAfter((analysis.rates_overridden_after as Record<string, number>) || {});
+        if (changed.includes('rates_overridden_before')) setOverriddenBefore((analysis.rates_overridden_before as Record<string, number>) || {});
+        if (changed.includes('rates_year_after') && analysis.rates_year_after) setRatesYearAfter(String(analysis.rates_year_after) as any);
+        lastFetchedAfterRef.current = ratesSignature(analysis.osd_id, analysis.tariff_code_after, analysis.season_after, (analysis.rates_year_after ?? ratesYearAfter) as any);
+        return;
+      }
       // Kody taryf zapisane inną wielkością liter (np. „C22B” z importu) → kod ze słownika i jego liczba stref.
       const tb = normalizeTariffCode(analysis.tariff_code_before).code;
       const ta = normalizeTariffCode(analysis.tariff_code_after).code;
