@@ -205,8 +205,22 @@ function AnalysisForm() {
     },
   });
 
+  const prevAnalysisRef = React.useRef<EnergyAnalysis | null>(null);
   useEffect(() => {
     if (analysis) {
+      // Re-hydration after a saved change (e.g. assistant command): take DB values only for fields that changed
+      // in the database; keep the user's other unsaved draft values untouched.
+      const prev = prevAnalysisRef.current;
+      prevAnalysisRef.current = analysis;
+      if (prev && prev.id === analysis.id && hydratedRef.current) {
+        const changed = (Object.keys(analysis) as (keyof EnergyAnalysis)[]).filter(k => JSON.stringify(prev[k]) !== JSON.stringify(analysis[k]));
+        setFormData(cur => ({ ...cur, ...Object.fromEntries(changed.map(k => [k, analysis[k]])), updated_at: analysis.updated_at }));
+        if (changed.includes('rates_overridden_after')) setOverriddenAfter((analysis.rates_overridden_after as Record<string, number>) || {});
+        if (changed.includes('rates_overridden_before')) setOverriddenBefore((analysis.rates_overridden_before as Record<string, number>) || {});
+        if (changed.includes('rates_year_after') && analysis.rates_year_after) setRatesYearAfter(String(analysis.rates_year_after));
+        lastFetchedAfterRef.current = ratesSignature(analysis.osd_id, analysis.tariff_code_after, analysis.season_after, String(analysis.rates_year_after ?? ratesYearAfter));
+        return;
+      }
       // Kody taryf zapisane inną wielkością liter (np. „C22B” z importu) → kod ze słownika i jego liczba stref.
       const tb = normalizeTariffCode(analysis.tariff_code_before).code;
       const ta = normalizeTariffCode(analysis.tariff_code_after).code;
@@ -856,7 +870,7 @@ function AnalysisForm() {
           )}
 
           {/* Step 3: Power - Taryfy i moce */}
-          {currentStep === 'power' && access.aiAssistant && <div className="flex justify-end mb-3"><AssistantContextButton label="Omów wariant" prompt="Omów wariant taryfy i mocy umownej PRZED i PO dla tego PPE. Rozróżnij dane potwierdzone od symulacji." /></div>}
+          {currentStep === 'power' && access.aiAssistant && <div className="flex flex-wrap justify-end gap-2 mb-3"><AssistantContextButton label="Porównaj taryfy" prompt="Porównaj dostępne taryfy PO dla tego PPE (bez zapisu). Pokaż tabelę i wskaż najtańszy poprawnie przeliczony wariant z warunkami." /><AssistantContextButton label="Omów wariant" prompt="Omów wariant taryfy i mocy umownej PRZED i PO dla tego PPE. Rozróżnij dane potwierdzone od symulacji." /></div>}
           {currentStep === 'power' && (
             <Card>
               <CardHeader>
