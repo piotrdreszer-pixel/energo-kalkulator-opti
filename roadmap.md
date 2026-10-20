@@ -4,8 +4,8 @@
 - [x] Reguły: taryfa+moc razem, dostępność dla OSD, warunki zmiany grupy, strefy wg znaczenia, brak stawki ≠ 0, najtańszy/remis (testy).
 - [x] Operacje zapisu w bazie: taryfa+moc+stawki PO, pola PRZED, wybór PPE do zestawienia — z historią (polecenie, wynik przed/po) i cofaniem.
 - [ ] Zmiana zaznaczeń importu przez asystenta (przez istniejący mechanizm ponownej edycji).
-- [ ] Narzędzia asystenta i scalanie z niezapisanym formularzem.
-- [ ] Przycisk „Porównaj taryfy” i tabela wyniku.
+- [x] Narzędzia asystenta (taryfa+moc PO, porównanie, PRZED, zestawienie) i scalanie z niezapisanym formularzem.
+- [x] Przycisk „Porównaj taryfy” (tabela w odpowiedzi asystenta).
 - [ ] Test w przeglądarce (sekcja 10).
 
 ## Układ Asystenta AI
