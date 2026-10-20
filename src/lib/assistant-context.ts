@@ -31,7 +31,8 @@ export function assistantResultSummary(a: Record<string, unknown>, r: Calculatio
 /** Fields whose draft value differs from the saved row (unsaved changes). */
 export function assistantDraftDiff(saved?: Record<string, unknown> | null, draft?: Record<string, unknown> | null): string[] {
   if (!saved || !draft) return [];
-  return Object.keys(draft).filter(k => !IGNORED.has(k) && k in saved && JSON.stringify(draft[k] ?? null) !== JSON.stringify(saved[k] ?? null));
+  const norm = (k: string, v: unknown) => (k.startsWith('tariff_code_') && typeof v === 'string' ? v.toUpperCase() : v ?? null);
+  return Object.keys(draft).filter(k => !IGNORED.has(k) && k in saved && JSON.stringify(norm(k, draft[k])) !== JSON.stringify(norm(k, saved[k])));
 }
 
 /** Gaps the assistant should know about; a missing value is never treated as zero. */

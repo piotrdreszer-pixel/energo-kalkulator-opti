@@ -58,3 +58,10 @@ describe('assistant proposals', () => {
     expect(canAutoApplyRates({ manualMode: false, overriddenCount: 0, prefix: 'after', sources: { capacity_charge_after: { source: 'ai' } } })).toBe(false);
   });
 });
+
+describe('assistant proposals – gaps', () => {
+  it('power change without a power rate is flagged instead of a fake result', () => {
+    const p = buildProposalPreview({ ...row, contracted_power_charge_rate_after: 0 }, [{ field: 'contracted_power_after_kw', value: 40 }]);
+    expect(p.issues.some(i => i.includes('stawki opłaty za moc'))).toBe(true);
+  });
+});

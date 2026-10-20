@@ -21,6 +21,8 @@ export function buildProposalPreview(row: Record<string, unknown>, changes: Prop
   });
   // Gaps that remain after the change; a missing value is never shown as an exact result.
   const issues = assistantIssues(copy);
+  if (changes.some(c => c.field === 'contracted_power_after_kw') && !Number(row.contracted_power_charge_rate_after))
+    issues.push('PO: brak stawki opłaty za moc umowną — zmiana mocy nie wpływa na wynik');
   return {
     fields, periodMonths: next.periodMonths, periodFrom: row.period_from ?? null, periodTo: row.period_to ?? null,
     costBefore: next.totalCostBefore,
