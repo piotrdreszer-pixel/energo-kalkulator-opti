@@ -44,6 +44,9 @@ import { useVisibleTariffsForOsd } from '@/hooks/useVisibleTariffsForOsd';
 import { cn } from '@/lib/utils';
 import { useGroupFeatureAccess, requireFeature } from '@/hooks/useFeatureAccess';
 import { MULTI_PPE_LOCK_MESSAGE } from '@/lib/feature-access';
+import { AssistantPanel, AssistantContextButton, openAssistant } from '@/components/assistant/AssistantPanel';
+import { assistantIssues } from '@/lib/assistant-context';
+import { Bot } from 'lucide-react';
 import { initialRatesYear, canAutoApplyRates, markSources, rateBaseFields, type ValueSources, type RatesSourceSnapshot } from '@/lib/value-sources';
 
 // Signature of the parameters rates were last fetched for (used to auto-fetch
@@ -189,6 +192,17 @@ function AnalysisForm() {
   });
 
   const access = useGroupFeatureAccess(analysis?.analysis_group_id);
+  const { data: aiGroup } = useQuery({
+    queryKey: ['ai-group-ppes', analysis?.analysis_group_id], enabled: !!analysis?.analysis_group_id && access.aiAssistant,
+    queryFn: async () => {
+      const gid = analysis!.analysis_group_id!;
+      const [{ data: g }, { data: list }] = await Promise.all([
+        supabase.from('analysis_groups').select('name').eq('id', gid).maybeSingle(),
+        supabase.from('energy_analyses').select('id,name,ppe_number').eq('analysis_group_id', gid).order('created_at'),
+      ]);
+      return { name: g?.name ?? null, ppes: list ?? [] };
+    },
+  });
 
   useEffect(() => {
     if (analysis) {
@@ -677,6 +691,7 @@ function AnalysisForm() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {access.aiAssistant && <Button variant="outline" onClick={() => openAssistant()}><Bot className="h-4 w-4 mr-2" />Asystent AI</Button>}
             <Button variant="outline" asChild>
               <Link to={`/projects/${projectId}/analysis/${analysisId}/report`}>
                 <Printer className="h-4 w-4 mr-2" />
@@ -839,6 +854,7 @@ function AnalysisForm() {
           )}
 
           {/* Step 3: Power - Taryfy i moce */}
+          {currentStep === 'power' && access.aiAssistant && <div className="flex justify-end mb-3"><AssistantContextButton label="Omów wariant" prompt="Omów wariant taryfy i mocy umownej PRZED i PO dla tego PPE. Rozróżnij dane potwierdzone od symulacji." /></div>}
           {currentStep === 'power' && (
             <Card>
               <CardHeader>
@@ -939,6 +955,7 @@ function AnalysisForm() {
           )}
 
           {/* Step 4: Before (Current State) */}
+          {currentStep === 'before' && access.aiAssistant && <div className="flex justify-end mb-3"><AssistantContextButton label="Sprawdź dane" prompt="Sprawdź kompletność i źródła danych PRZED dla tego PPE. Wskaż braki i wartości wpisane ręcznie." /></div>}
           {currentStep === 'before' && (
             <div className="space-y-6">
               <Card>
@@ -1049,6 +1066,7 @@ function AnalysisForm() {
           )}
 
           {/* Step 5: After (Proposed State) */}
+          {currentStep === 'after' && access.aiAssistant && <div className="flex justify-end mb-3"><AssistantContextButton label="Sprawdź założenia PO" prompt="Sprawdź założenia PO: niespójności z PRZED, puste koszty PO występujące w PRZED i brakujące dane." /></div>}
           {currentStep === 'after' && (
             <div className="space-y-6">
               <Card>
@@ -1164,6 +1182,7 @@ function AnalysisForm() {
           )}
 
           {/* Step 6: Summary */}
+          {currentStep === 'summary' && access.aiAssistant && <div className="flex justify-end mb-3"><AssistantContextButton label="Wyjaśnij wynik" prompt="Wyjaśnij wynik kalkulatora: z czego wynikają sumy PRZED i PO oraz oszczędność, i jakie braki ograniczają ocenę." /></div>}
           {currentStep === 'summary' && (
             <ComparisonSummary
               costBefore={results.totalCostBefore}
@@ -1233,6 +1252,10 @@ function AnalysisForm() {
           </div>
         </div>
       </div>
+      {access.aiAssistant && analysis?.analysis_group_id && <AssistantPanel groupId={analysis.analysis_group_id} clientName={project?.client_name} groupName={aiGroup?.name}
+        ppes={aiGroup?.ppes ?? [{ id: analysisId!, name: formData.name || 'PPE', ppe_number: formData.ppe_number }]} currentPpeId={analysisId} allowAll={access.multiPpe}
+        step={WIZARD_STEPS.find(s => s.id === currentStep)?.label} draft={formData as Record<string, unknown>} saved={analysis as unknown as Record<string, unknown>}
+        results={results as unknown as Record<string, unknown>} issues={assistantIssues(formData as Record<string, unknown>)} />}
     </AppLayout>
   );
 }
