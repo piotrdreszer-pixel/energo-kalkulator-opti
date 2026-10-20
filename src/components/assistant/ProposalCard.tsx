@@ -97,6 +97,7 @@ export function ProposalCard({ proposalId, dirtyFor, onSaveForm }: { proposalId:
       {preview.issues.length > 0 && <div className="text-destructive"><p>Braki danych — wynik niepełny:</p><ul className="list-disc pl-4">{preview.issues.map(i => <li key={i}>{i}</li>)}</ul></div>}
     </div>}
     {appliedPreview && <div className="border-t pt-2"><p>Potwierdzony wynik po zapisie: PO {formatCurrency(appliedPreview.currentAfter)}, oszczędność względem PRZED {formatCurrency(Math.abs(appliedPreview.savingsAfterChange))}</p></div>}
+    {stale && !msg && <p className="text-destructive">Dane PPE zmieniły się od przygotowania propozycji — przelicz podgląd i zatwierdź ponownie.</p>}
     {msg && <p role="status" className={msg.error ? 'text-destructive' : 'text-success'}>{msg.text}</p>}
     {p.status === 'pending' && askSave && <div className="rounded border p-2 space-y-2"><p>Formularz ma niezapisane zmiany. Zapisz je najpierw albo zrezygnuj z zastosowania.</p>
       <div className="flex gap-2"><Button size="sm" onClick={saveThenApply} disabled={busy}>Zapisz formularz</Button><Button size="sm" variant="outline" onClick={() => setAskSave(false)} disabled={busy}>Nie stosuj teraz</Button></div></div>}

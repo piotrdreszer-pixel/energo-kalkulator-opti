@@ -8,6 +8,7 @@ import ReactMarkdown from 'react-markdown';
 import { assistantDraftDiff, assistantResultSummary, AI_MAX_MESSAGE } from '@/lib/assistant-context';
 import { calculateEnergyCosts } from '@/lib/calculation-utils';
 import { ProposalCard } from './ProposalCard';
+import { PROPOSAL_FIELDS } from '@/lib/assistant-proposal';
 
 export interface AssistantPpe { id: string; name: string; ppe_number?: string | null }
 export interface AssistantPanelProps {
@@ -60,6 +61,13 @@ export function AssistantPanel(p: AssistantPanelProps) {
       const { data, error } = await supabase.from('ai_messages').select('id,role,content,ppe_label,proposal_id').eq('conversation_id', conv.id).order('created_at').limit(100);
       if (error) throw error;
       return (data ?? []) as Msg[];
+    },
+  });
+  const changes = useQuery({
+    queryKey: ['ai-history', p.groupId], enabled: open,
+    queryFn: async () => {
+      const { data } = await (supabase as any).from('ai_applied_changes').select('id,analysis_id,fields,source,assumption,created_at,undone_at').eq('analysis_group_id', p.groupId).order('created_at', { ascending: false }).limit(20);
+      return (data ?? []) as { id: string; analysis_id: string; fields: Record<string, { before: unknown; after: unknown }>; created_at: string; undone_at: string | null }[];
     },
   });
   const msgs = [...(history.data ?? []), ...pending];
@@ -126,6 +134,10 @@ export function AssistantPanel(p: AssistantPanelProps) {
         {p.allowAll && p.ppes.length > 1 && <option value="all">Wszystkie PPE</option>}
       </select>
       {dirty.length > 0 && <p className="text-xs text-muted-foreground">Formularz ma niezapisane zmiany — asystent zobaczy je jako wersję roboczą. Nic nie zostanie zapisane bez Twojej zgody.</p>}
+      {(changes.data?.length ?? 0) > 0 && <details className="text-xs"><summary className="cursor-pointer text-muted-foreground">Historia zmian asystenta ({changes.data!.length})</summary>
+        <ul className="mt-1 space-y-1 max-h-40 overflow-y-auto">{changes.data!.map(c => <li key={c.id} className="border-b pb-1">
+          {new Date(c.created_at).toLocaleString('pl-PL')} · {p.ppes.find(x => x.id === c.analysis_id)?.ppe_number || p.ppes.find(x => x.id === c.analysis_id)?.name || 'PPE'}{c.undone_at ? ' · cofnięta' : ''}
+          <span className="block text-muted-foreground">{Object.entries(c.fields).map(([f, v]) => `${PROPOSAL_FIELDS[f as keyof typeof PROPOSAL_FIELDS]?.label ?? f}: ${v.before ?? 'brak'} → ${v.after}`).join('; ')}</span></li>)}</ul></details>}
     </header>
     <div className="flex-1 overflow-y-auto p-4 space-y-3">
       {history.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : history.error ? <p className="text-sm text-destructive">Nie udało się wczytać rozmowy.</p> :
