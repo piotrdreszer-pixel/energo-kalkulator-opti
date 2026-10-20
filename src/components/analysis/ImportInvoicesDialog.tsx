@@ -6,6 +6,7 @@ import { useOsdOperators } from '@/hooks/useOsdOperators';
 import { matchOsd } from '@/lib/osd-match';
 import { supabase } from '@/integrations/supabase/client';
 import { requireFeature, useGroupFeatureAccess } from '@/hooks/useFeatureAccess';
+import { STAGE_LABELS, isAllowedFile, functionErrorMessage, storageErrorMessage, type UploadItem } from '@/lib/invoice-upload';
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
@@ -195,9 +196,7 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
     }
   };
 
-  const handleUpload = async (fileList: FileList | null) => {
-    // Kopia przed wyczyszczeniem pola — reset value opróżnia FileList (wcześniej import kończył się po cichu).
-    const files = fileList ? Array.from(fileList) : [];
+  const handleUpload = async (files: File[]) => {
     if (!files.length) return;
     const fresh: UploadItem[] = [];
     for (const file of files) {
@@ -266,7 +265,12 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
             accept=".pdf,.jpg,.jpeg,.png"
             multiple
             disabled={uploading || !access.canImport}
-            onChange={(e) => { const f = e.target.files; handleUpload(f ? (Array.from(f) as unknown as FileList) : null); e.target.value = ''; }}
+            onChange={(e) => {
+              // Kopia przed wyczyszczeniem pola — reset value opróżnia FileList (wcześniej import kończył się po cichu).
+              const files = Array.from(e.target.files || []);
+              e.target.value = '';
+              handleUpload(files);
+            }}
             aria-label="Wybierz pliki faktur"
           />
           {uploading && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
@@ -304,6 +308,7 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
                     {[d.doc_type && DOC_TYPE_LABELS[d.doc_type], d.document_number && `nr ${d.document_number}`, d.issuer]
                       .filter(Boolean).join(' • ') || '—'}
                   </p>
+                  {d.status === 'error' && d.error && <p className="text-xs text-destructive">{d.error}</p>}
                 </div>
                 <Badge variant={d.status === 'approved' ? 'default' : d.status === 'error' ? 'destructive' : 'secondary'}>
                   {STATUS_LABELS[d.status]}
