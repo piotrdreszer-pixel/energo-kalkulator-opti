@@ -6,7 +6,8 @@
 - [ ] Zmiana zaznaczeń importu przez asystenta (przez istniejący mechanizm ponownej edycji).
 - [x] Narzędzia asystenta (taryfa+moc PO, porównanie, PRZED, zestawienie) i scalanie z niezapisanym formularzem.
 - [x] Przycisk „Porównaj taryfy” (tabela w odpowiedzi asystenta).
-- [ ] Test w przeglądarce (sekcja 10).
+- [x] Test w przeglądarce: porównanie, taryfa+moc z roboczą zmianą, cofnięcie, ochrona ręcznych korekt.
+- [ ] Test w przeglądarce: ograniczenia uprawnień (wymaga konta testowego z wyłączonymi funkcjami).
 
 ## Układ Asystenta AI
 - [x] Panel obok treści na szerokich ekranach, nakładany na mniejszych; brak nadmiaru szerokości.
