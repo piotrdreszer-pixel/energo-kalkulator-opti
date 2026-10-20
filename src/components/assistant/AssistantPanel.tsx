@@ -76,6 +76,7 @@ export function AssistantPanel(p: AssistantPanelProps) {
   const isAll = scope === 'all';
   const ppe = p.ppes.find(x => x.id === scope);
   const dirty = !isAll && scope === p.currentPpeId ? assistantDraftDiff(p.saved, p.draft) : [];
+  if (dirty.length) console.debug('AI_DIRTY', dirty.map(k => [k, p.saved?.[k], p.draft?.[k]]));
 
   const send = async (text: string) => {
     const message = text.trim();
