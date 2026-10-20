@@ -1255,7 +1255,8 @@ function AnalysisForm() {
       {access.aiAssistant && analysis?.analysis_group_id && <AssistantPanel groupId={analysis.analysis_group_id} clientName={project?.client_name} groupName={aiGroup?.name}
         ppes={aiGroup?.ppes ?? [{ id: analysisId!, name: formData.name || 'PPE', ppe_number: formData.ppe_number }]} currentPpeId={analysisId} allowAll={access.multiPpe}
         step={WIZARD_STEPS.find(s => s.id === currentStep)?.label} draft={formData as Record<string, unknown>} saved={analysis as unknown as Record<string, unknown>}
-        results={results as unknown as Record<string, unknown>} issues={assistantIssues(formData as Record<string, unknown>)} />}
+        results={results as unknown as Record<string, unknown>} issues={assistantIssues(formData as Record<string, unknown>)}
+        onSaveForm={async () => { if (Object.keys(validationErrors).length) { handleSave(); return false; } try { await saveMutation.mutateAsync(); return true; } catch { return false; } }} />}
     </AppLayout>
   );
 }
