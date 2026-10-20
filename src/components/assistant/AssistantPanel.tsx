@@ -115,7 +115,9 @@ export function AssistantPanel(p: AssistantPanelProps) {
       for (;;) { const { done, value } = await reader.read(); if (done) break; acc += dec.decode(value, { stream: true });
         setPending(prev => prev.map(m => m.id === aId ? { ...m, content: acc.split('[[BŁĄD]]')[0] } : m)); }
       if (acc.includes('[[BŁĄD]]')) throw new Error(acc.split('[[BŁĄD]]')[1].trim());
-      await qc.invalidateQueries({ queryKey: ['ai-messages', p.groupId] });
+      // A chat command may have saved PO values: reload form, PPE card and summary from the database.
+      await Promise.all(['ai-messages', 'ai-proposal', 'analysis', 'ai-group-ppes', 'group-ppe', 'analyses', 'ai-history']
+        .map(k => qc.invalidateQueries({ queryKey: [k] })));
       setPending([]);
     } catch (e) {
       setLastFailed(message);
