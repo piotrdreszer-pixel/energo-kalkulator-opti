@@ -1,25 +1,31 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { AlertTriangle, ClipboardList, Loader2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ClipboardList, Loader2, Sparkles } from 'lucide-react';
 import type { EnergyAnalysis } from '@/types/database';
-import type { InvoicePpeRecord } from '@/lib/invoice-import';
-import { buildSettlement, settlementProposals, matchesStored, type Component, type SettlementDoc, type SettlementItem } from '@/lib/invoice-settlement';
+import { buildSettlement, settlementProposals, matchesStored, type Component } from '@/lib/invoice-settlement';
 import type { ValueSources } from '@/lib/value-sources';
 import { formatCurrency } from '@/lib/calculation-utils';
 import { requireFeature, useGroupFeatureAccess } from '@/hooks/useFeatureAccess';
+import { loadGroupInvoices, useActiveEstimates } from '@/hooks/useInvoiceFacts';
+import { gapMessage, itemStatus } from '@/lib/invoice-summary';
+import { summarizeDocs } from '@/lib/invoice-upload';
+import { openAssistant } from '@/components/assistant/AssistantPanel';
 
 const fmt = (v: number | null | undefined, d = 3) =>
   v == null ? 'brak danych' : v.toLocaleString('pl-PL', { minimumFractionDigits: 0, maximumFractionDigits: d });
 const per = (a: string | null, b: string | null) => `${a ?? '?'} – ${b ?? '?'}`;
 const STREAM: Record<string, string> = { sales: 'sprzedaż', distribution: 'dystrybucja', both: 'kompleksowa' };
+
+const OPEN_EVENT = 'open-invoice-summary';
+/** Otwiera „Podsumowanie danych z faktur” (np. po zakończeniu odczytu paczki albo z formularza PPE). */
+export function openInvoiceSummary(ppeId?: string) { window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: { ppeId } })); }
 
 interface Props { projectId: string; groupId: string; ppes: EnergyAnalysis[]; onApplied: () => void }
 
@@ -27,25 +33,23 @@ export default function InvoiceSettlementDialog({ projectId, groupId, ppes, onAp
   const [open, setOpen] = useState(false);
   const [ppeId, setPpeId] = useState<string>('');
   const navigate = useNavigate();
-  useEffect(() => { if (!ppeId && ppes[0]) setPpeId(ppes[0].id); }, [ppes, ppeId]);
+  useEffect(() => {
+    const h = (e: Event) => { const id = (e as CustomEvent).detail?.ppeId; setPpeId(id || ''); setOpen(true); };
+    window.addEventListener(OPEN_EVENT, h); return () => window.removeEventListener(OPEN_EVENT, h);
+  }, []);
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    const id = params.get('summary');
+    if (id == null) return;
+    setPpeId(id); setOpen(true);
+    const next = new URLSearchParams(params); next.delete('summary'); setParams(next, { replace: true });
+  }, [params, setParams]);
+  useEffect(() => { if (open && !ppeId && ppes.length === 1) setPpeId(ppes[0].id); }, [open, ppes, ppeId]);
 
   const data = useQuery({
     queryKey: ['group-settlement', groupId],
     enabled: open,
-    queryFn: async () => {
-      const { data: docs, error } = await supabase.from('analysis_documents')
-        .select('id,file_name,status,doc_type,issuer,document_number,corrected_document_number,file_hash').eq('analysis_group_id', groupId);
-      if (error) throw error;
-      const ids = (docs || []).map((d) => d.id);
-      if (!ids.length) return { docs: [], records: [], items: [] };
-      const [r, i] = await Promise.all([
-        supabase.from('document_ppe_records').select('*').in('document_id', ids),
-        supabase.from('document_line_items').select('id,document_id,ppe_record_id,name,quantity,unit,rate,net_value,category,page').in('document_id', ids),
-      ]);
-      if (r.error) throw r.error;
-      if (i.error) throw i.error;
-      return { docs: (docs || []) as SettlementDoc[], records: (r.data || []) as unknown as InvoicePpeRecord[], items: (i.data || []) as SettlementItem[] };
-    },
+    queryFn: () => loadGroupInvoices(groupId),
   });
 
   const all = useMemo(() => {
@@ -53,41 +57,82 @@ export default function InvoiceSettlementDialog({ projectId, groupId, ppes, onAp
     return ppes.map((a) => ({ a, s: buildSettlement({ ppeNumber: a.ppe_number || '', analysisId: a.id, ...data.data }) }));
   }, [data.data, ppes]);
   const current = all.find((x) => x.a.id === ppeId);
+  const docSum = summarizeDocs(data.data?.docs || []);
   const openReview = (docId: string) => { setOpen(false); navigate(`/projects/${projectId}/analyses/${groupId}?review=${docId}`); };
+  const goToAnalysis = (id: string) => { setOpen(false); navigate(`/projects/${projectId}/analysis/${id}`); };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline"><ClipboardList className="mr-2 h-4 w-4" />Rozliczenia z faktur</Button>
+        <Button variant="outline"><ClipboardList className="mr-2 h-4 w-4" />Podsumowanie danych z faktur</Button>
       </DialogTrigger>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Rozliczenia z faktur</DialogTitle>
+          <DialogTitle>Podsumowanie danych z faktur</DialogTitle>
           <DialogDescription>
-            Rzeczywiste zestawienie kosztów z zatwierdzonych faktur tej analizy (netto). To nie jest wynik kalkulatora „według stawek”.
+            Zestawienie z faktur tej analizy (netto). Nowe dane nie trafiają do kalkulatora same — zastosujesz je przyciskiem „Zastosuj do PRZED”. To nie jest wynik kalkulatora „według stawek”.
           </DialogDescription>
         </DialogHeader>
         {data.isLoading ? (
           <div className="py-10 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
         ) : data.error ? (
-          <p className="text-destructive">Nie udało się wczytać rozliczeń.</p>
+          <p className="text-destructive">Nie udało się wczytać danych z faktur.</p>
         ) : (
-          <div className="space-y-6">
-            <MultiSummary rows={all} />
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium">PPE:</span>
-              <Select value={ppeId} onValueChange={setPpeId}>
-                <SelectTrigger className="w-[420px]"><SelectValue placeholder="Wybierz PPE" /></SelectTrigger>
-                <SelectContent>
-                  {ppes.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}{p.ppe_number ? ` — ${p.ppe_number}` : ''}</SelectItem>)}
-                </SelectContent>
-              </Select>
+          <div className="space-y-6 min-w-0">
+            <div className="flex flex-wrap gap-2 text-xs">
+              <Badge>zatwierdzone: {docSum.approved}</Badge>
+              {docSum.toReview > 0 && <Badge variant="secondary">nowe, do zatwierdzenia: {docSum.toReview}</Badge>}
+              {docSum.reading > 0 && <Badge variant="secondary">w odczycie: {docSum.reading}</Badge>}
+              {docSum.errors > 0 && <Badge variant="destructive">nieodczytane: {docSum.errors}</Badge>}
             </div>
-            {current && <PpeSettlement analysis={current.a} s={current.s} onOpenReview={openReview} onApplied={() => { onApplied(); data.refetch(); }} />}
+            {(docSum.errors > 0 || docSum.reading > 0) && (
+              <p className="text-sm flex gap-1 items-start"><AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
+                Część dokumentów nie została odczytana — zestawienie jest niepełne.
+                {(data.data?.docs || []).filter((d) => d.status === 'error').map((d) => <button key={d.id} type="button" className="underline ml-1" onClick={() => openReview(d.id)}>{d.file_name}</button>)}
+              </p>
+            )}
+            {current ? (
+              <>
+                {ppes.length > 1 && <Button variant="ghost" size="sm" onClick={() => setPpeId('')}><ArrowLeft className="mr-1 h-4 w-4" />Wszystkie PPE</Button>}
+                <PpeSettlement analysis={current.a} s={current.s} onOpenReview={openReview} onGoToAnalysis={() => goToAnalysis(current.a.id)}
+                  onApplied={() => { onApplied(); data.refetch(); }} onAssistant={() => setOpen(false)} />
+              </>
+            ) : (
+              <>
+                <PpeList rows={all} onOpen={setPpeId} />
+                <MultiSummary rows={all} />
+              </>
+            )}
           </div>
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function PpeList({ rows, onOpen }: { rows: { a: EnergyAnalysis; s: ReturnType<typeof buildSettlement> }[]; onOpen: (id: string) => void }) {
+  if (!rows.length) return <p className="text-sm text-muted-foreground">Brak PPE w tej analizie.</p>;
+  return (
+    <table className="w-full text-sm">
+      <thead><tr className="text-left text-muted-foreground text-xs"><th>PPE</th><th>Adres</th><th>Okres z faktur</th><th>Status</th><th /></tr></thead>
+      <tbody>
+        {rows.map(({ a, s }) => {
+          const has = s.entries.length || s.pending.length;
+          const status = !has ? <Badge variant="outline">brak faktur</Badge>
+            : s.issues.length || s.blocked.length || s.gaps.length ? <Badge variant="secondary">niepełne / do decyzji</Badge>
+            : s.pending.length ? <Badge variant="secondary">nowe do zatwierdzenia</Badge> : <Badge>kompletne</Badge>;
+          return (
+            <tr key={a.id} className="border-t align-top">
+              <td className="py-1 break-all">{a.ppe_number || a.name}</td>
+              <td className="break-words">{a.ppe_address || '—'}</td>
+              <td className="whitespace-nowrap">{s.proposedPeriod ? per(s.proposedPeriod.from, s.proposedPeriod.to) : '—'}</td>
+              <td>{status}</td>
+              <td className="text-right"><Button size="sm" variant="outline" onClick={() => onOpen(a.id)}>Szczegóły</Button></td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }
 
@@ -151,11 +196,13 @@ function Components({ list, onOpenReview }: { list: Component[]; onOpenReview: (
   );
 }
 
-function PpeSettlement({ analysis, s, onOpenReview, onApplied }: {
+function PpeSettlement({ analysis, s, onOpenReview, onApplied, onGoToAnalysis, onAssistant }: {
   analysis: EnergyAnalysis; s: ReturnType<typeof buildSettlement>; onOpenReview: (id: string) => void; onApplied: () => void;
+  onGoToAnalysis: () => void; onAssistant: () => void;
 }) {
   const { toast } = useToast();
   const access = useGroupFeatureAccess(analysis.analysis_group_id);
+  const estimates = useActiveEstimates(analysis.id);
   const [busy, setBusy] = useState(false);
   const [confirmPeriod, setConfirmPeriod] = useState(false);
   const [showApply, setShowApply] = useState(false);
@@ -163,11 +210,25 @@ function PpeSettlement({ analysis, s, onOpenReview, onApplied }: {
   const proposals = settlementProposals(s);
   const sources = (analysis.value_sources || {}) as ValueSources;
   const a = analysis as unknown as Record<string, unknown>;
+  const estBy = (field: string) => (estimates.data || []).filter((e) => e.field === field);
+  // Szacunek jest osobną częścią wartości przyjętej do analizy: łącznie = z faktur + szacunek (nie nadpisujemy go wartością z samych faktur).
   const rows = proposals.map((p) => {
+    const est = estBy(p.field);
+    const estimated = /_mwh$/.test(p.field) || /^(capacity_charge|reactive_energy_cost)_before$/.test(p.field) ? est.reduce((x, e) => x + Number(e.value), 0) : 0;
+    const total = est.length && estimated ? p.value + estimated : p.value;
     const cur = a[p.field];
-    const manual = sources[p.field]?.source === 'manual' && cur != null && !matchesStored(p.field, p.value, cur);
-    return { ...p, current: cur, manual };
+    const manual = sources[p.field]?.source === 'manual' && cur != null && !matchesStored(p.field, total, cur);
+    const status = itemStatus({ hasInvoiceValue: true, estimated: est.length > 0, conflict: manual });
+    return { ...p, invoiceValue: p.value, estimated: est.length ? estimated : null, value: total, current: cur, manual, status };
   });
+  const gapText = gapMessage(s.proposedPeriod, s.gaps);
+  const hasEstimates = (estimates.data || []).length > 0;
+  const osd = Array.from(new Set(s.entries.map((e) => e.record.osd_name).filter(Boolean)));
+  const needDecision = s.entries.filter((e) => !e.included).length;
+  const askAssistant = () => {
+    onAssistant();
+    openAssistant(`Uzupełnij brakujący okres dla PPE ${analysis.ppe_number || analysis.name} na podstawie podsumowania danych z faktur. ${gapText ?? ''} Najpierw zaproponuj symulację: jaki okres uzupełniasz, na podstawie których rozliczeń, jaką metodą, jakie wartości możesz oszacować i które koszty pozostaną nieuzupełnione. Nic nie zapisuj bez mojej akceptacji.`);
+  };
 
   if (!s.entries.length && !s.pending.length) {
     return <p className="text-sm text-muted-foreground">Brak faktur przypisanych do tego PPE w tej analizie.</p>;
@@ -216,7 +277,22 @@ function PpeSettlement({ analysis, s, onOpenReview, onApplied }: {
   const periodDiffers = s.proposedPeriod && (analysis.period_from !== s.proposedPeriod.from || analysis.period_to !== s.proposedPeriod.to);
 
   return (
-    <div className="space-y-5 text-sm">
+    <div className="space-y-5 text-sm min-w-0">
+      <section className="space-y-1">
+        <h3 className="font-semibold text-base break-all">PPE {analysis.ppe_number || analysis.name}</h3>
+        <p className="text-muted-foreground">{analysis.ppe_address || 'brak adresu'} · OSD: {osd.length ? osd.join(', ') : 'nie rozpoznano'} · taryfa: {s.tariffs.length ? s.tariffs.map((t) => t.code).join(' → ') : 'brak danych'}</p>
+        <p className="text-xs">Dokumenty: zatwierdzone {s.entries.length}, nowe do zatwierdzenia {s.pending.length}, wymagające wyjaśnienia {needDecision}.</p>
+      </section>
+
+      {(gapText || hasEstimates) && (
+        <section className="rounded-md border border-warning/50 bg-warning/10 p-3 space-y-2">
+          {gapText && <p className="flex gap-1 items-start"><AlertTriangle className="h-4 w-4 shrink-0" />{gapText}</p>}
+          {hasEstimates && <p className="font-medium">Okres uzupełniony szacunkiem — nie jest w pełni udokumentowany fakturami.</p>}
+          {gapText && (access as { aiAssistant?: boolean }).aiAssistant && <Button size="sm" variant="outline" onClick={askAssistant}><Sparkles className="mr-1 h-4 w-4" />Uzupełnij brakujący okres z asystentem</Button>}
+          <p className="text-xs text-muted-foreground">Pmax i bezpiecznej mocy umownej nie szacujemy z miesięcznego zużycia.</p>
+        </section>
+      )}
+
       <section>
         <h3 className="font-semibold mb-2">Dokumenty i okresy rozliczenia</h3>
         <table className="w-full text-xs">
@@ -312,20 +388,25 @@ function PpeSettlement({ analysis, s, onOpenReview, onApplied }: {
         {s.handling && <p className="mt-1 text-muted-foreground">Abonament / opłata handlowa: koszt za okres {formatCurrency(s.handling.totalNet)}. {s.handling.note}</p>}
       </section>
 
-      {access.canImport && <section className="rounded-md border p-3">
-        {!showApply ? (
-          <Button onClick={() => setShowApply(true)} disabled={!rows.length}>Zastosuj zestawienie do PRZED</Button>
-        ) : (
+      <section className="rounded-md border p-3 space-y-2">
+        <div className="flex flex-wrap gap-2">
+          {access.canImport && !showApply && <Button onClick={() => setShowApply(true)} disabled={!rows.length}>Zastosuj do PRZED</Button>}
+          <Button variant="outline" onClick={onGoToAnalysis}>Przejdź do analizy</Button>
+        </div>
+        {access.canImport && showApply && (
           <div className="space-y-2">
-            <p className="font-medium">Podgląd zapisu (tylko PRZED; PO bez zmian)</p>
+            <p className="font-medium">Porównanie przed zapisem (tylko PRZED; PO bez zmian)</p>
             <table className="w-full text-xs">
-              <thead><tr className="text-left text-muted-foreground"><th>Pole</th><th>Obecnie</th><th>Proponowane</th><th>Uwagi</th></tr></thead>
+              <thead><tr className="text-left text-muted-foreground"><th>Pole kalkulatora</th><th>Obecnie</th><th>Z faktur</th><th>Szacunek</th><th>Łącznie do analizy</th><th>Status</th><th>Uwagi</th></tr></thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.field} className="border-t align-top">
                     <td className="py-1">{r.label}</td>
                     <td>{r.current == null ? '—' : fmt(Number(r.current), 4)}</td>
-                    <td>{fmt(r.value, 4)}</td>
+                    <td>{fmt(r.invoiceValue, 4)}</td>
+                    <td>{r.estimated == null ? '—' : fmt(r.estimated, 4)}</td>
+                    <td className="font-medium">{fmt(r.value, 4)}</td>
+                    <td><Badge variant={r.status === 'z faktur' ? 'default' : 'secondary'}>{r.status}</Badge></td>
                     <td>
                       {r.note}
                       {r.manual && (
@@ -342,6 +423,9 @@ function PpeSettlement({ analysis, s, onOpenReview, onApplied }: {
             <p className="text-xs text-muted-foreground">
               Okres źródeł: {s.proposedPeriod ? per(s.proposedPeriod.from, s.proposedPeriod.to) : '?'}; dokumenty: {s.entries.filter((e) => e.included).length}.
               Taryfa, moc i składniki sieciowe nie są zapisywane automatycznie{s.blocked.length ? ' — patrz konflikty powyżej' : ''}.
+              {s.pending.length ? ` Nowe niezatwierdzone dokumenty (${s.pending.length}) nie są wliczone.` : ''}
+              {needDecision ? ` Pozycje wymagające decyzji (${needDecision}) nie są wliczone — zestawienie niepełne.` : ''}
+              {' '}Ponowne zastosowanie nadpisuje te same pola (nie dodaje).
             </p>
             <div className="flex gap-2">
               <Button onClick={applyBefore} disabled={busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Zapisz do PRZED</Button>
@@ -349,7 +433,7 @@ function PpeSettlement({ analysis, s, onOpenReview, onApplied }: {
             </div>
           </div>
         )}
-      </section>}
+      </section>
     </div>
   );
 }

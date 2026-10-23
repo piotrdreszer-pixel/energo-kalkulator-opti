@@ -858,6 +858,12 @@ function AnalysisForm() {
                   </div>
                 </div>
                 <InvoiceGapsNotice groupId={analysis?.analysis_group_id} row={analysis as unknown as Record<string, unknown>} canImport={access.canImport} />
+                {access.canImport && analysis?.analysis_group_id && (
+                  <Button type="button" variant="outline" size="sm" className="mt-2"
+                    onClick={() => navigate(`/projects/${projectId}/analyses/${analysis.analysis_group_id}?summary=${analysisId}`)}>
+                    Podsumowanie danych z faktur
+                  </Button>
+                )}
                 {formData.period_from && formData.period_to && (
                   <div className="p-4 bg-muted/50 rounded-lg">
                     <p className="text-sm">
