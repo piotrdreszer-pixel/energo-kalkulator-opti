@@ -1,5 +1,12 @@
 # Roadmap
 
+## Podsumowanie danych z faktur
+- [x] Auto-otwarcie po odczycie paczki, lista PPE / szczegóły, statusy dokumentów, nieodczytane jawnie.
+- [x] Komunikat o lukach (miesiące), przycisk asystenta, „Okres uzupełniony szacunkiem”, z faktur / szacunek / łącznie.
+- [x] „Zastosuj do PRZED” (porównanie, ochrona ręcznych, nadpisanie bez sumowania), „Przejdź do analizy”, wejście z formularza PPE.
+- [ ] Zastosowanie podsumowania do PRZED przez asystenta tym samym mechanizmem (wymaga przeniesienia zapisu do funkcji bazy).
+- [ ] Test w przeglądarce pełnej listy scenariuszy z punktu 6.
+
 ## Asystent: zmiana pól i porównanie taryf
 - [x] Reguły: taryfa+moc razem, dostępność dla OSD, warunki zmiany grupy, strefy wg znaczenia, brak stawki ≠ 0, najtańszy/remis (testy).
 - [x] Operacje zapisu w bazie: taryfa+moc+stawki PO, pola PRZED, wybór PPE do zestawienia — z historią (polecenie, wynik przed/po) i cofaniem.
