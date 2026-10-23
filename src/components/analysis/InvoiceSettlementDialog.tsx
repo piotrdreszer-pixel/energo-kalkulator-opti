@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
@@ -37,6 +37,13 @@ export default function InvoiceSettlementDialog({ projectId, groupId, ppes, onAp
     const h = (e: Event) => { const id = (e as CustomEvent).detail?.ppeId; setPpeId(id || ''); setOpen(true); };
     window.addEventListener(OPEN_EVENT, h); return () => window.removeEventListener(OPEN_EVENT, h);
   }, []);
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    const id = params.get('summary');
+    if (id == null) return;
+    setPpeId(id); setOpen(true);
+    const next = new URLSearchParams(params); next.delete('summary'); setParams(next, { replace: true });
+  }, [params, setParams]);
   useEffect(() => { if (open && !ppeId && ppes.length === 1) setPpeId(ppes[0].id); }, [open, ppes, ppeId]);
 
   const data = useQuery({
