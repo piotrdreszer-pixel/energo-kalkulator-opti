@@ -6,6 +6,7 @@ import { matchOsd } from '@/lib/osd-match';
 import { supabase } from '@/integrations/supabase/client';
 import { requireFeature, useGroupFeatureAccess } from '@/hooks/useFeatureAccess';
 import { STAGE_LABELS, isAllowedFile, functionErrorMessage, storageErrorMessage, summarizeDocs, analysisTarget, type UploadItem } from '@/lib/invoice-upload';
+import { openInvoiceSummary } from '@/components/analysis/InvoiceSettlementDialog';
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
@@ -233,6 +234,17 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
     onError: (e) => { invalidateDocs(); toast({ variant: 'destructive', title: 'Ponowny odczyt nie powiódł się', description: e instanceof Error ? e.message : undefined }); },
   });
 
+  // Po zakończeniu odczytu wgranej paczki: automatycznie otwórz podsumowanie (bez stosowania danych do kalkulatora).
+  const showSummary = () => { setReviewDocId(null); setOpen(false); openInvoiceSummary(ppes.length === 1 ? ppes[0].id : undefined); };
+  const batchWaiting = useRef(false);
+  useEffect(() => { if (uploading) batchWaiting.current = true; }, [uploading]);
+  useEffect(() => {
+    if (!batchWaiting.current || uploading || !open || !docsQuery.data) return;
+    if (docsQuery.data.some((d) => d.status === 'processing' || d.status === 'pending')) return;
+    batchWaiting.current = false;
+    if (items.some((i) => i.stage === 'done')) showSummary();
+  });
+
   const reviewDoc = docsQuery.data?.find((d) => d.id === reviewDocId) || null;
   const summary = summarizeDocs(docsQuery.data || []);
 
@@ -355,7 +367,10 @@ export default function ImportInvoicesDialog({ projectId, groupId, ppes, onAppli
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 border-t bg-background px-4 py-3 sm:px-6">
           <p className="text-xs text-muted-foreground">Niezatwierdzone dokumenty pozostaną do sprawdzenia później.</p>
-          <Button onClick={goToAnalysis}>Przejdź do analizy</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={showSummary}>Podsumowanie danych z faktur</Button>
+            <Button onClick={goToAnalysis}>Przejdź do analizy</Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

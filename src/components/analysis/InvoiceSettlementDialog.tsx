@@ -281,7 +281,7 @@ function PpeSettlement({ analysis, s, onOpenReview, onApplied, onGoToAnalysis, o
         <section className="rounded-md border border-warning/50 bg-warning/10 p-3 space-y-2">
           {gapText && <p className="flex gap-1 items-start"><AlertTriangle className="h-4 w-4 shrink-0" />{gapText}</p>}
           {hasEstimates && <p className="font-medium">Okres uzupełniony szacunkiem — nie jest w pełni udokumentowany fakturami.</p>}
-          {gapText && <Button size="sm" variant="outline" onClick={askAssistant}><Sparkles className="mr-1 h-4 w-4" />Uzupełnij brakujący okres z asystentem</Button>}
+          {gapText && (access as { aiAssistant?: boolean }).aiAssistant && <Button size="sm" variant="outline" onClick={askAssistant}><Sparkles className="mr-1 h-4 w-4" />Uzupełnij brakujący okres z asystentem</Button>}
           <p className="text-xs text-muted-foreground">Pmax i bezpiecznej mocy umownej nie szacujemy z miesięcznego zużycia.</p>
         </section>
       )}
