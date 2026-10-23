@@ -270,7 +270,22 @@ function PpeSettlement({ analysis, s, onOpenReview, onApplied, onGoToAnalysis, o
   const periodDiffers = s.proposedPeriod && (analysis.period_from !== s.proposedPeriod.from || analysis.period_to !== s.proposedPeriod.to);
 
   return (
-    <div className="space-y-5 text-sm">
+    <div className="space-y-5 text-sm min-w-0">
+      <section className="space-y-1">
+        <h3 className="font-semibold text-base break-all">PPE {analysis.ppe_number || analysis.name}</h3>
+        <p className="text-muted-foreground">{analysis.ppe_address || 'brak adresu'} · OSD: {osd.length ? osd.join(', ') : 'nie rozpoznano'} · taryfa: {s.tariffs.length ? s.tariffs.map((t) => t.code).join(' → ') : 'brak danych'}</p>
+        <p className="text-xs">Dokumenty: zatwierdzone {s.entries.length}, nowe do zatwierdzenia {s.pending.length}, wymagające wyjaśnienia {needDecision}.</p>
+      </section>
+
+      {(gapText || hasEstimates) && (
+        <section className="rounded-md border border-warning/50 bg-warning/10 p-3 space-y-2">
+          {gapText && <p className="flex gap-1 items-start"><AlertTriangle className="h-4 w-4 shrink-0" />{gapText}</p>}
+          {hasEstimates && <p className="font-medium">Okres uzupełniony szacunkiem — nie jest w pełni udokumentowany fakturami.</p>}
+          {gapText && <Button size="sm" variant="outline" onClick={askAssistant}><Sparkles className="mr-1 h-4 w-4" />Uzupełnij brakujący okres z asystentem</Button>}
+          <p className="text-xs text-muted-foreground">Pmax i bezpiecznej mocy umownej nie szacujemy z miesięcznego zużycia.</p>
+        </section>
+      )}
+
       <section>
         <h3 className="font-semibold mb-2">Dokumenty i okresy rozliczenia</h3>
         <table className="w-full text-xs">
@@ -366,20 +381,25 @@ function PpeSettlement({ analysis, s, onOpenReview, onApplied, onGoToAnalysis, o
         {s.handling && <p className="mt-1 text-muted-foreground">Abonament / opłata handlowa: koszt za okres {formatCurrency(s.handling.totalNet)}. {s.handling.note}</p>}
       </section>
 
-      {access.canImport && <section className="rounded-md border p-3">
-        {!showApply ? (
-          <Button onClick={() => setShowApply(true)} disabled={!rows.length}>Zastosuj zestawienie do PRZED</Button>
-        ) : (
+      <section className="rounded-md border p-3 space-y-2">
+        <div className="flex flex-wrap gap-2">
+          {access.canImport && !showApply && <Button onClick={() => setShowApply(true)} disabled={!rows.length}>Zastosuj do PRZED</Button>}
+          <Button variant="outline" onClick={onGoToAnalysis}>Przejdź do analizy</Button>
+        </div>
+        {access.canImport && showApply && (
           <div className="space-y-2">
-            <p className="font-medium">Podgląd zapisu (tylko PRZED; PO bez zmian)</p>
+            <p className="font-medium">Porównanie przed zapisem (tylko PRZED; PO bez zmian)</p>
             <table className="w-full text-xs">
-              <thead><tr className="text-left text-muted-foreground"><th>Pole</th><th>Obecnie</th><th>Proponowane</th><th>Uwagi</th></tr></thead>
+              <thead><tr className="text-left text-muted-foreground"><th>Pole kalkulatora</th><th>Obecnie</th><th>Z faktur</th><th>Szacunek</th><th>Łącznie do analizy</th><th>Status</th><th>Uwagi</th></tr></thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.field} className="border-t align-top">
                     <td className="py-1">{r.label}</td>
                     <td>{r.current == null ? '—' : fmt(Number(r.current), 4)}</td>
-                    <td>{fmt(r.value, 4)}</td>
+                    <td>{fmt(r.invoiceValue, 4)}</td>
+                    <td>{r.estimated == null ? '—' : fmt(r.estimated, 4)}</td>
+                    <td className="font-medium">{fmt(r.value, 4)}</td>
+                    <td><Badge variant={r.status === 'z faktur' ? 'default' : 'secondary'}>{r.status}</Badge></td>
                     <td>
                       {r.note}
                       {r.manual && (
@@ -396,6 +416,9 @@ function PpeSettlement({ analysis, s, onOpenReview, onApplied, onGoToAnalysis, o
             <p className="text-xs text-muted-foreground">
               Okres źródeł: {s.proposedPeriod ? per(s.proposedPeriod.from, s.proposedPeriod.to) : '?'}; dokumenty: {s.entries.filter((e) => e.included).length}.
               Taryfa, moc i składniki sieciowe nie są zapisywane automatycznie{s.blocked.length ? ' — patrz konflikty powyżej' : ''}.
+              {s.pending.length ? ` Nowe niezatwierdzone dokumenty (${s.pending.length}) nie są wliczone.` : ''}
+              {needDecision ? ` Pozycje wymagające decyzji (${needDecision}) nie są wliczone — zestawienie niepełne.` : ''}
+              {' '}Ponowne zastosowanie nadpisuje te same pola (nie dodaje).
             </p>
             <div className="flex gap-2">
               <Button onClick={applyBefore} disabled={busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Zapisz do PRZED</Button>
@@ -403,7 +426,7 @@ function PpeSettlement({ analysis, s, onOpenReview, onApplied, onGoToAnalysis, o
             </div>
           </div>
         )}
-      </section>}
+      </section>
     </div>
   );
 }
