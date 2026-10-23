@@ -189,11 +189,13 @@ function Components({ list, onOpenReview }: { list: Component[]; onOpenReview: (
   );
 }
 
-function PpeSettlement({ analysis, s, onOpenReview, onApplied }: {
+function PpeSettlement({ analysis, s, onOpenReview, onApplied, onGoToAnalysis, onAssistant }: {
   analysis: EnergyAnalysis; s: ReturnType<typeof buildSettlement>; onOpenReview: (id: string) => void; onApplied: () => void;
+  onGoToAnalysis: () => void; onAssistant: () => void;
 }) {
   const { toast } = useToast();
   const access = useGroupFeatureAccess(analysis.analysis_group_id);
+  const estimates = useActiveEstimates(analysis.id);
   const [busy, setBusy] = useState(false);
   const [confirmPeriod, setConfirmPeriod] = useState(false);
   const [showApply, setShowApply] = useState(false);
@@ -201,11 +203,25 @@ function PpeSettlement({ analysis, s, onOpenReview, onApplied }: {
   const proposals = settlementProposals(s);
   const sources = (analysis.value_sources || {}) as ValueSources;
   const a = analysis as unknown as Record<string, unknown>;
+  const estBy = (field: string) => (estimates.data || []).filter((e) => e.field === field);
+  // Szacunek jest osobną częścią wartości przyjętej do analizy: łącznie = z faktur + szacunek (nie nadpisujemy go wartością z samych faktur).
   const rows = proposals.map((p) => {
+    const est = estBy(p.field);
+    const estimated = /_mwh$/.test(p.field) || /^(capacity_charge|reactive_energy_cost)_before$/.test(p.field) ? est.reduce((x, e) => x + Number(e.value), 0) : 0;
+    const total = est.length && estimated ? p.value + estimated : p.value;
     const cur = a[p.field];
-    const manual = sources[p.field]?.source === 'manual' && cur != null && !matchesStored(p.field, p.value, cur);
-    return { ...p, current: cur, manual };
+    const manual = sources[p.field]?.source === 'manual' && cur != null && !matchesStored(p.field, total, cur);
+    const status = itemStatus({ hasInvoiceValue: true, estimated: est.length > 0, conflict: manual });
+    return { ...p, invoiceValue: p.value, estimated: est.length ? estimated : null, value: total, current: cur, manual, status };
   });
+  const gapText = gapMessage(s.proposedPeriod, s.gaps);
+  const hasEstimates = (estimates.data || []).length > 0;
+  const osd = Array.from(new Set(s.entries.map((e) => e.record.osd_name).filter(Boolean)));
+  const needDecision = s.entries.filter((e) => !e.included).length;
+  const askAssistant = () => {
+    onAssistant();
+    openAssistant(`Uzupełnij brakujący okres dla PPE ${analysis.ppe_number || analysis.name} na podstawie podsumowania danych z faktur. ${gapText ?? ''} Najpierw zaproponuj symulację: jaki okres uzupełniasz, na podstawie których rozliczeń, jaką metodą, jakie wartości możesz oszacować i które koszty pozostaną nieuzupełnione. Nic nie zapisuj bez mojej akceptacji.`);
+  };
 
   if (!s.entries.length && !s.pending.length) {
     return <p className="text-sm text-muted-foreground">Brak faktur przypisanych do tego PPE w tej analizie.</p>;
