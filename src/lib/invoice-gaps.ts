@@ -116,22 +116,28 @@ export function planCostEstimate(row: Record<string, unknown>, s: Settlement, ga
   return p;
 }
 
-/** Zastąpienie aktywnych szacunków danymi z faktur, gdy luka jest już pokryta — bez podwójnego liczenia (nowa wartość = suma z faktur). */
+/** Zastąpienie aktywnych szacunków danymi z faktur, gdy ich okres jest już pokryty — bez podwójnego liczenia.
+ *  Pole może mieć kilka szacunków (np. miesięcznych): nowa wartość = suma z faktur + szacunki jeszcze niepokryte. */
 export function planReplaceEstimates(row: Record<string, unknown>, s: Settlement, active: ActiveEstimate[]): Plan {
   const p = empty();
-  for (const a of active) {
-    const covered = !s.gaps.some(g => toDay(g.from) <= toDay(a.period_to) && toDay(a.period_from) <= toDay(g.to)) &&
-      s.entries.some(e => e.included && e.record.period_from && e.record.period_to && toDay(e.record.period_from) <= toDay(a.period_from) && toDay(a.period_to) <= toDay(e.record.period_to));
-    if (!covered) continue;
-    const zone = /zone(\d)_mwh$/.exec(a.field)?.[1];
+  const byField = new Map<string, ActiveEstimate[]>();
+  for (const a of active) { const l = byField.get(a.field) ?? []; l.push(a); byField.set(a.field, l); }
+  for (const [field, list] of byField) {
+    const coveredList = list.filter(a =>
+      !s.gaps.some(g => toDay(g.from) <= toDay(a.period_to) && toDay(a.period_from) <= toDay(g.to)) &&
+      s.entries.some(e => e.included && e.record.period_from && e.record.period_to && toDay(e.record.period_from) <= toDay(a.period_from) && toDay(a.period_to) <= toDay(e.record.period_to)));
+    if (!coveredList.length) continue;
+    const zone = /zone(\d)_mwh$/.exec(field)?.[1];
     let actual: number | null = null;
     if (zone) { const zs = s.zoneSummaries.find(x => x.zone === Number(zone)); actual = zs && !zs.incomplete ? zs.mwh : null; }
-    else { const c = s.costs.find(x => x.kind === (a.field === 'capacity_charge_before' ? 'capacity' : 'reactive')); actual = c && !c.missingAmounts ? c.total : null; }
-    if (actual == null) { p.errors.push(`${a.field}: dane z faktur niepełne — szacunek pozostaje.`); continue; }
-    const expected = Number(a.base_value ?? 0) + Number(a.value);
-    if (!close(row[a.field], expected, a.field)) { p.errors.push(`${a.field}: wartość zmieniono po zapisie szacunku — nie nadpisuję, popraw ręcznie.`); continue; }
-    p.changes.push({ field: a.field, value: toStored(a.field, actual) });
-    p.replace.push(a.id);
+    else { const c = s.costs.find(x => x.kind === (field === 'capacity_charge_before' ? 'capacity' : 'reactive')); actual = c && !c.missingAmounts ? c.total : null; }
+    if (actual == null) { p.errors.push(`${field}: dane z faktur niepełne — szacunek pozostaje.`); continue; }
+    // Łączna oczekiwana wartość pola: skumulowane base_value + value (ostatni szacunek niesie sumę całości).
+    const expected = Math.max(...list.map(a => Number(a.base_value ?? 0) + Number(a.value)));
+    if (!close(row[field], expected, field)) { p.errors.push(`${field}: wartość zmieniono po zapisie szacunku — nie nadpisuję, popraw ręcznie.`); continue; }
+    const retainedSum = list.filter(a => !coveredList.includes(a)).reduce((n, a) => n + Number(a.value), 0);
+    p.changes.push({ field, value: toStored(field, actual + retainedSum) });
+    p.replace.push(...coveredList.map(a => a.id));
   }
   if (!p.replace.length && !p.errors.length) p.notes.push('Żaden szacunek nie jest jeszcze pokryty zatwierdzoną fakturą.');
   return p;
