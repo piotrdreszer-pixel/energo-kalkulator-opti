@@ -335,7 +335,19 @@ export function buildSettlement(args: {
     if (last && Math.abs(last.kw - Number(kw)) < 1e-9) last.period_to = e.record.period_to;
     else contractedPower.push({ kw: Number(kw), period_from: e.record.period_from, period_to: e.record.period_to });
   }
-  if (new Set(contractedPower.map((c) => c.kw)).size > 1) blocked.push('Zmiana mocy umownej w okresie — moc nie jest ustawiana automatycznie.');
+  // Różne moce w nienakładających się okresach = historia zmian (nie blokada).
+  // Różne moce w nakładających się okresach = konflikt danych (korekty/duplikaty) — blokada.
+  const powerRecs = used.filter((e) => e.record.contracted_power_kw != null && e.record.period_from && e.record.period_to);
+  let powerConflict = false;
+  for (let i = 0; i < powerRecs.length && !powerConflict; i++)
+    for (let j = i + 1; j < powerRecs.length; j++) {
+      const a = powerRecs[i], b = powerRecs[j];
+      if (Math.abs(Number(a.record.contracted_power_kw) - Number(b.record.contracted_power_kw)) >= 1e-9 &&
+        overlaps({ from: String(a.record.period_from), to: String(a.record.period_to) }, { from: String(b.record.period_from), to: String(b.record.period_to) })) {
+        powerConflict = true; break;
+      }
+    }
+  if (powerConflict) blocked.push('Sprzeczne moce umowne dla tego samego okresu — sprawdź korekty i źródła faktur.');
 
   // Pmax — najwyższa dostępna wartość, brak ≠ 0
   let pmax: Settlement['pmax'] = null;
