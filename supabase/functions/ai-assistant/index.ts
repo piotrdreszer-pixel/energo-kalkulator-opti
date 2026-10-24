@@ -153,7 +153,7 @@ Deno.serve(async (req) => {
   let { data: conv } = await admin.from('ai_conversations').select('id').eq('user_id', userId).eq('analysis_group_id', b.groupId).maybeSingle();
   if (!conv) ({ data: conv } = await admin.from('ai_conversations').insert({ user_id: userId, analysis_group_id: b.groupId }).select('id').single());
   const { data: histRaw } = await admin.from('ai_messages').select('role,content').eq('conversation_id', conv!.id).order('created_at', { ascending: false }).limit(MAX_HISTORY);
-  const hist = trimHistory(((histRaw ?? []) as { role: string; content: string }[]).reverse(), HISTORY_MAX_TOTAL).reverse();
+  const hist = trimHistory(((histRaw ?? []) as { role: string; content: string }[]).reverse(), HISTORY_MAX_TOTAL);
   const ppeLabel = b.scope === 'all' ? 'Wszystkie PPE' : String(current?.ppe_number || current?.name || 'PPE');
   await admin.from('ai_messages').insert({ conversation_id: conv!.id, role: 'user', content: b.message, ppe_id: b.scope === 'all' ? null : b.ppeId, ppe_label: ppeLabel, scope: b.scope });
 
