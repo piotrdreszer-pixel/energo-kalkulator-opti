@@ -78,12 +78,13 @@ describe('szacunek kosztów i zastąpienie fakturą', () => {
     expect(p.errors).toEqual([]);
     expect(p.replace.sort()).toEqual(['e1', 'e2']);
     expect(p.changes[0].value).toBeCloseTo(11.2, 4);
-    // gdy pokryty jest tylko sierpień, lipiec (szacunek 3 MWh) zostaje: 8.2 + 3 = 11.2 → tu faktury dają 8.2, razem 11.2
-    const pOnly = planReplaceEstimates({ consumption_before_zone1_mwh: 11.2 }, buildSettlement({ ppeNumber: 'PL1', analysisId: 'a1', docs: [doc('aug')], records: [rec('aug', '2025-08-01', '2025-08-31', 2000, 4000)], items }),
+    // gdy pokryty jest tylko sierpień (faktura 2 MWh), czerwiec (szacunek 2,8 MWh) zostaje: 2 + 2,8 = 4,8
+    const pOnly = planReplaceEstimates({ consumption_before_zone1_mwh: 5.9 }, buildSettlement({ ppeNumber: 'PL1', analysisId: 'a1', docs: [doc('aug')], records: [rec('aug', '2025-08-01', '2025-08-31', 2000, 4000)], items }),
       [{ id: 'e1', field: 'consumption_before_zone1_mwh', period_from: '2025-06-01', period_to: '2025-06-30', value: 2.8, base_value: 0, unit: 'MWh' },
        { id: 'e2', field: 'consumption_before_zone1_mwh', period_from: '2025-08-01', period_to: '2025-08-31', value: 3.1, base_value: 2.8, unit: 'MWh' }]);
+    expect(pOnly.errors).toEqual([]);
     expect(pOnly.replace).toEqual(['e2']);
-    expect(pOnly.changes[0].value).toBeCloseTo(5.8, 4);
+    expect(pOnly.changes[0].value).toBeCloseTo(4.8, 4);
   });
 });
 
