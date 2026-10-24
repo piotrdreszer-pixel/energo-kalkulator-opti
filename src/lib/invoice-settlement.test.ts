@@ -110,7 +110,8 @@ describe('buildSettlement', () => {
   });
 
   it('sprzeczne moce w tym samym okresie → konflikt, blokada', () => {
-    const d1 = doc(), d2 = doc();
+    // Faktura sprzedażowa i dystrybucyjna za ten sam okres z różnymi mocami — obie wchodzą do rozliczenia.
+    const d1 = doc({ doc_type: 'sprzedażowa' }), d2 = doc({ doc_type: 'dystrybucyjna' });
     const r1 = rec(d1, month(2025, 1));
     const r2 = { ...rec(d2, month(2025, 1)), id: 'r2', contracted_power_kw: 60 };
     const s = buildSettlement({ ppeNumber: PPE, docs: [d1, d2], records: [r1, r2], items: [...items(d1, r1), ...items(d2, r2).map((i) => ({ ...i, id: i.id + 'x', ppe_record_id: 'r2' }))] });
