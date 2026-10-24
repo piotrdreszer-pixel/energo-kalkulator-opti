@@ -87,8 +87,9 @@ export function planYearSimulation(
   activeEstimates: { id: string; field: string; period_from: string; period_to: string; value: number }[],
   target: Interval,
   cost: 'mocowa' | 'bierna' | null = null,
+  powerAssumption: number | null = null,
 ): YearSimPlan {
-  const p: YearSimPlan = { changes: [], estimates: [], errors: [], notes: [], warnings: [], unresolved: [], preview: null };
+  const p: YearSimPlan = { changes: [], estimates: [], errors: [], notes: [], warnings: [], unresolved: [], power: null, preview: null };
   if (s.blocked.length) { p.errors.push(...s.blocked); return p; }
   if (!target.from || !target.to || target.from > target.to) { p.errors.push('Nieprawidłowy docelowy okres.'); return p; }
   const zones = s.zones;
@@ -196,6 +197,37 @@ export function planYearSimulation(
   if (!cost) {
     if (s.costs.some(c => c.kind === 'capacity' && c.components.length)) p.unresolved.push('Opłata mocowa PRZED za brakujące dni — możliwa do oszacowania osobno, na jawną zgodę.');
     if (s.costs.some(c => c.kind === 'reactive' && c.components.length)) p.unresolved.push('Energia bierna PRZED za brakujące dni — możliwa do oszacowania osobno, na jawną zgodę.');
+  }
+
+  // Moc umowna: historia z faktur jest zachowana; zmiana mocy NIE blokuje szacunku zużycia.
+  // Kalkulator ma jedno pole mocy PRZED na cały okres — zapisujemy ją wyłącznie jako jawny,
+  // zaakceptowany wariant uproszczony; nigdy nie uśredniamy ani nie stosujemy wstecz.
+  const hist = s.contractedPower.filter(c => c.period_from && c.period_to);
+  const formPower = row.contracted_power_before_kw != null && row.contracted_power_before_kw !== '' ? Number(row.contracted_power_before_kw) : null;
+  const distinctKw = [...new Set(hist.map(c => c.kw))];
+  const lastKw = hist.length ? hist[hist.length - 1].kw : null;
+  const powerDiffers = distinctKw.length > 1 || (formPower != null && lastKw != null && Math.abs(formPower - lastKw) >= 1e-9);
+  if (hist.length && powerDiffers) {
+    const missFrom = missing[0].from, missTo = missing[missing.length - 1].to;
+    p.power = {
+      historia: hist.map(c => ({ kw: c.kw, od: c.period_from!, do: c.period_to! })),
+      formularz_kw: formPower,
+      ostatnia_znana_kw: lastKw,
+      pytanie: powerAssumption == null
+        ? `Czy dla brakujących miesięcy ${fmtD(missFrom)}–${fmtD(missTo)} przyjąć ostatnią znaną moc ${lastKw} kW?`
+        : null,
+    };
+    const histTxt = hist.map(c => `${c.kw} kW (${fmtD(c.period_from!)}–${fmtD(c.period_to!)})`).join(', ');
+    if (powerAssumption == null) {
+      p.unresolved.push(`Moc umowna zmieniała się w okresie (${histTxt}) — to historia zmian, nie konflikt. Dla brakujących miesięcy potrzebne jest założenie; proponuję ostatnią znaną moc ${lastKw} kW. Bez tego założenia mocy nie zapisuję.`);
+    } else {
+      if (!Number.isFinite(powerAssumption) || powerAssumption <= 0) p.errors.push('Nieprawidłowa wartość założonej mocy.');
+      else {
+        if (formPower == null || Math.abs(formPower - powerAssumption) >= 1e-9)
+          p.changes.push({ field: 'contracted_power_before_kw', value: powerAssumption });
+        p.notes.push(`Moc umowna PRZED: historia z faktur (${histTxt}) pozostaje zachowana w rozliczeniach. Kalkulator przechowuje jedną moc dla całego okresu, więc zapisuję zaakceptowaną wartość ${powerAssumption} kW jako jawny wariant uproszczony — nie jest to średnia i nie odzwierciedla dokładnie historii. Koszty zależne od mocy (np. opłata naliczana od mocy umownej) kalkulator policzy z tej jednej wartości; opłata mocowa z faktur to osobny składnik i nie jest z nią utożsamiana.`);
+      }
+    }
   }
 
   // Ostrzeżenia o mocy.
