@@ -1,6 +1,7 @@
 import { settlementPlan, type SettlementSnapshot } from './settlement-plan.ts';
 import { calculateEnergyCosts, formatCurrency, formatPercent } from './calculation-utils.ts';
 import { INCOMPLETE_PO_MESSAGE } from './po-completeness.ts';
+import { matchesStored } from './invoice-settlement.ts';
 
 export async function readSettlement(admin: any, userId: string, analysisId: string): Promise<SettlementSnapshot> {
   const {data,error} = await admin.rpc('invoice_summary_snapshot',{_actor:userId,_analysis_id:analysisId});
@@ -19,8 +20,15 @@ export async function applySettlement(admin:any,userId:string,analysisId:string,
   if(error) throw new Error(error.message);
   if(!['applied','already_applied','unchanged'].includes(data.status)) return data;
   const confirmed=await readSettlement(admin,userId,analysisId);
-  const result=calculateEnergyCosts(confirmed.row);
   const fields=data.fields || {};
+  for(const [field,value] of Object.entries(fields) as [string,any][]) {
+    if(!matchesStored(field,value.after,confirmed.row[field]) || JSON.stringify(confirmed.row.value_sources?.[field]) !== JSON.stringify(value.source_after)) {
+      return {...data,message:'Operacja została zapisana, ale dane zmieniły się przed potwierdzeniem. Odśwież analizę; nie podaję niepotwierdzonych wyników.'};
+    }
+  }
+  let result;
+  try { result=calculateEnergyCosts(confirmed.row); }
+  catch { return {...data,row:confirmed.row,message:'Potwierdzono zapis danych PRZED. Nie udało się przeliczyć wyniku; wariant PO bez zmian.'}; }
   const labels=Object.fromEntries(plan.rows.map(r=>[r.field,r.label]));
   const description=Object.entries(fields).map(([f,v]:[string,any])=>`${labels[f] || f}: ${Number(v.after).toLocaleString('pl-PL',{maximumFractionDigits:4})}`).join('; ');
   const message=(data.status==='unchanged'?'Podsumowanie już odpowiada zapisanym wartościom.':`Zastosowano i potwierdzono odczytem: ${description}.`)+
