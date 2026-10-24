@@ -126,20 +126,29 @@ Deno.serve(async (req) => {
   }
   const { data: osd } = await userClient.from('osd_operators').select('id,name');
 
-  const context = JSON.stringify({
+  // Zwarte części kontekstu: tylko pola z listy, bez surowych pozycji faktur ani pełnego rozliczenia.
+  const savedCompact = saved.map(p => pickPpeFields(p, PPE_FIELDS));
+  const calcResults = Object.fromEntries(saved.flatMap(p => { const r = calculateEnergyCosts(p); return [[p.id as string, { wersja_danych: p.updated_at, okres: { od: p.period_from, do: p.period_to, miesiecy: r.periodMonths }, koszt_przed_zl: r.totalCostBefore, koszt_po_zl: r.totalCostAfter, oszczednosc_zl: r.savingsAvailable ? r.savingsValue : null, oszczednosc_proc: r.savingsAvailable ? r.savingsPercent : null, po_niepelne: r.missingPo, rozbicie_zl: r }], ...Object.entries(b.results ?? {}).filter(([k]) => k === `${p.id}__robocze`)]; }));
+  const settlementSummary = summarySnapshot ? compactSettlementPlan(settlementPlan(summarySnapshot)) : null;
+  const parts: Record<string, unknown> = {
     klient: (group as any).client_projects?.client_name, analiza: group.name, zakres: b.scope === 'all' ? 'Wszystkie PPE' : 'jeden PPE', biezacy_krok: b.step ?? null,
     operatorzy_osd: osd ?? [],
-    zapisane_dane_ppe: saved,
+    zapisane_dane_ppe: savedCompact,
     dane_robocze_niezapisane: b.draftDirty ? (b.draft ?? null) : 'brak niezapisanych zmian',
-    wyniki_kalkulatora: Object.fromEntries(saved.flatMap(p => { const r = calculateEnergyCosts(p); return [[p.id as string, { wersja_danych: p.updated_at, okres: { od: p.period_from, do: p.period_to, miesiecy: r.periodMonths }, koszt_przed_zl: r.totalCostBefore, koszt_po_zl: r.totalCostAfter, oszczednosc_zl: r.savingsAvailable ? r.savingsValue : null, oszczednosc_proc: r.savingsAvailable ? r.savingsPercent : null, po_niepelne: r.missingPo, rozbicie_zl: r }], ...Object.entries(b.results ?? {}).filter(([k]) => k === `${p.id}__robocze`)]; })),
+    wyniki_kalkulatora: calcResults,
     wykryte_braki_i_konflikty: b.issues ?? [],
     zatwierdzone_dane_faktur: invoices,
     faktury_okres_i_luki: inv === true && b.scope === 'ppe' && b.facts ? { okres_z_faktur: b.facts.period, luki: b.facts.gaps, pierwsza_luka: b.facts.gap, problemy: b.facts.issues,
       plany_aplikacji: Object.fromEntries(Object.entries(b.facts.plans).map(([k, v]) => [k, { zmiany: v.changes, bledy: v.errors, uwagi: v.notes }])) } : 'niedostępne',
     aktywne_szacunki: inv === true && b.facts ? b.facts.active_estimates : [],
-    podsumowanie_faktur:summarySnapshot?settlementPlan(summarySnapshot):null,
-  });
-  if (context.length > MAX_CONTEXT) return json(413, { error: 'Kontekst analizy jest zbyt duży. Wybierz jeden PPE zamiast „Wszystkie PPE”.' });
+    podsumowanie_faktur: settlementSummary,
+  };
+  const context = JSON.stringify(parts);
+  // Diagnostyka rozmiarów: liczniki bez treści faktur ani danych klientów.
+  console.log('ai-assistant kontekst', JSON.stringify(Object.fromEntries([...Object.entries(parts).map(([k, v]) => [k, JSON.stringify(v)?.length ?? 0]), ['razem', context.length], ['ppe', saved.length]])));
+  if (context.length > MAX_CONTEXT) return json(413, { error: b.scope === 'all'
+    ? 'Kontekst analizy jest zbyt duży. Wybierz jeden PPE zamiast „Wszystkie PPE”.'
+    : 'Kontekst tego PPE jest wyjątkowo duży mimo skrótu (np. bardzo wiele faktur). Zadaj pytanie węższe lub otwórz rozmowę na liście PPE.' });
 
   let { data: conv } = await admin.from('ai_conversations').select('id').eq('user_id', userId).eq('analysis_group_id', b.groupId).maybeSingle();
   if (!conv) ({ data: conv } = await admin.from('ai_conversations').insert({ user_id: userId, analysis_group_id: b.groupId }).select('id').single());
