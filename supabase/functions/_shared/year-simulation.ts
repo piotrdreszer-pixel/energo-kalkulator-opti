@@ -26,6 +26,13 @@ export interface YearSimPlan {
   changes: { field: string; value: number | string }[];
   estimates: SimEstimate[];
   errors: string[]; notes: string[]; warnings: string[]; unresolved: string[];
+  /** Moc umowna: historia z faktur i pytanie o założenie dla brakujących miesięcy (null = brak pytania). */
+  power: {
+    historia: { kw: number; od: string; do: string }[];
+    formularz_kw: number | null;
+    ostatnia_znana_kw: number | null;
+    pytanie: string | null;
+  } | null;
   preview: {
     okres_docelowy: { od: string; do: string; dni: number };
     dane_rzeczywiste: { od: string; do: string; dni: number };
