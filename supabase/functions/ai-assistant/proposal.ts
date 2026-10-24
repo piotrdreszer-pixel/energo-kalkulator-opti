@@ -121,7 +121,7 @@ const KIND_FIELDS: Record<string, RegExp> = {
   period: /^period_(from|to)$/,
   estimate: /^(consumption_(before|after)_zone[123]_mwh|capacity_charge_before|reactive_energy_cost_before)$/,
   estimate_replace: /^(consumption_(before|after)_zone[123]_mwh|capacity_charge_before|reactive_energy_cost_before)$/,
-  year_simulation: /^(period_(from|to)|consumption_before_zone[123]_mwh|capacity_charge_before|reactive_energy_cost_before)$/,
+  year_simulation: /^(period_(from|to)|consumption_before_zone[123]_mwh|capacity_charge_before|reactive_energy_cost_before|contracted_power_before_kw)$/,
   tariff_po: /^(tariff_code_after|zones_count_after|season_after|rate_card_id_after|rates_year_after|rates_source_after|rates_overridden_after|contracted_power_after_kw|handling_fee_after|capacity_charge_after|reactive_energy_cost_after|fixed_distribution_after_total|contracted_power_charge_rate_after|variable_distribution_after_zone[123]_rate|active_energy_price_after_zone[123]|consumption_after_zone[123]_mwh)$/,
   report_selection: /^include_in_project_report$/,
 };

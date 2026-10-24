@@ -105,7 +105,9 @@ export function ProposalCard({ proposalId, dirtyFor, onSaveForm,invoiceSummary=f
       <p>Obecny koszt PO: {formatCurrency(preview.currentAfter)}</p>
       <p>Proponowany koszt PO: <b>{formatCurrency(preview.proposedAfter)}</b></p>
       <p>Różnica względem obecnego PO: <b className={preview.extraBenefit >= 0 ? 'text-success' : 'text-destructive'}>{formatCurrency(Math.abs(preview.extraBenefit))} {preview.extraBenefit >= 0 ? 'mniej' : 'więcej'}</b></p>
-      <p>{preview.savingsAvailable ? 'Łączna oszczędność względem PRZED po zmianie:' : ''} <b className={preview.savingsAfterChange >= 0 ? 'text-success' : 'text-destructive'}>{formatCurrency(Math.abs(preview.savingsAfterChange))}{preview.savingsPercentAfterChange !== null ? ` (${formatNumber(Math.abs(preview.savingsPercentAfterChange), 2)}%)` : ''}</b></p>
+      {preview.savingsAvailable
+        ? <p>Łączna oszczędność względem PRZED po zmianie: <b className={preview.savingsAfterChange >= 0 ? 'text-success' : 'text-destructive'}>{formatCurrency(Math.abs(preview.savingsAfterChange))}{preview.savingsPercentAfterChange !== null ? ` (${formatNumber(Math.abs(preview.savingsPercentAfterChange), 2)}%)` : ''}</b></p>
+        : <p className="text-destructive">Nie można wyznaczyć oszczędności — uzupełnij wariant PO</p>}
       {preview.issues.length > 0 && <div className="text-destructive"><p>Braki danych — wynik niepełny:</p><ul className="list-disc pl-4">{preview.issues.map(i => <li key={i}>{i}</li>)}</ul></div>}
     </div>}
     {appliedPreview && <div className="border-t pt-2"><p>Potwierdzony wynik po zapisie: PO {formatCurrency(appliedPreview.currentAfter)}, oszczędność względem PRZED {formatCurrency(Math.abs(appliedPreview.savingsAfterChange))}</p></div>}

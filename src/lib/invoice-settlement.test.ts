@@ -101,12 +101,21 @@ describe('buildSettlement', () => {
     expect(settlementProposals(s).some((p) => p.field.startsWith('consumption_'))).toBe(false);
   });
 
-  it('zmiana mocy: historia bez uśredniania', () => {
+  it('zmiana mocy: historia bez uśredniania, bez blokady', () => {
     const y = year();
     for (let i = 6; i < 12; i++) y.records[i].contracted_power_kw = 60;
     const s = buildSettlement({ ppeNumber: PPE, ...y });
     expect(s.contractedPower.map((c) => c.kw)).toEqual([40, 60]);
-    expect(s.blocked.some((b) => b.includes('mocy'))).toBe(true);
+    expect(s.blocked.some((b) => b.includes('moc'))).toBe(false);
+  });
+
+  it('sprzeczne moce w tym samym okresie → konflikt, blokada', () => {
+    // Faktura sprzedażowa i dystrybucyjna za ten sam okres z różnymi mocami — obie wchodzą do rozliczenia.
+    const d1 = doc({ doc_type: 'sprzedażowa' }), d2 = doc({ doc_type: 'dystrybucyjna' });
+    const r1 = rec(d1, month(2025, 1));
+    const r2 = { ...rec(d2, month(2025, 1)), id: 'r2', contracted_power_kw: 60 };
+    const s = buildSettlement({ ppeNumber: PPE, docs: [d1, d2], records: [r1, r2], items: [...items(d1, r1), ...items(d2, r2).map((i) => ({ ...i, id: i.id + 'x', ppe_record_id: 'r2' }))] });
+    expect(s.blocked.some((b) => b.includes('Sprzeczne moce umowne'))).toBe(true);
   });
 
   it('zmiana ceny: cena zbiorcza ważona zużyciem', () => {
