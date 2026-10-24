@@ -9,6 +9,8 @@ import { numbersInText, validateProposal, commandGuard, isAcceptance, isCommand,
 import { z } from 'npm:zod@3';
 import { planTariffPo, compareForRow } from './tariff-ops.ts';
 import { TARIFF_CODES } from '../_shared/tariff-utils.ts';
+import { readSettlement, applySettlement } from '../_shared/settlement-service.ts';
+import { settlementPlan } from '../_shared/settlement-plan.ts';
 
 const MODEL = 'openai/gpt-6-astra';
 const MAX_MESSAGE = 2000;
@@ -22,6 +24,7 @@ const Body = z.object({
   scope: z.enum(['ppe', 'all']),
   step: z.string().max(100).optional(),
   message: z.string().trim().min(1).max(MAX_MESSAGE),
+  summaryToken:z.string().max(64).optional(),
   draft: z.record(z.unknown()).nullable().optional(),
   draftDirty: z.boolean().optional(),
   results: z.record(z.string().max(80), z.record(z.unknown())).nullable().optional(),
@@ -112,6 +115,7 @@ Deno.serve(async (req) => {
   if (b.ppeId && !current) return json(403, { error: 'Brak dostępu do tego PPE' });
   if (b.scope === 'ppe' && !current) return json(400, { error: 'Wybierz PPE' });
   const saved = b.scope === 'all' ? list : [current!];
+  const summarySnapshot=inv===true && current?await readSettlement(admin,userId,current.id as string):null;
 
   let invoices: unknown = 'brak dostępu do funkcji Import faktur';
   if (inv === true) {
@@ -132,6 +136,7 @@ Deno.serve(async (req) => {
     faktury_okres_i_luki: inv === true && b.scope === 'ppe' && b.facts ? { okres_z_faktur: b.facts.period, luki: b.facts.gaps, pierwsza_luka: b.facts.gap, problemy: b.facts.issues,
       plany_aplikacji: Object.fromEntries(Object.entries(b.facts.plans).map(([k, v]) => [k, { zmiany: v.changes, bledy: v.errors, uwagi: v.notes }])) } : 'niedostępne',
     aktywne_szacunki: inv === true && b.facts ? b.facts.active_estimates : [],
+    podsumowanie_faktur:summarySnapshot?settlementPlan(summarySnapshot):null,
   });
   if (context.length > MAX_CONTEXT) return json(413, { error: 'Kontekst analizy jest zbyt duży. Wybierz jeden PPE zamiast „Wszystkie PPE”.' });
 
@@ -170,6 +175,7 @@ Deno.serve(async (req) => {
   let confirmedResult: ReturnType<typeof calculateEnergyCosts> | null = null;
   let confirmedChanges: { field: string; value: any }[] = [];
   let extraNote = '';
+  let summaryAnswer:string|null=null;
   // A chat command replaces the unsaved draft value of the same field; other draft fields stay in the form (merged client-side).
   const draftConflict = (_fields: string[]): string[] => [];
   // Saves via the user's own JWT (permission + version checked in ai_apply_proposal), then confirms by reading back.
@@ -263,6 +269,19 @@ Deno.serve(async (req) => {
     return codes.size ? TARIFF_CODES.map(t => t.code).filter(c => codes.has(c.toUpperCase())) : null;
   };
   const tools = b.scope === 'ppe' && current ? {
+    zastosuj_podsumowanie_przed:tool({
+      description:'Zastosuj zatwierdzone podsumowanie faktur do PRZED bieżącego PPE. Wartości liczy serwer. Polecenie „Zastosuj to podsumowanie do PRZED” zapisuje bez kolejnego kliknięcia. Nie zatwierdza nowych pozycji, nie zastępuje ręcznych korekt i nigdy nie zmienia PO.',
+      inputSchema:z.object({}),
+      execute:async()=>{
+        if(!inv || !summarySnapshot)return {ok:false,errors:['Brak dostępu do Importu faktur.']};
+        if(summaryAnswer||proposalId)return {ok:false,errors:['W jednej odpowiedzi można wykonać tylko jedną operację.']};
+        if(!isCommand(b.message)||!/podsumowan|zestawieni/i.test(b.message)||!/PRZED/i.test(b.message))return {ok:false,errors:['Brak jednoznacznego polecenia zastosowania podsumowania do PRZED.']};
+        const out=await applySettlement(admin,userId,current.id as string,b.summaryToken ?? summarySnapshot.token,crypto.randomUUID(),[],b.message);
+        summaryAnswer=out.message || 'Nie zastosowano podsumowania.';
+        if(out.conflicts?.length)summaryAnswer+=' '+out.conflicts.map((c:any)=>`${c.label}: ręcznie ${c.current}, z podsumowania ${c.incoming}`).join('; ')+'. Wybierz konkretne korekty w podsumowaniu; nie nadpisuję ich automatycznie.';
+        return {ok:['applied','already_applied','unchanged'].includes(out.status),...out};
+      },
+    }),
     zmien_po: tool({
       description: 'Zmiana pól PO bieżącego PPE. tryb="polecenie" TYLKO gdy użytkownik w tej wiadomości jednoznacznie polecił ustawić konkretne wartości (np. „Ustaw cenę PO na 500 zł/MWh w strefie 1”) — zapisuje od razu. tryb="propozycja" gdy wartość lub metodę wybierasz sam albo użytkownik pyta „co da…” (symulacja) — nic nie zapisuje, użytkownik zatwierdzi. Przy pytaniach nie wywołuj.',
       inputSchema: z.object({
@@ -373,7 +392,7 @@ Deno.serve(async (req) => {
     ...(inv === true && b.facts ? invoiceTools() : {}),
   } : undefined;
   const result = streamText({
-    model: provider.responses(MODEL), system: INSTRUCTIONS, messages, abortSignal: req.signal, tools, stopWhen: stepCountIs(4),
+    model: provider.responses(MODEL), system: INSTRUCTIONS+'\nPolecenie zastosowania podsumowania do PRZED wykonuj wyłącznie zastosuj_podsumowanie_przed. Nie przepisuj liczb z podsumowania przez zmien_przed. Konflikt ręczny nie upoważnia do nadpisania. Historię i cofnięcie znajdziesz w podsumowaniu faktur.', messages, abortSignal: req.signal, tools, stopWhen: stepCountIs(4),
     providerOptions: { openai: { forceReasoning: true, reasoningEffort: 'low', reasoningSummary: 'auto', store: false, include: ['reasoning.encrypted_content'] } },
     onError: ({ error }) => { streamError = error; },
   });
@@ -384,6 +403,7 @@ Deno.serve(async (req) => {
       let text = '';
       try {
         for await (const chunk of result.textStream) { text += chunk; }
+        if(summaryAnswer)text=summaryAnswer+'\n\nHistoria i cofnięcie: podsumowanie danych z faktur.';
         if (applied && confirmedAfter) {
           const fmtValue = (v: any) => v === null ? 'brak (do uzupełnienia)' : typeof v === 'boolean' ? (v ? 'tak' : 'nie') : typeof v === 'number' ? v.toLocaleString('pl-PL', { maximumFractionDigits: 4 }) : String(v);
           const labels: Record<string, string> = { tariff_code_after: 'Taryfa PO', contracted_power_after_kw: 'Moc umowna PO', zones_count_after: 'Liczba stref PO', include_in_project_report: 'W zestawieniu', contracted_power_before_kw: 'Moc umowna PRZED', consumption_before_zone1_mwh: 'Zużycie PRZED — strefa 1 (MWh)', consumption_before_zone2_mwh: 'Zużycie PRZED — strefa 2 (MWh)', consumption_before_zone3_mwh: 'Zużycie PRZED — strefa 3 (MWh)', period_from: 'Okres od', period_to: 'Okres do', capacity_charge_before: 'Opłata mocowa PRZED', reactive_energy_cost_before: 'Energia bierna PRZED' };
