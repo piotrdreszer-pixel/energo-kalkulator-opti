@@ -16,6 +16,7 @@ export interface SettlementDoc {
   document_number: string | null;
   corrected_document_number: string | null;
   file_hash: string | null;
+  created_at?: string;
 }
 
 export interface SettlementItem {
@@ -163,7 +164,8 @@ export function buildSettlement(args: {
   const pending: Settlement['pending'] = [];
   const entries: SettlementEntry[] = [];
 
-  const sorted = [...mine].sort((a, b) => String(a.period_from || '').localeCompare(String(b.period_from || '')));
+  const sorted = [...mine].sort((a, b) => String(a.period_from || '').localeCompare(String(b.period_from || '')) ||
+    String(docById.get(a.document_id)?.created_at || '').localeCompare(String(docById.get(b.document_id)?.created_at || '')));
   const seenHash = new Map<string, string>();
   const seenNum = new Map<string, string>();
   for (const record of sorted) {

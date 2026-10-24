@@ -20,7 +20,7 @@ export function useActiveEstimates(analysisId?: string | null) {
 
 export async function loadGroupInvoices(groupId: string) {
   const { data: docs, error } = await supabase.from('analysis_documents')
-    .select('id,file_name,status,doc_type,issuer,document_number,corrected_document_number,file_hash').eq('analysis_group_id', groupId);
+    .select('id,file_name,status,doc_type,issuer,document_number,corrected_document_number,file_hash,created_at').eq('analysis_group_id', groupId);
   if (error) throw error;
   const ids = (docs || []).map(d => d.id);
   if (!ids.length) return { docs: [] as SettlementDoc[], records: [] as InvoicePpeRecord[], items: [] as SettlementItem[] };
