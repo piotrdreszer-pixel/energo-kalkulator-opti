@@ -7,9 +7,9 @@
 //  - handling_fee_before: zł/mies (silnik × miesiące okresu)
 //  - capacity_charge_before, fixed_distribution_before_total, reactive_energy_cost_before: kwota zł za cały okres analizy
 
-import type { EnergyAnalysis } from '@/types/database';
-import { getZonesCount, isRatesInMWh } from './tariff-utils';
-import { zoneFromName, type InvoicePpeRecord } from './invoice-import';
+import type { EnergyAnalysis } from './database-types.ts';
+import { getZonesCount, isRatesInMWh } from './tariff-utils.ts';
+import { zoneFromName, type InvoicePpeRecord } from './invoice-import.ts';
 
 export interface LineItemInput {
   id: string;
@@ -382,7 +382,7 @@ export function planOtherCharges(args: {
   const items: OtherContribution[] = args.maps
     .filter((m) => m.target === tgt && m.status === 'mapped' && args.selected.has(m.item.id) && m.item.net_value != null)
     .map((m) => ({
-      document_id: args.documentId, item_ref: m.item.id, name: m.item.name, net_value: m.item.net_value!,
+      document_id: args.documentId, item_ref: m.item.id, name: m.item.name, net_value: Number(m.item.net_value),
       page: m.item.page, period_from: args.period.from, period_to: args.period.to,
     }));
   const total = round2(items.reduce((s, i) => s + i.net_value, 0));

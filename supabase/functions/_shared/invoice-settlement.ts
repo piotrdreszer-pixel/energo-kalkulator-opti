@@ -2,10 +2,10 @@
 // Czyste funkcje: zestawienie liczone zawsze od nowa z zatwierdzonych rekordów i zaznaczonych pozycji
 // (brak przyrostowego dodawania do poprzedniej sumy => ponowny zapis nie tworzy duplikatów).
 
-import { normalizePpe } from './project-totals';
-import { mapConsumptionZones, normalizeTariffCode, zoneFromName, type InvoicePpeRecord } from './invoice-import';
-import { classifyItem, fullMonths, type LineKind } from './invoice-line-mapping';
-import { getZonesCount } from './tariff-utils';
+import { normalizePpe } from './ppe-number.ts';
+import { mapConsumptionZones, normalizeTariffCode, zoneFromName, type InvoicePpeRecord } from './invoice-import.ts';
+import { classifyItem, fullMonths, type LineKind } from './invoice-line-mapping.ts';
+import { getZonesCount } from './tariff-utils.ts';
 
 export interface SettlementDoc {
   id: string;
@@ -171,7 +171,7 @@ export function buildSettlement(args: {
     if (!doc) continue;
     if (doc.status !== 'approved') { pending.push({ doc, record }); continue; }
     const e: SettlementEntry = { record, doc, stream: streamOf(doc.doc_type), included: true, consumptionCounted: true, notes: [] };
-    const dupOf = (doc.file_hash && seenHash.get(doc.file_hash)) || (docKey(doc) && seenNum.get(docKey(doc)!));
+    const dupOf = (doc.file_hash && seenHash.get(doc.file_hash)) || (docKey(doc) && seenNum.get(docKey(doc) ?? ''));
     if (dupOf && dupOf !== doc.id) {
       e.included = false;
       e.notes.push(`Powtórny dokument (taki sam jak „${docById.get(dupOf)?.file_name}”) — pominięty.`);
@@ -192,7 +192,7 @@ export function buildSettlement(args: {
     }
     if (e.included) {
       if (doc.file_hash) seenHash.set(doc.file_hash, doc.id);
-      if (docKey(doc)) seenNum.set(docKey(doc)!, doc.id);
+      if (docKey(doc)) seenNum.set(docKey(doc) ?? '', doc.id);
     }
     entries.push(e);
   }
@@ -200,9 +200,9 @@ export function buildSettlement(args: {
   // Nakładanie okresów w tym samym strumieniu (lub z fakturą kompleksową) = konflikt.
   const inc = () => entries.filter((e) => e.included && e.record.period_from && e.record.period_to);
   for (const e of inc()) {
-    const iv = { from: e.record.period_from!, to: e.record.period_to! };
+    const iv = { from: String(e.record.period_from), to: String(e.record.period_to) };
     const clash = inc().find((o) => o !== e && entries.indexOf(o) < entries.indexOf(e) && o.included &&
-      (o.stream === e.stream || o.stream === 'both' || e.stream === 'both') && overlaps(iv, { from: o.record.period_from!, to: o.record.period_to! }));
+      (o.stream === e.stream || o.stream === 'both' || e.stream === 'both') && overlaps(iv, { from: String(o.record.period_from), to: String(o.record.period_to) }));
     if (clash) {
       e.included = false;
       e.notes.push(`Okres nakłada się z „${clash.doc.file_name}” (${clash.record.period_from} – ${clash.record.period_to}) — nie wliczono, wymaga decyzji.`);
@@ -345,13 +345,13 @@ export function buildSettlement(args: {
   }
 
   // Okres i pokrycie
-  const ivs = used.filter((e) => e.record.period_from && e.record.period_to).map((e) => ({ from: e.record.period_from!, to: e.record.period_to! }));
+  const ivs = used.filter((e) => e.record.period_from && e.record.period_to).map((e) => ({ from: String(e.record.period_from), to: String(e.record.period_to) }));
   const proposedPeriod = ivs.length
     ? { from: ivs.map((i) => i.from).sort()[0], to: ivs.map((i) => i.to).sort().slice(-1)[0] }
     : null;
   const gaps = coverageGaps(ivs);
-  const salesIv = used.filter((e) => e.stream !== 'distribution' && e.record.period_from && e.record.period_to).map((e) => ({ from: e.record.period_from!, to: e.record.period_to! }));
-  const distIv = used.filter((e) => e.stream !== 'sales' && e.record.period_from && e.record.period_to).map((e) => ({ from: e.record.period_from!, to: e.record.period_to! }));
+  const salesIv = used.filter((e) => e.stream !== 'distribution' && e.record.period_from && e.record.period_to).map((e) => ({ from: String(e.record.period_from), to: String(e.record.period_to) }));
+  const distIv = used.filter((e) => e.stream !== 'sales' && e.record.period_from && e.record.period_to).map((e) => ({ from: String(e.record.period_from), to: String(e.record.period_to) }));
   if (proposedPeriod) {
     const covers = (list: Interval[]) => list.length > 0 && coverageGaps(list).length === 0 &&
       list.map((i) => i.from).sort()[0] === proposedPeriod.from && list.map((i) => i.to).sort().slice(-1)[0] === proposedPeriod.to;

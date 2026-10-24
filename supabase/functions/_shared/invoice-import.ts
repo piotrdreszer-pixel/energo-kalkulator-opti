@@ -1,9 +1,9 @@
 // Etap 2: import faktur — dopasowanie PPE, różnice i mapowanie pól PRZED.
 // Czyste funkcje pomocnicze (testowalne jednostkowo).
 
-import { normalizePpe } from './project-totals';
-import type { EnergyAnalysis } from '@/types/database';
-import { TARIFF_CODES, getZonesCount } from './tariff-utils';
+import { normalizePpe } from './ppe-number.ts';
+import type { EnergyAnalysis } from './database-types.ts';
+import { TARIFF_CODES, getZonesCount } from './tariff-utils.ts';
 
 export interface InvoiceLineItem {
   id: string;
@@ -120,7 +120,7 @@ export function tariffConflict(
     const t = normalizeTariffCode(r.tariff_code);
     const key = t.code ?? (t.original || '').trim().toUpperCase();
     if (!key) continue;
-    if (!seen.has(key)) seen.set(key, { code: t.code ?? t.original!, period_from: r.period_from, period_to: r.period_to });
+    if (!seen.has(key)) seen.set(key, { code: t.code ?? t.original ?? '', period_from: r.period_from, period_to: r.period_to });
   }
   return seen.size > 1 ? Array.from(seen.values()) : null;
 }
