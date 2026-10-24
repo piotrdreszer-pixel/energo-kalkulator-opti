@@ -400,6 +400,19 @@ Deno.serve(async (req) => {
         return appOp('report_selection', [{ field: 'include_in_project_report', value: wlacz }], null, 'Wybór PPE do zestawienia', true, target);
       },
     }),
+    ...(inv === true ? {
+      szczegoly_faktur: tool({
+        description: 'Pobiera szczegóły (pozycje) zatwierdzonych faktur bieżącego PPE na żądanie — gdy pytanie dotyczy konkretnych pozycji, a zwarte podsumowanie nie wystarcza. Nic nie zapisuje.',
+        inputSchema: z.object({}),
+        execute: async () => {
+          const { data: recs } = await userClient.from('document_ppe_records').select('id,document_id,period_from,period_to,analysis_documents(document_number)').eq('matched_analysis_id', current!.id as string).not('applied_at', 'is', null).limit(20);
+          if (!recs?.length) return { ok: true, pozycje: [], info: 'Brak zatwierdzonych faktur dla tego PPE.' };
+          const { data: items } = await userClient.from('document_line_items').select('document_id,name,category,quantity,rate,unit,net_value').in('document_id', recs.map(r => r.document_id)).order('created_at').limit(80);
+          const byDoc = Object.fromEntries(recs.map(r => [r.document_id, { dokument: (r as any).analysis_documents?.document_number ?? null, okres: `${r.period_from ?? '?'} – ${r.period_to ?? '?'}`, pozycje: (items ?? []).filter(i => i.document_id === r.document_id).map(i => ({ nazwa: i.name, kategoria: i.category, ilosc: i.quantity, stawka: i.rate, jednostka: i.unit, netto_zl: i.net_value })) }]));
+          return { ok: true, dokumenty: byDoc };
+        },
+      }),
+    } : {}),
     ...(inv === true && b.facts ? invoiceTools() : {}),
   } : undefined;
   const result = streamText({
