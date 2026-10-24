@@ -455,7 +455,9 @@ Deno.serve(async (req) => {
         const status = (e as any)?.statusCode ?? (e as any)?.status;
         console.error('ai-assistant error', status, String(e));
         await log(`error_${status ?? 'unknown'}`, text);
-        const msg = status === 429 ? 'Za dużo zapytań do AI. Spróbuj za chwilę.' : status === 402 ? 'Brak kredytów AI w przestrzeni roboczej.' : status === 403 ? 'Dostęp do modelu AI jest zablokowany.' : 'Asystent AI jest chwilowo niedostępny.';
+        const raw = String((e as any)?.message ?? e);
+        const contextTooBig = /context|too (large|long|many tokens)|maximum.*token/i.test(raw) && (status === 400 || status === 413 || status === 422);
+        const msg = contextTooBig ? 'Kontekst rozmowy przekracza limit modelu mimo skrótu. Rozpocznij nową rozmowę lub zawęź pytanie.' : status === 429 ? 'Za dużo zapytań do AI. Spróbuj za chwilę.' : status === 402 ? 'Brak kredytów AI w przestrzeni roboczej.' : status === 403 ? 'Dostęp do modelu AI jest zablokowany.' : 'Asystent AI jest chwilowo niedostępny.';
         controller.enqueue(enc.encode(`\n\n[[BŁĄD]] ${msg}`));
       }
       controller.close();
