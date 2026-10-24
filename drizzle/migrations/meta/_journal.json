@@ -120,6 +120,13 @@
       "when": 1792831046874,
       "tag": "0016_invoice_summary_atomic_application",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792831412333,
+      "tag": "0017_invoice_summary_commit_alias_fix",
+      "breakpoints": true
     }
   ]
 }
