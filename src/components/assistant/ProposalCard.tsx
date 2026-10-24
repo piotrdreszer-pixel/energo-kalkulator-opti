@@ -7,7 +7,7 @@ import { buildProposalPreview, isProposalStale, PROPOSAL_FIELDS, PROPOSAL_SOURCE
 import { formatCurrency, formatNumber } from '@/lib/calculation-utils';
 import { ESTIMATE_FIELD_LABELS } from '@/lib/invoice-gaps';
 
-const KIND_TITLE: Record<string, string> = { po: 'Propozycja zmiany PO', period: 'Zmiana okresu analizy (z faktur)', estimate: 'Szacunek brakującego okresu', estimate_replace: 'Zastąpienie szacunku fakturą' };
+const KIND_TITLE: Record<string, string> = { po: 'Propozycja zmiany PO', period: 'Zmiana okresu analizy (z faktur)', estimate: 'Szacunek brakującego okresu', estimate_replace: 'Zastąpienie szacunku fakturą', year_simulation: 'Symulacja pełnego okresu (PRZED)' };
 const label = (f: string) => PROPOSAL_FIELDS[f as keyof typeof PROPOSAL_FIELDS]?.label ?? ESTIMATE_FIELD_LABELS[f] ?? f;
 
 const db = supabase as any;
@@ -98,6 +98,7 @@ export function ProposalCard({ proposalId, dirtyFor, onSaveForm,invoiceSummary=f
       {f.replaces && <span className="block text-destructive">Zastąpi {f.replaces}.</span>}</li>)}</ul>
     <p>Źródło: {PROPOSAL_SOURCE_LABELS[p.source as keyof typeof PROPOSAL_SOURCE_LABELS] ?? p.source}{p.assumption ? ` — ${p.assumption}` : ''}</p>
     {(p.kind === 'estimate') && <p className="text-destructive">Wartość szacunkowa (średnia dobowa z sąsiednich rozliczeń) — przechowywana osobno od danych z faktur; nie potwierdza Pmax ani bezpiecznej mocy umownej.</p>}
+    {(p.kind === 'year_simulation') && <p className="text-destructive">Symulacja: średnia dobowa z zatwierdzonego okresu z założeniem braku zmian sezonowych — to nie jest prognoza. Szacunki przechowywane osobno od faktur; nie potwierdzają Pmax ani bezpiecznej mocy umownej. PO pozostaje bez zmian.</p>}
     {p.is_simulation && <p className="text-destructive">Zmiana mocy to symulacja — jej wystarczalność nie została potwierdzona.</p>}
     {p.status === 'pending' && <div className="space-y-0.5 border-t pt-2">
       <p>Okres: {String(preview.periodFrom ?? 'brak')} – {String(preview.periodTo ?? 'brak')} ({preview.periodMonths} mies.)</p>

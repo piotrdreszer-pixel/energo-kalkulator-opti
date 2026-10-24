@@ -1,0 +1,2 @@
+ALTER TABLE public.ai_proposals DROP CONSTRAINT ai_proposals_kind_check;
+ALTER TABLE public.ai_proposals ADD CONSTRAINT ai_proposals_kind_check CHECK (kind = ANY (ARRAY['po','period','estimate','estimate_replace','year_simulation','tariff_po','tariff_przed','field_przed','report_selection']));

@@ -127,6 +127,20 @@
       "when": 1792831412333,
       "tag": "0017_invoice_summary_commit_alias_fix",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792855227859,
+      "tag": "0018_year_simulation",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792855712469,
+      "tag": "0019_year_simulation_kind_check",
+      "breakpoints": true
     }
   ]
 }

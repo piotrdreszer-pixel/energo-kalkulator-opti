@@ -121,6 +121,7 @@ const KIND_FIELDS: Record<string, RegExp> = {
   period: /^period_(from|to)$/,
   estimate: /^(consumption_(before|after)_zone[123]_mwh|capacity_charge_before|reactive_energy_cost_before)$/,
   estimate_replace: /^(consumption_(before|after)_zone[123]_mwh|capacity_charge_before|reactive_energy_cost_before)$/,
+  year_simulation: /^(period_(from|to)|consumption_before_zone[123]_mwh|capacity_charge_before|reactive_energy_cost_before)$/,
   tariff_po: /^(tariff_code_after|zones_count_after|season_after|rate_card_id_after|rates_year_after|rates_source_after|rates_overridden_after|contracted_power_after_kw|handling_fee_after|capacity_charge_after|reactive_energy_cost_after|fixed_distribution_after_total|contracted_power_charge_rate_after|variable_distribution_after_zone[123]_rate|active_energy_price_after_zone[123]|consumption_after_zone[123]_mwh)$/,
   report_selection: /^include_in_project_report$/,
 };
@@ -135,9 +136,9 @@ export function validateAppChanges(kind: string, changes: { field: string; value
   for (const c of changes) {
     if (!re.test(c.field)) errs.push(`Pole „${c.field}” jest niedozwolone dla tej operacji.`);
     else if (LOOSE_KINDS.has(kind)) { if (kind === 'report_selection' && typeof c.value !== 'boolean') errs.push(`Nieprawidłowa wartość pola „${c.field}”.`); }
-    else if (kind === 'period' ? !(typeof c.value === 'string' && ISO.test(c.value)) : !(typeof c.value === 'number' && Number.isFinite(c.value) && c.value >= 0 && c.value < 1e9)) errs.push(`Nieprawidłowa wartość pola „${c.field}”.`);
+    else if (/^period_(from|to)$/.test(c.field) ? !(typeof c.value === 'string' && ISO.test(c.value)) : !(typeof c.value === 'number' && Number.isFinite(c.value) && c.value >= 0 && c.value < 1e9)) errs.push(`Nieprawidłowa wartość pola „${c.field}”.`);
   }
-  if (kind === 'period') {
+  if (kind === 'period' || kind === 'year_simulation') {
     const f = changes.find(c => c.field === 'period_from')?.value as string | undefined, t = changes.find(c => c.field === 'period_to')?.value as string | undefined;
     if (!f || !t || f > t) errs.push('Nieprawidłowy okres.');
   }

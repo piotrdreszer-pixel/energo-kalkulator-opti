@@ -11,6 +11,8 @@ import { planTariffPo, compareForRow } from './tariff-ops.ts';
 import { TARIFF_CODES } from '../_shared/tariff-utils.ts';
 import { readSettlement, applySettlement } from '../_shared/settlement-service.ts';
 import { settlementPlan,isSummaryCommand } from '../_shared/settlement-plan.ts';
+import { buildSettlement } from '../_shared/invoice-settlement.ts';
+import { planYearSimulation, METHOD_YEAR_LABEL } from '../_shared/year-simulation.ts';
 import { pickPpeFields, compactInvoiceRecord, compactSettlementPlan, trimHistory, HISTORY_MAX_TOTAL } from '../_shared/assistant-context-pack.ts';
 
 const MODEL = 'openai/gpt-6-astra';
@@ -64,6 +66,7 @@ Zasady:
 - AKCEPTACJA: zatwierdz_propozycje z proposal_id, gdy wiadomo której dotyczy. Gdy narzędzie zwróci kilka możliwych propozycji — zapytaj, o którą chodzi.
 - FAKTURY (sekcja faktury_okres_i_luki): „ustaw okres według faktur” → ustaw_okres_z_faktur (zmienia tylko okres, nie zużycie ani kwot; po zapisie wymień luki). „Uzupełnij zużycie luki średnią dobową…” → uzupelnij_luke zakres="zuzycie"; koszty (opłata mocowa, energia bierna) → zakres="koszty"; gdy faktura pokryła lukę → zastap_szacunki. Metodę podaje lub akceptuje użytkownik; jedyna dostępna to średnia dobowa z sąsiednich rozliczeń. Domyślnie szacuj WYŁĄCZNIE PRZED. Zgodne taryfy ani zużycie nie są zgodą na zmianę PO. Nie wyrównuj różnic. Polecenie zużycia NIE upoważnia do szacowania kosztów. Każdy koszt osobno: metoda, źródła, kwota i zgoda; średnia dobowa kosztu to tylko uproszczenie, nie rzeczywiste naliczenie.
 - Szacunek zużycia NIGDY nie potwierdza Pmax ani bezpiecznej mocy umownej — zawsze to zaznacz przy rozmowie o mocy.
+- SYMULACJA PEŁNEGO OKRESU („zrób symulację pełnego roku”, „przedłuż na cały 2025”, „rozszerz okres”) → symuluj_okres z docelowym zakresem dat. Gdy brakuje roku lub zakresu — zadaj JEDNO pytanie i poczekaj na potwierdzenie. Narzędzie nic nie zapisuje: przedstaw zwrócony podgląd (okres docelowy, zakres danych rzeczywistych, brakujące okresy, zużycie rzeczywiste/szacowane/łączne per strefa, koszty, pozycje nierozstrzygnięte, ostrzeżenia). Zapis wyłącznie po jednoznacznej akceptacji („Zastosuj tę symulację”) przez zatwierdz_propozycje. Metodę opisuj jako średnią dobową z zatwierdzonego okresu z założeniem braku zmian sezonowych — NIGDY jako prognozę ani odtworzenie rzeczywistego naliczenia. Symulacja zmienia wyłącznie okres i PRZED; PO zostaje nietknięte — różnicę zużycia PRZED/PO pokaż i zapytaj, czy warianty zachowują własne założenia, czy mają być wspólny profil. Koszty za okres (opłata mocowa, energia bierna) szacuj tylko po jawnej zgodzie na dany składnik (parametr koszt, jeden na raz).
 - Gdy wyniki_kalkulatora zawierają po_niepelne (składniki z kosztem w PRZED i pustym PO) — nie podawaj żadnej kwoty ani procentu oszczędności; napisz „Nie można wyznaczyć oszczędności — uzupełnij wariant PO” i zaproponuj uzupełnienie wariantu PO.
 - Pisz „Zmieniono …” WYŁĄCZNIE gdy narzędzie zwróciło ok z informacją o zapisie. Gdy zwróci propozycję — napisz, że czeka na zatwierdzenie. Gdy zwróci błędy — wyraźnie napisz, że operacja się nie udała i dlaczego. Nie podawaj własnych kwot podglądu — pokaże je karta.
 - Bez dostępu do funkcji Import faktur narzędzia okresu i szacunków są niedostępne — powiedz to i wskaż ręczną edycję.
@@ -207,12 +210,12 @@ Deno.serve(async (req) => {
   };
   // Operations whose values are computed by the app from approved invoices (never by the model).
   const appOp = async (kind: string, changes: { field: string; value: any }[], estimates: unknown, assumption: string, command: boolean, target?: Record<string, unknown>) => {
-    const feats = ['ai_assistant', ...(['period', 'estimate', 'estimate_replace'].includes(kind) ? ['invoice_import'] : []), ...(kind === 'report_selection' ? ['multi_ppe'] : [])];
+    const feats = ['ai_assistant', ...(['period', 'estimate', 'estimate_replace', 'year_simulation'].includes(kind) ? ['invoice_import'] : []), ...(kind === 'report_selection' ? ['multi_ppe'] : [])];
     const checks = await Promise.all(feats.map(_feature => userClient.rpc('has_feature_access', { _feature })));
     const { data: access } = await userClient.rpc('can_access_analysis_group', { _group_id: b.groupId });
     if (access !== true || checks.some(c => c.data !== true)) return { ok: false, errors: ['Odebrano dostęp do operacji. Nic nie zapisano.'] };
     if (proposalId) return { ok: false, errors: ['W jednej odpowiedzi można wykonać tylko jedną operację.'] };
-    const errs = ['period', 'estimate', 'estimate_replace', 'tariff_po', 'report_selection'].includes(kind) ? validateAppChanges(kind, changes) : [];
+    const errs = ['period', 'estimate', 'estimate_replace', 'year_simulation', 'tariff_po', 'report_selection'].includes(kind) ? validateAppChanges(kind, changes) : [];
     if (errs.length) return { ok: false, errors: errs };
     const conflict = draftConflict(changes.map(c => c.field));
     if (conflict.length) return { ok: false, errors: [`Konflikt: formularz ma niezapisaną zmianę tych samych pól (${conflict.join(', ')}). Zapisz lub odrzuć ją i powtórz polecenie.`] };
@@ -401,6 +404,21 @@ Deno.serve(async (req) => {
         return appOp('report_selection', [{ field: 'include_in_project_report', value: wlacz }], null, 'Wybór PPE do zestawienia', true, target);
       },
     }),
+    ...(inv === true && summarySnapshot ? {
+      symuluj_okres: tool({
+        description: 'Przygotowuje symulację rozszerzenia okresu analizy (np. na pełny rok) z zatwierdzonych faktur. Liczy aplikacja: średnia dobowa z zatwierdzonego okresu × brakujące dni, osobno per strefa, dla WSZYSTKICH brakujących części (luki wewnątrz i przedłużenie przed/po fakturach). Nic nie zapisuje — tworzy propozycję z podglądem; zapis dopiero po akceptacji użytkownika („Zastosuj tę symulację” → zatwierdz_propozycje). Zmienia wyłącznie okres i zużycie PRZED; PO nigdy. Parametr koszt: co najwyżej jeden składnik („mocowa” lub „bierna”) i tylko gdy użytkownik wyraźnie zgodził się na oszacowanie właśnie tego składnika.',
+        inputSchema: z.object({ od: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), do: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), koszt: z.enum(['mocowa', 'bierna']).nullable() }),
+        execute: async ({ od, do: doo, koszt }) => {
+          if (!/symul|rok|przedłu|przedlu|rozszerz|wydłu|wydlu|pełn|peln|cał|cal/i.test(b.message)) return { ok: false, errors: ['Brak jednoznacznego polecenia symulacji lub rozszerzenia okresu.'] };
+          if (koszt && !requestedEstimateScope(b.message, 'koszty', koszt)) return { ok: false, errors: ['Brak jednoznacznej zgody na szacunek tego kosztu — każdy koszt wymaga osobnej, jawnej zgody.'] };
+          const settlement = buildSettlement({ ppeNumber: String(current!.ppe_number || ''), analysisId: current!.id as string, docs: summarySnapshot.docs, records: summarySnapshot.records, items: summarySnapshot.items });
+          const plan = planYearSimulation(current!, settlement, (summarySnapshot.estimates ?? []) as never[], { from: od, to: doo }, koszt);
+          if (plan.errors.length) return { ok: false, errors: plan.errors, uwagi: plan.notes };
+          const r = await appOp('year_simulation', plan.changes, { create: plan.estimates }, `Symulacja okresu ${od} – ${doo}: ${METHOD_YEAR_LABEL}; założenie braku zmian sezonowych (nie prognoza). Szacunek nie potwierdza Pmax ani bezpiecznej mocy umownej.`, false);
+          return { ...r, podglad: plan.preview, nierozstrzygniete: plan.unresolved, ostrzezenia: plan.warnings, uwagi: plan.notes };
+        },
+      }),
+    } : {}),
     ...(inv === true ? {
       szczegoly_faktur: tool({
         description: 'Pobiera szczegóły (pozycje) zatwierdzonych faktur bieżącego PPE na żądanie — gdy pytanie dotyczy konkretnych pozycji, a zwarte podsumowanie nie wystarcza. Nic nie zapisuje.',
