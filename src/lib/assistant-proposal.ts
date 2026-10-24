@@ -39,7 +39,7 @@ export function buildProposalPreview(row: Record<string, unknown>, changes: Prop
     costBefore: next.totalCostBefore,
     currentAfter: cur.totalCostAfter, proposedAfter: next.totalCostAfter,
     extraBenefit: cur.totalCostAfter - next.totalCostAfter,
-    savingsAfterChange: next.savingsValue, savingsPercentAfterChange: next.totalCostBefore ? next.savingsPercent : null,
+    savingsAfterChange: next.savingsValue, savingsPercentAfterChange: next.savingsAvailable && Number.isFinite(next.savingsPercent) ? next.savingsPercent : null,
     issues, savingsAvailable: next.savingsAvailable,
   };
 }
