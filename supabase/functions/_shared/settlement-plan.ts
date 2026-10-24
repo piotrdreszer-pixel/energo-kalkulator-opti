@@ -20,9 +20,12 @@ export function intervalCovered(interval: Interval, ranges: Interval[]): boolean
   return next > end;
 }
 export function estimateCovered(s: Settlement, e: any): boolean {
-  const ranges = s.entries.filter(x => x.included && x.record.period_from && x.record.period_to &&
-    (e.field.startsWith('consumption_') ? x.consumptionCounted : x.stream !== 'sales'))
-    .map(x => ({ from: String(x.record.period_from), to: String(x.record.period_to) }));
+  const zone = /^consumption_before_zone([123])_mwh$/.exec(e.field);
+  const components = zone
+    ? s.zoneSummaries.find(z => z.zone === Number(zone[1]))?.components ?? []
+    : s.costs.find(c => c.kind === (e.field === 'capacity_charge_before' ? 'capacity' : 'reactive'))?.components ?? [];
+  const ranges = components.filter(c => c.value != null && c.period_from && c.period_to)
+    .map(c => ({ from: String(c.period_from), to: String(c.period_to) }));
   return intervalCovered({from:e.period_from,to:e.period_to},ranges);
 }
 /** Trusted source values only; no model/client totals. */
