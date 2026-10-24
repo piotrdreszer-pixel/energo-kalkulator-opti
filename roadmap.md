@@ -63,3 +63,10 @@
 - `planReplaceEstimates` obsługuje wiele szacunków miesięcznych na pole (pokryty zastępowany, reszta zostaje).
 - Testy: 217 automatycznych OK; przeglądarka: pełna rozmowa (dopytanie o rok → podgląd → zastosowanie → readback 12,0862 MWh, PRZED 6543,10 zł, PO bez zmian), cofnięcie kartą (powrót do 5 MWh/31.05, szacunki undone). Projekt testowy usunięty.
 - Ograniczenie znane: doszacowanie kosztu PO zastosowaniu symulacji wymaga ponownej symulacji (nie doszacowuje w miejscu).
+
+## Zmiany mocy umownej w symulacji — ZROBIONE 2026-10-24
+- Historia mocy (różne moce w nienakładających się okresach) nie blokuje szacunku zużycia; blokują tylko sprzeczne moce w nakładających się okresach (invoice-settlement).
+- Symulacja pyta o moc dla brakujących miesięcy (propozycja: ostatnia znana), po akceptacji kontynuuje tę samą propozycję; moc zapisywana jako jawny wariant uproszczony z notką, bez uśredniania i bez cofania historii z faktur.
+- Migracja 0020: contracted_power_before_kw dozwolone w kind year_simulation; narzędzie symuluj_okres z parametrem moc_zalozona i kontrolą jawnej odpowiedzi.
+- Poprawka karty propozycji: przy niepełnym PO brak „NaN%” — komunikat „Nie można wyznaczyć oszczędności — uzupełnij wariant PO”.
+- Testy: 224 automatyczne OK; przeglądarka: historia 1100→1050 kW bez blokady zużycia, pytanie o moc, akceptacja 1050 kW, zapis (okres do 31.12.2025, 12,0862 MWh, moc 1050 kW), cofnięcie kartą (powrót 5 MWh/1100 kW/31.05). Projekt testowy usunięty.
