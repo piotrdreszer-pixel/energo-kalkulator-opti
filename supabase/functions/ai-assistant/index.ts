@@ -10,7 +10,7 @@ import { z } from 'npm:zod@3';
 import { planTariffPo, compareForRow } from './tariff-ops.ts';
 import { TARIFF_CODES } from '../_shared/tariff-utils.ts';
 import { readSettlement, applySettlement } from '../_shared/settlement-service.ts';
-import { settlementPlan } from '../_shared/settlement-plan.ts';
+import { settlementPlan,isSummaryCommand } from '../_shared/settlement-plan.ts';
 
 const MODEL = 'openai/gpt-6-astra';
 const MAX_MESSAGE = 2000;
@@ -275,7 +275,7 @@ Deno.serve(async (req) => {
       execute:async()=>{
         if(!inv || !summarySnapshot)return {ok:false,errors:['Brak dostępu do Importu faktur.']};
         if(summaryAnswer||proposalId)return {ok:false,errors:['W jednej odpowiedzi można wykonać tylko jedną operację.']};
-        if(!isCommand(b.message)||!/podsumowan|zestawieni/i.test(b.message)||!/PRZED/i.test(b.message))return {ok:false,errors:['Brak jednoznacznego polecenia zastosowania podsumowania do PRZED.']};
+        if(!isSummaryCommand(b.message))return {ok:false,errors:['Brak jednoznacznego polecenia zastosowania podsumowania do PRZED.']};
         const out=await applySettlement(admin,userId,current.id as string,b.summaryToken ?? summarySnapshot.token,crypto.randomUUID(),[],b.message);
         summaryAnswer=out.message || 'Nie zastosowano podsumowania.';
         if(out.conflicts?.length)summaryAnswer+=' '+out.conflicts.map((c:any)=>`${c.label}: ręcznie ${c.current}, z podsumowania ${c.incoming}`).join('; ')+'. Wybierz konkretne korekty w podsumowaniu; nie nadpisuję ich automatycznie.';

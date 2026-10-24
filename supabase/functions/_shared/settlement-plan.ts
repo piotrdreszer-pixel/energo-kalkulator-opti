@@ -8,6 +8,7 @@ export interface SettlementSnapshot {
   items: any[];
   estimates: any[];
 }
+export const isSummaryCommand=(message:string)=> /(^|\s)zastosuj\s+(to\s+)?(podsumowanie|zestawienie)\s+do\s+PRZED(?:\s|[.!]|$)/i.test(message) && !/\?|\bnie\s+zastosuj/i.test(message);
 export function intervalCovered(interval: Interval, ranges: Interval[]): boolean {
   let next = Date.parse(interval.from + 'T00:00:00Z');
   const end = Date.parse(interval.to + 'T00:00:00Z');

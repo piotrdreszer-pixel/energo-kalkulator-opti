@@ -1,10 +1,11 @@
 import { describe,it,expect } from 'vitest';
-import { settlementPlan,intervalCovered,type SettlementSnapshot } from '../../supabase/functions/_shared/settlement-plan';
+import { settlementPlan,intervalCovered,isSummaryCommand,type SettlementSnapshot } from '../../supabase/functions/_shared/settlement-plan';
 const fixture=():SettlementSnapshot=>({token:'t',row:{id:'a',ppe_number:'PL1',value_sources:{},consumption_before_zone1_mwh:0,capacity_charge_before:0},
  docs:[{id:'d',file_name:'lipiec.pdf',status:'approved',doc_type:'kompleksowa',document_number:'1',issuer:'X'}],
  records:[{id:'r',document_id:'d',ppe_number:'PL1',matched_analysis_id:'a',tariff_code:'C11',period_from:'2026-07-01',period_to:'2026-07-31',consumption:[{zone_name:'całodobowa',value:3100,unit:'kWh'}],review_state:{lineSelected:['i']}}],
  items:[{id:'i',document_id:'d',ppe_record_id:'r',name:'Opłata mocowa',net_value:310,category:'mocowa'}],estimates:[]});
 describe('server settlement application',()=>{
+ it('literal acceptance applies summary, question and prohibition do not',()=>{expect(isSummaryCommand('Zastosuj to podsumowanie do PRZED')).toBe(true);expect(isSummaryCommand('Czy zastosuj to podsumowanie do PRZED?')).toBe(false);expect(isSummaryCommand('Nie zastosuj to podsumowanie do PRZED')).toBe(false);});
  it('applies 3.1 MWh and 310 zł to PRZED only',()=>{const p=settlementPlan(fixture());expect(p.changes).toEqual([{field:'consumption_before_zone1_mwh',value:3.1},{field:'capacity_charge_before',value:310}]);});
  it('unapproved document does not contribute',()=>{const s=fixture();s.docs[0].status='needs_review';expect(settlementPlan(s).changes).toEqual([]);});
  it('unselected cost does not contribute',()=>{const s=fixture();s.records[0].review_state.lineSelected=[];expect(settlementPlan(s).changes.some(c=>c.field==='capacity_charge_before')).toBe(false);});
