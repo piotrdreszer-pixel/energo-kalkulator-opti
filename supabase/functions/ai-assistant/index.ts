@@ -11,6 +11,7 @@ import { planTariffPo, compareForRow } from './tariff-ops.ts';
 import { TARIFF_CODES } from '../_shared/tariff-utils.ts';
 import { readSettlement, applySettlement } from '../_shared/settlement-service.ts';
 import { settlementPlan,isSummaryCommand } from '../_shared/settlement-plan.ts';
+import { pickPpeFields, compactInvoiceRecord, compactSettlementPlan, trimHistory, HISTORY_MAX_TOTAL } from '../_shared/assistant-context-pack.ts';
 
 const MODEL = 'openai/gpt-6-astra';
 const MAX_MESSAGE = 2000;
@@ -120,8 +121,8 @@ Deno.serve(async (req) => {
   let invoices: unknown = 'brak dostępu do funkcji Import faktur';
   if (inv === true) {
     const ids = saved.map(p => p.id as string);
-    const { data: recs } = await userClient.from('document_ppe_records').select('matched_analysis_id,ppe_number,tariff_code,period_from,period_to,contracted_power_kw,max_power_kw,consumption,applied_at,analysis_documents(doc_type,issuer,document_number)').in('matched_analysis_id', ids).not('applied_at', 'is', null).limit(40);
-    invoices = recs ?? [];
+    const { data: recs } = await userClient.from('document_ppe_records').select('matched_analysis_id,ppe_number,tariff_code,period_from,period_to,contracted_power_kw,max_power_kw,consumption,reactive,other_charges,applied_at,analysis_documents(doc_type,issuer,document_number)').in('matched_analysis_id', ids).not('applied_at', 'is', null).limit(40);
+    invoices = (recs ?? []).map(r => compactInvoiceRecord(r as unknown as Record<string, unknown>));
   }
   const { data: osd } = await userClient.from('osd_operators').select('id,name');
 
