@@ -41,7 +41,7 @@ export function settlementPlan(snapshot: SettlementSnapshot, replaceManual: stri
     for(const e of active.filter(e => estimateCovered(settlement,e))) replaced.push(e.id);
     return {...p,invoiceValue:p.value,estimated:retained.length ? estimated : null,value,current:row[p.field],manual};
   });
-  const changes = rows.filter(p => !matchesStored(p.field,p.value,row[p.field])).map(p => ({field:p.field,value:p.value}));
+  const changes = rows.filter(p => !matchesStored(p.field,p.value,row[p.field]) || estimates.some(e=>e.field===p.field && replaced.includes(e.id))).map(p => ({field:p.field,value:p.value}));
   const sources = Object.fromEntries(rows.map(p => [p.field,{source:'document',item_ref:'settlement',
     document_ids:settlement.entries.filter(e=>e.included).map(e=>e.doc.id),estimate_ids:estimates.filter(e=>e.field===p.field && !replaced.includes(e.id)).map(e=>e.id)}]));
   return {settlement,rows,conflicts,changes,sources,replaced};
