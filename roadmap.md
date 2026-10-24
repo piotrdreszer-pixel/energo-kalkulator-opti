@@ -4,10 +4,11 @@
 - [x] Auto-otwarcie po odczycie paczki, lista PPE / szczegóły, statusy dokumentów, nieodczytane jawnie.
 - [x] Komunikat o lukach (miesiące), przycisk asystenta, „Okres uzupełniony szacunkiem”, z faktur / szacunek / łącznie.
 - [x] „Zastosuj do PRZED” (porównanie, ochrona ręcznych, nadpisanie bez sumowania), „Przejdź do analizy”, wejście z formularza PPE.
-- [ ] Zastosowanie podsumowania do PRZED przez asystenta tym samym mechanizmem (wymaga przeniesienia zapisu do funkcji bazy).
-- [ ] Test w przeglądarce pełnej listy scenariuszy z punktu 6.
-- [ ] Wspólny atomowy zapis serwerowy: aktualność podglądu, tylko zatwierdzone źródła, konkretne konflikty ręczne, historia i cofnięcie; PO bez zmian.
-- [ ] Test zalogowanych widoków podsumowania, importu i formularza; rzeczywiste daty i oddzielne pokrycie sprzedaży/dystrybucji; sprzątnięcie wyłącznie nowych danych testowych.
+- [x] Zastosowanie podsumowania do PRZED przez asystenta tym samym mechanizmem serwerowym.
+- [x] Przeglądarka: paczka dwóch obrazów faktur z rzeczywistym odczytem, automatyczne podsumowanie, jawne zatwierdzenie, trzy PPE, identyczny zapis przyciskiem/czatem, ponowienie, ręczne konflikty, nieaktualny podgląd, duplikat, korekta, błąd odczytu, szacunek i zastąpienie, cofnięcie i ponowne otwarcie.
+- [ ] Test wyłączonych uprawnień: zablokowany brakiem wskazanego konta z wyłączonymi funkcjami i zakazem zmiany uprawnień. Sprawdzono odmowę 401 bez logowania; nie udaje ona testu wyłączonej flagi.
+- [x] Wspólny atomowy zapis serwerowy: aktualność podglądu, tylko zatwierdzone źródła, konkretne konflikty ręczne, historia i cofnięcie; PO bez zmian.
+- [x] Zalogowane widoki podsumowania, importu i formularza bez błędów aplikacji; rzeczywiste daty i oddzielne pokrycie sprzedaży/dystrybucji w silniku; projekt testowy i jego pliki usunięte.
 
 ## Asystent: zmiana pól i porównanie taryf
 - [x] Reguły: taryfa+moc razem, dostępność dla OSD, warunki zmiany grupy, strefy wg znaczenia, brak stawki ≠ 0, najtańszy/remis (testy).
