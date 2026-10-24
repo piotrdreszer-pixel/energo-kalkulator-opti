@@ -352,7 +352,7 @@ export default function AnalysisGroupDetail() {
         )}
       </div>
       {access.aiAssistant && (ppes?.length ?? 0) > 0 && <AssistantPanel groupId={groupId!} clientName={project.client_name} groupName={group.name}
-        ppes={(ppes || []).map(a => ({ id: a.id, name: a.name, ppe_number: a.ppe_number }))} currentPpeId={null} allowAll={access.multiPpe} step="Lista PPE" />}
+        ppes={(ppes || []).map(a => ({ id: a.id, name: a.name, ppe_number: a.ppe_number }))} currentPpeId={null} allowAll={access.multiPpe} invoiceImport={access.canImport} step="Lista PPE" />}
     </AppLayout>
   );
 }
