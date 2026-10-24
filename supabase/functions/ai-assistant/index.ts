@@ -11,6 +11,8 @@ import { planTariffPo, compareForRow } from './tariff-ops.ts';
 import { TARIFF_CODES } from '../_shared/tariff-utils.ts';
 import { readSettlement, applySettlement } from '../_shared/settlement-service.ts';
 import { settlementPlan,isSummaryCommand } from '../_shared/settlement-plan.ts';
+import { buildSettlement } from '../_shared/invoice-settlement.ts';
+import { planYearSimulation, METHOD_YEAR_LABEL } from '../_shared/year-simulation.ts';
 import { pickPpeFields, compactInvoiceRecord, compactSettlementPlan, trimHistory, HISTORY_MAX_TOTAL } from '../_shared/assistant-context-pack.ts';
 
 const MODEL = 'openai/gpt-6-astra';
@@ -207,12 +209,12 @@ Deno.serve(async (req) => {
   };
   // Operations whose values are computed by the app from approved invoices (never by the model).
   const appOp = async (kind: string, changes: { field: string; value: any }[], estimates: unknown, assumption: string, command: boolean, target?: Record<string, unknown>) => {
-    const feats = ['ai_assistant', ...(['period', 'estimate', 'estimate_replace'].includes(kind) ? ['invoice_import'] : []), ...(kind === 'report_selection' ? ['multi_ppe'] : [])];
+    const feats = ['ai_assistant', ...(['period', 'estimate', 'estimate_replace', 'year_simulation'].includes(kind) ? ['invoice_import'] : []), ...(kind === 'report_selection' ? ['multi_ppe'] : [])];
     const checks = await Promise.all(feats.map(_feature => userClient.rpc('has_feature_access', { _feature })));
     const { data: access } = await userClient.rpc('can_access_analysis_group', { _group_id: b.groupId });
     if (access !== true || checks.some(c => c.data !== true)) return { ok: false, errors: ['Odebrano dostęp do operacji. Nic nie zapisano.'] };
     if (proposalId) return { ok: false, errors: ['W jednej odpowiedzi można wykonać tylko jedną operację.'] };
-    const errs = ['period', 'estimate', 'estimate_replace', 'tariff_po', 'report_selection'].includes(kind) ? validateAppChanges(kind, changes) : [];
+    const errs = ['period', 'estimate', 'estimate_replace', 'year_simulation', 'tariff_po', 'report_selection'].includes(kind) ? validateAppChanges(kind, changes) : [];
     if (errs.length) return { ok: false, errors: errs };
     const conflict = draftConflict(changes.map(c => c.field));
     if (conflict.length) return { ok: false, errors: [`Konflikt: formularz ma niezapisaną zmianę tych samych pól (${conflict.join(', ')}). Zapisz lub odrzuć ją i powtórz polecenie.`] };
