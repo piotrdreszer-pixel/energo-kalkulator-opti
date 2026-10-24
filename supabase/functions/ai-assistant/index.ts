@@ -406,16 +406,21 @@ Deno.serve(async (req) => {
     }),
     ...(inv === true && summarySnapshot ? {
       symuluj_okres: tool({
-        description: 'Przygotowuje symulację rozszerzenia okresu analizy (np. na pełny rok) z zatwierdzonych faktur. Liczy aplikacja: średnia dobowa z zatwierdzonego okresu × brakujące dni, osobno per strefa, dla WSZYSTKICH brakujących części (luki wewnątrz i przedłużenie przed/po fakturach). Nic nie zapisuje — tworzy propozycję z podglądem; zapis dopiero po akceptacji użytkownika („Zastosuj tę symulację” → zatwierdz_propozycje). Zmienia wyłącznie okres i zużycie PRZED; PO nigdy. Parametr koszt: co najwyżej jeden składnik („mocowa” lub „bierna”) i tylko gdy użytkownik wyraźnie zgodził się na oszacowanie właśnie tego składnika.',
-        inputSchema: z.object({ od: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), do: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), koszt: z.enum(['mocowa', 'bierna']).nullable() }),
-        execute: async ({ od, do: doo, koszt }) => {
-          if (!/symul|rok|przedłu|przedlu|rozszerz|wydłu|wydlu|pełn|peln|cał|cal/i.test(b.message)) return { ok: false, errors: ['Brak jednoznacznego polecenia symulacji lub rozszerzenia okresu.'] };
+        description: 'Przygotowuje symulację rozszerzenia okresu analizy (np. na pełny rok) z zatwierdzonych faktur. Liczy aplikacja: średnia dobowa z zatwierdzonego okresu × brakujące dni, osobno per strefa, dla WSZYSTKICH brakujących części (luki wewnątrz i przedłużenie przed/po fakturach). Nic nie zapisuje — tworzy propozycję z podglądem; zapis dopiero po akceptacji użytkownika („Zastosuj tę symulację” → zatwierdz_propozycje). Zmienia wyłącznie okres i zużycie PRZED; PO nigdy. Parametr koszt: co najwyżej jeden składnik („mocowa” lub „bierna”) i tylko gdy użytkownik wyraźnie zgodził się na oszacowanie właśnie tego składnika. Gdy wynik zawiera pytanie_moc, zadaj je użytkownikowi dosłownie i POCZEKAJ na odpowiedź; po odpowiedzi wywołaj symuluj_okres ponownie z moc_zalozona (ostatnia znana moc przy akceptacji albo wartość podana przez użytkownika) — to kontynuacja tej samej symulacji. moc_zalozona przekazuj WYŁĄCZNIE po jawnej odpowiedzi użytkownika na pytanie o moc.',
+        inputSchema: z.object({ od: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), do: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), koszt: z.enum(['mocowa', 'bierna']).nullable(), moc_zalozona: z.number().positive().nullable() }),
+        execute: async ({ od, do: doo, koszt, moc_zalozona }) => {
+          if (!/symul|rok|przedłu|przedlu|rozszerz|wydłu|wydlu|pełn|peln|cał|cal|moc/i.test(b.message)) return { ok: false, errors: ['Brak jednoznacznego polecenia symulacji lub rozszerzenia okresu.'] };
           if (koszt && !requestedEstimateScope(b.message, 'koszty', koszt)) return { ok: false, errors: ['Brak jednoznacznej zgody na szacunek tego kosztu — każdy koszt wymaga osobnej, jawnej zgody.'] };
+          if (moc_zalozona != null) {
+            const num = new RegExp(String(moc_zalozona).replace('.', '[.,]')).test(b.message);
+            const accept = /^(tak|zgoda|zgadza|przyjm|akcept|poproszę|poprosze)\b/i.test(b.message.trim());
+            if (!num && !accept) return { ok: false, errors: ['Brak jawnej odpowiedzi użytkownika na pytanie o moc — najpierw zadaj pytanie o moc dla brakujących miesięcy i poczekaj na odpowiedź.'] };
+          }
           const settlement = buildSettlement({ ppeNumber: String(current!.ppe_number || ''), analysisId: current!.id as string, docs: summarySnapshot.docs, records: summarySnapshot.records, items: summarySnapshot.items });
-          const plan = planYearSimulation(current!, settlement, (summarySnapshot.estimates ?? []) as never[], { from: od, to: doo }, koszt);
+          const plan = planYearSimulation(current!, settlement, (summarySnapshot.estimates ?? []) as never[], { from: od, to: doo }, koszt, moc_zalozona);
           if (plan.errors.length) return { ok: false, errors: plan.errors, uwagi: plan.notes };
           const r = await appOp('year_simulation', plan.changes, { create: plan.estimates }, `Symulacja okresu ${od} – ${doo}: ${METHOD_YEAR_LABEL}; założenie braku zmian sezonowych (nie prognoza). Szacunek nie potwierdza Pmax ani bezpiecznej mocy umownej.`, false);
-          return { ...r, podglad: plan.preview, nierozstrzygniete: plan.unresolved, ostrzezenia: plan.warnings, uwagi: plan.notes };
+          return { ...r, podglad: plan.preview, moc: plan.power, pytanie_moc: plan.power?.pytanie ?? null, nierozstrzygniete: plan.unresolved, ostrzezenia: plan.warnings, uwagi: plan.notes };
         },
       }),
     } : {}),
