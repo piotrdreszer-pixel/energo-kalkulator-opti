@@ -133,7 +133,8 @@ export function AssistantPanel(p: AssistantPanelProps) {
         .map(k => qc.invalidateQueries({ queryKey: [k] })));
       setPending([]);
     } catch (e) {
-      setLastFailed(message);
+      // Nie ponawiaj automatycznie żądań odrzuconych jako zbyt duże — serwer i tak zbuduje identyczny kontekst.
+      if (!/Kontekst/.test((e as Error).message)) setLastFailed(message); else setLastFailed(null);
       setPending(prev => prev.map(m => m.id === aId ? { ...m, content: (e as Error).message, error: true } : m));
     } finally { setBusy(false); }
   };
