@@ -1,0 +1,1 @@
+export const normalizePpe = (v: string | null | undefined) => (v || '').replace(/\s+/g, '').toUpperCase();
