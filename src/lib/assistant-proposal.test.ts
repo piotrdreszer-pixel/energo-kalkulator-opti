@@ -65,3 +65,14 @@ describe('assistant proposals – gaps', () => {
     expect(p.issues.some(i => i.includes('stawki opłaty za moc'))).toBe(true);
   });
 });
+
+describe('podgląd przy niepełnym PO', () => {
+  it('procent oszczędności jest pusty (null), nigdy NaN', () => {
+    const p = buildProposalPreview(
+      { period_from: '2025-01-01', period_to: '2025-05-31', consumption_before_zone1_mwh: 5, active_energy_price_before_zone1: 500, capacity_charge_before: 500, consumption_after_zone1_mwh: 4, active_energy_price_after_zone1: 450 },
+      [{ field: 'consumption_before_zone1_mwh', value: 12.0862 }],
+    );
+    expect(p.savingsAvailable).toBe(false);
+    expect(p.savingsPercentAfterChange).toBeNull();
+  });
+});
