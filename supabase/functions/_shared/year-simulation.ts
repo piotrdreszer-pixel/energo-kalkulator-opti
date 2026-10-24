@@ -91,6 +91,7 @@ export function planYearSimulation(
   if (!entries.length) { p.errors.push('Brak zatwierdzonych rozliczeń z okresem — nie ma podstawy do symulacji.'); return p; }
   const covered = entries.map(e => ({ from: e.record.period_from!, to: e.record.period_to! }));
   const missing = missingWithin(target, covered);
+  const missingMonths = missing.flatMap(splitMonths);
   if (!missing.length) { p.errors.push('Docelowy okres jest już w pełni pokryty zatwierdzonymi fakturami.'); return p; }
   const realFrom = covered.map(i => i.from).sort()[0];
   const realTo = covered.map(i => i.to).sort().slice(-1)[0];
@@ -122,7 +123,7 @@ export function planYearSimulation(
     }
     const avg = zs.mwh / days;
     let estTotal = 0; let base = expected;
-    for (const m of missing) {
+    for (const m of missingMonths) {
       const est = Math.round(avg * daysOf(m) * 10000) / 10000;
       estTotal += est;
       p.estimates.push({ field, period_from: m.from, period_to: m.to, value: est, base_value: toStored(field, base), unit: 'MWh', method: METHOD_YEAR, basis });
@@ -164,7 +165,7 @@ export function planYearSimulation(
           const avg = c.total / days;
           const basis: SimEstimate['basis'] = [...byRec.entries()].map(([recordId, x]) => ({ record_id: recordId, document: x.doc, period_from: x.from, period_to: x.to, days: x.days, value: Math.round(x.value * 100) / 100 }));
           let estTotal = 0; let base = expected;
-          for (const m of missing) {
+          for (const m of missingMonths) {
             const est = Math.round(avg * daysOf(m) * 100) / 100;
             estTotal += est;
             p.estimates.push({ field: cf.field, period_from: m.from, period_to: m.to, value: est, base_value: toStored(cf.field, base), unit: 'zł', method: METHOD_YEAR, basis });
