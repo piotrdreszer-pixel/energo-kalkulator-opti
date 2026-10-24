@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import { loadGroupInvoices, useActiveEstimates } from '@/hooks/useInvoiceFacts';
 import { gapMessage, itemStatus } from '@/lib/invoice-summary';
 import { summarizeDocs } from '@/lib/invoice-upload';
 import { openAssistant } from '@/components/assistant/AssistantPanel';
+import { ProposalCard } from '@/components/assistant/ProposalCard';
 
 const fmt = (v: number | null | undefined, d = 3) =>
   v == null ? 'brak danych' : v.toLocaleString('pl-PL', { minimumFractionDigits: 0, maximumFractionDigits: d });
@@ -201,18 +202,37 @@ function PpeSettlement({ analysis, s, onOpenReview, onApplied, onGoToAnalysis, o
   onGoToAnalysis: () => void; onAssistant: () => void;
 }) {
   const { toast } = useToast();
+  const qc = useQueryClient();
   const access = useGroupFeatureAccess(analysis.analysis_group_id);
   const estimates = useActiveEstimates(analysis.id);
   const [busy, setBusy] = useState(false);
   const [confirmPeriod, setConfirmPeriod] = useState(false);
   const [showApply, setShowApply] = useState(false);
   const [overrideManual, setOverrideManual] = useState<Set<string>>(new Set());
+  const [requestId, setRequestId] = useState(() => crypto.randomUUID());
+  const preview = useQuery({
+    queryKey: ['invoice-summary-preview', analysis.id, analysis.updated_at],
+    enabled: access.canImport,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('invoice-summary', { body: { action: 'preview', analysisId: analysis.id } });
+      if (error || data?.error) throw new Error(data?.error || 'Nie udało się odczytać podsumowania.');
+      return data;
+    },
+  });
+  const history = useQuery({
+    queryKey: ['invoice-summary-history', analysis.id],
+    queryFn: async () => {
+      const {data,error}=await supabase.from('invoice_summary_changes').select('id,created_at,undone_at').eq('analysis_id',analysis.id).order('created_at',{ascending:false}).limit(10);
+      if(error)throw error;
+      return data;
+    }, enabled: access.canImport,
+  });
   const proposals = settlementProposals(s);
   const sources = (analysis.value_sources || {}) as ValueSources;
   const a = analysis as unknown as Record<string, unknown>;
   const estBy = (field: string) => (estimates.data || []).filter((e) => e.field === field);
   // Szacunek jest osobną częścią wartości przyjętej do analizy: łącznie = z faktur + szacunek (nie nadpisujemy go wartością z samych faktur).
-  const rows = proposals.map((p) => {
+  const fallbackRows = proposals.map((p) => {
     const est = estBy(p.field);
     const estimated = /_mwh$/.test(p.field) || /^(capacity_charge|reactive_energy_cost)_before$/.test(p.field) ? est.reduce((x, e) => x + Number(e.value), 0) : 0;
     const total = est.length && estimated ? p.value + estimated : p.value;
@@ -221,6 +241,7 @@ function PpeSettlement({ analysis, s, onOpenReview, onApplied, onGoToAnalysis, o
     const status = itemStatus({ hasInvoiceValue: true, estimated: est.length > 0, conflict: manual });
     return { ...p, invoiceValue: p.value, estimated: est.length ? estimated : null, value: total, current: cur, manual, status };
   });
+  const rows: typeof fallbackRows = preview.data?.rows?.map((r: typeof fallbackRows[number]) => ({...r,status:itemStatus({hasInvoiceValue:true,estimated:r.estimated!=null,conflict:r.manual})})) ?? fallbackRows;
   const gapText = gapMessage(s.proposedPeriod, s.gaps);
   const hasEstimates = (estimates.data || []).length > 0;
   const osd = Array.from(new Set(s.entries.map((e) => e.record.osd_name).filter(Boolean)));
@@ -244,34 +265,22 @@ function PpeSettlement({ analysis, s, onOpenReview, onApplied, onGoToAnalysis, o
   };
 
   const applyBefore = async () => {
-    if (!access.canImport) return;
-    try { await requireFeature('invoice_import', analysis.analysis_group_id); }
-    catch { toast({ variant: 'destructive', title: 'Brak dostępu do zastosowania faktur' }); return; }
-    const write: Record<string, unknown> = {};
-    const nextSources: ValueSources = { ...sources };
-    for (const r of rows) {
-      if (r.manual && !overrideManual.has(r.field)) continue;
-      write[r.field] = r.value;
-      nextSources[r.field] = { source: 'document', item_ref: 'settlement' };
-    }
-    if (!Object.keys(write).length) { toast({ title: 'Brak zmian do zapisania' }); return; }
+    if (!access.canImport || !preview.data?.token || busy) return;
     setBusy(true);
-    const { error } = await supabase.from('energy_analyses').update({ ...write, value_sources: nextSources } as never).eq('id', analysis.id);
-    if (error) { setBusy(false); toast({ variant: 'destructive', title: 'Błąd', description: 'Nie udało się zapisać wartości.' }); return; }
-    const { data: back } = await supabase.from('energy_analyses').select(Object.keys(write).join(',')).eq('id', analysis.id).maybeSingle();
-    setBusy(false);
-    const rb = (back as unknown as Record<string, unknown> | null) ?? {};
-    const bad = Object.entries(write).filter(([f, v]) => !matchesStored(f, v as number | null, rb[f]));
-    const label = (f: string) => rows.find((r) => r.field === f)?.label ?? f;
-    const unit = (f: string) => (/_mwh$/.test(f) ? ' MWh' : '');
-    if (bad.length) toast({
-      variant: 'destructive', title: 'Odczyt kontrolny niezgodny',
-      description: bad.map(([f, v]) => `${label(f)}: próbowano zapisać ${fmt(v as number, 6)}${unit(f)}, odczytano ${rb[f] == null ? 'brak' : fmt(Number(rb[f]), 6)}${unit(f)}`).join('; ')
-        + '. Zapis został wykonany — sprawdź wartości w formularzu. Ponowne zastosowanie nadpisze je (nie doda).',
-    });
-    else toast({ title: 'Zastosowano zestawienie do PRZED', description: `Zapisano ${Object.keys(write).length} pól (zużycie z dokładnością 0,0001 MWh, kwoty 0,01 zł). Wariant PO bez zmian.` });
-    setShowApply(false);
-    onApplied();
+    try {
+      await requireFeature('invoice_import',analysis.analysis_group_id);
+      const {data,error}=await supabase.functions.invoke('invoice-summary',{body:{action:'apply',analysisId:analysis.id,token:preview.data.token,requestId,replaceManual:[...overrideManual]}});
+      if(error||data?.error)throw new Error(data?.error || 'Nie udało się zastosować podsumowania.');
+      if(!['applied','already_applied','unchanged'].includes(data.status)) {
+        toast({variant:'destructive',title:'Nie zastosowano podsumowania',description:data.message});
+        if(data.status==='stale') {await preview.refetch();setOverrideManual(new Set());setRequestId(crypto.randomUUID());}
+        return;
+      }
+      await Promise.all(['analysis','group-ppe','analyses','invoice-facts','analysis-estimates','invoice-summary-preview','invoice-summary-history','group-settlement'].map(k=>qc.invalidateQueries({queryKey:[k]})));
+      toast({title:'Zastosowano zestawienie do PRZED',description:'Zapis potwierdzony odczytem. Wariant PO bez zmian.'});
+      setRequestId(crypto.randomUUID());setShowApply(false);setOverrideManual(new Set());onApplied();
+    }catch(e){toast({variant:'destructive',title:'Błąd',description:e instanceof Error?e.message:undefined});}
+    finally{setBusy(false);}
   };
 
   const periodDiffers = s.proposedPeriod && (analysis.period_from !== s.proposedPeriod.from || analysis.period_to !== s.proposedPeriod.to);
@@ -390,9 +399,12 @@ function PpeSettlement({ analysis, s, onOpenReview, onApplied, onGoToAnalysis, o
 
       <section className="rounded-md border p-3 space-y-2">
         <div className="flex flex-wrap gap-2">
-          {access.canImport && !showApply && <Button onClick={() => setShowApply(true)} disabled={!rows.length}>Zastosuj do PRZED</Button>}
+          {access.canImport && !showApply && <Button onClick={() => setShowApply(true)} disabled={!rows.length || preview.isPending || !!preview.error}>Zastosuj do PRZED</Button>}
+          {access.canImport && access.aiAssistant && preview.data?.token && <Button variant="outline" onClick={() => {onAssistant();openAssistant('Zastosuj to podsumowanie do PRZED',{ppeId:analysis.id,token:preview.data.token});}}><Sparkles className="mr-1 h-4 w-4" />Zastosuj przez asystenta</Button>}
           <Button variant="outline" onClick={onGoToAnalysis}>Przejdź do analizy</Button>
         </div>
+        {preview.error && <p className="text-destructive">Nie udało się potwierdzić aktualnego podsumowania. <Button variant="link" onClick={()=>preview.refetch()}>Ponów</Button></p>}
+        {(history.data?.length ?? 0)>0 && <details><summary>Historia zastosowania podsumowania</summary>{history.data?.map(ch=><ProposalCard key={ch.id} proposalId={ch.id} invoiceSummary />)}</details>}
         {access.canImport && showApply && (
           <div className="space-y-2">
             <p className="font-medium">Porównanie przed zapisem (tylko PRZED; PO bez zmian)</p>
