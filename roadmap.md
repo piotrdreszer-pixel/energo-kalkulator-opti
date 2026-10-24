@@ -56,3 +56,10 @@
 - [x] Zbiorcze rozliczanie wielu faktur na PPE („Rozliczenia z faktur”).
 - [x] Auto-wybór roku stawek (PRZED i PO) na podstawie okresu analizy; gdy okres nachodzi na dwa lata (np. 2025/2026) — wybór roku pozostaje ręczny.
 - [x] Import faktur: ponowna edycja zatwierdzonego importu, dopasowanie taryfy, zużycie wielostrefowe.
+
+## Symulacja pełnego roku (asystent AI) — ZROBIONE 2026-10-24
+- `supabase/functions/_shared/year-simulation.ts`: planYearSimulation — średnia dobowa z zatwierdzonego okresu × brakujące dni, per strefa, luki wewnętrzne + przedłużenia, szacunki miesięczne (faktura zastępuje swój miesiąc), 1 koszt na jawną zgodę, PO nigdy nietknięte.
+- Narzędzie `symuluj_okres` w ai-assistant (podgląd + propozycja, zapis po akceptacji); migracje 0018 (RPC/guard) i 0019 (kind check).
+- `planReplaceEstimates` obsługuje wiele szacunków miesięcznych na pole (pokryty zastępowany, reszta zostaje).
+- Testy: 217 automatycznych OK; przeglądarka: pełna rozmowa (dopytanie o rok → podgląd → zastosowanie → readback 12,0862 MWh, PRZED 6543,10 zł, PO bez zmian), cofnięcie kartą (powrót do 5 MWh/31.05, szacunki undone). Projekt testowy usunięty.
+- Ograniczenie znane: doszacowanie kosztu PO zastosowaniu symulacji wymaga ponownej symulacji (nie doszacowuje w miejscu).
