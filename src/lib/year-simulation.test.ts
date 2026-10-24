@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { planYearSimulation, missingWithin, METHOD_YEAR } from '../../supabase/functions/_shared/year-simulation';
+import { planYearSimulation, missingWithin, splitMonths, METHOD_YEAR } from '../../supabase/functions/_shared/year-simulation';
+import { settlementPlan, type SettlementSnapshot } from '../../supabase/functions/_shared/settlement-plan';
 import type { Settlement, SettlementEntry } from '../../supabase/functions/_shared/invoice-settlement';
 
 const entry = (id: string, from: string, to: string, kwh: number, counted = true, included = true): SettlementEntry => ({
@@ -43,41 +44,49 @@ describe('missingWithin', () => {
   });
 });
 
+describe('splitMonths', () => {
+  it('dzieli na miesiące kalendarzowe', () => {
+    expect(splitMonths({ from: '2025-06-01', to: '2025-12-31' }).map(m => m.from)).toEqual(
+      ['2025-06-01', '2025-07-01', '2025-08-01', '2025-09-01', '2025-10-01', '2025-11-01', '2025-12-01']);
+    expect(splitMonths({ from: '2025-01-16', to: '2025-03-31' })).toEqual([
+      { from: '2025-01-16', to: '2025-01-31' }, { from: '2025-02-01', to: '2025-02-28' }, { from: '2025-03-01', to: '2025-03-31' }]);
+  });
+});
+
 describe('planYearSimulation', () => {
-  it('przedłużenie na pełny rok: 151 dni danych, 214 dni szacowanych, średnia dobowa', () => {
+  it('przedłużenie na pełny rok: 151 dni danych, 214 dni szacowanych, średnia dobowa, szacunki miesięczne', () => {
     const p = planYearSimulation(row(), settlement(janMay()), [], YEAR);
     expect(p.errors).toEqual([]);
-    // 5 MWh / 151 dni × 214 dni = 7,0861 MWh; razem 12,0861 MWh
-    expect(p.estimates).toHaveLength(1);
-    expect(p.estimates[0]).toMatchObject({ field: 'consumption_before_zone1_mwh', period_from: '2025-06-01', period_to: '2025-12-31', value: 7.0861, unit: 'MWh', method: METHOD_YEAR });
-    expect(p.changes).toContainEqual({ field: 'consumption_before_zone1_mwh', value: 12.0861 });
+    // 5 MWh / 151 dni; miesięcznie: 30 dni → 0,9934; 31 dni → 1,0265; razem 7,0862 MWh; łącznie 12,0862 MWh
+    expect(p.estimates).toHaveLength(7);
+    expect(p.estimates[0]).toMatchObject({ field: 'consumption_before_zone1_mwh', period_from: '2025-06-01', period_to: '2025-06-30', value: 0.9934, unit: 'MWh', method: METHOD_YEAR });
+    expect(p.estimates.map(e => e.value)).toEqual([0.9934, 1.0265, 1.0265, 0.9934, 1.0265, 0.9934, 1.0265]);
+    expect(p.changes).toContainEqual({ field: 'consumption_before_zone1_mwh', value: 12.0862 });
     expect(p.changes).toContainEqual({ field: 'period_from', value: '2025-01-01' });
     expect(p.changes).toContainEqual({ field: 'period_to', value: '2025-12-31' });
     expect(p.preview).toMatchObject({ okres_docelowy: { dni: 365 }, dane_rzeczywiste: { od: '2025-01-01', do: '2025-05-31', dni: 151 } });
     expect(p.preview!.brakujace_okresy).toEqual([{ od: '2025-06-01', do: '2025-12-31', dni: 214 }]);
-    expect(p.preview!.strefy[0]).toMatchObject({ strefa: 1, rzeczywiste_mwh: 5, szacunek_mwh: 7.0861, razem_mwh: 12.0861 });
+    expect(p.preview!.strefy[0]).toMatchObject({ strefa: 1, rzeczywiste_mwh: 5, szacunek_mwh: 7.0862, razem_mwh: 12.0862 });
   });
 
   it('kilka brakujących części naraz (luka + przedłużenie), bez ograniczenia do pierwszej', () => {
     const entries = [entry('1', '2025-01-01', '2025-01-31', 1000), entry('3', '2025-03-01', '2025-03-31', 1000)];
     const p = planYearSimulation(row({ consumption_before_zone1_mwh: 2 }), settlement(entries), [], YEAR);
     expect(p.errors).toEqual([]);
-    expect(p.estimates.map(e => [e.period_from, e.period_to])).toEqual([
-      ['2025-02-01', '2025-02-28'], ['2025-04-01', '2025-12-31'],
-    ]);
-    // 2 MWh / 62 dni; luty: 28 dni → 0,9032; kwiecień–grudzień: 275 dni → 8,871
-    expect(p.estimates[0].value).toBe(0.9032);
-    expect(p.estimates[1].value).toBe(8.871);
-    expect(p.changes).toContainEqual({ field: 'consumption_before_zone1_mwh', value: 11.7742 });
+    // 2 MWh / 62 dni; braki: luty + kwiecień–grudzień → 10 miesięcznych szacunków
+    expect(p.estimates.map(e => e.period_from)).toEqual([
+      '2025-02-01', '2025-04-01', '2025-05-01', '2025-06-01', '2025-07-01', '2025-08-01', '2025-09-01', '2025-10-01', '2025-11-01', '2025-12-01']);
+    expect(p.estimates.map(e => e.value)).toEqual([0.9032, 0.9677, 1, 0.9677, 1, 1, 0.9677, 1, 0.9677, 1]);
+    expect(p.changes).toContainEqual({ field: 'consumption_before_zone1_mwh', value: 11.774 });
   });
 
   it('niepełny miesiąc źródłowy liczy średnią z rzeczywistych dni', () => {
     const entries = [entry('1', '2025-01-01', '2025-01-15', 1000)]; // 15 dni, 1 MWh
     const p = planYearSimulation(row({ consumption_before_zone1_mwh: 1 }), settlement(entries), [], YEAR);
     expect(p.errors).toEqual([]);
-    // 1/15 × 350 dni = 23,3333
-    expect(p.estimates[0].value).toBe(23.3333);
-    expect(p.changes).toContainEqual({ field: 'consumption_before_zone1_mwh', value: 24.3333 });
+    // 1/15 × dni brakujące; 16–31 stycznia: 16 dni → 1,0667; razem 23,3336; łącznie 24,3336
+    expect(p.estimates[0]).toMatchObject({ period_from: '2025-01-16', period_to: '2025-01-31', value: 1.0667 });
+    expect(p.changes).toContainEqual({ field: 'consumption_before_zone1_mwh', value: 24.3336 });
   });
 
   it('niewliczane rozliczenia (duplikat/korekta) nie zwiększają podstawy', () => {
@@ -86,14 +95,14 @@ describe('planYearSimulation', () => {
     s.zoneSummaries[0].mwh = 5;
     const p = planYearSimulation(row(), s, [], YEAR);
     expect(p.errors).toEqual([]);
-    expect(p.estimates[0].value).toBe(7.0861);
+    expect(p.estimates[0].value).toBe(0.9934);
   });
 
   it('różne zużycie PRZED i PO: ostrzeżenie, PO bez zmian', () => {
     const p = planYearSimulation(row({ consumption_after_zone1_mwh: 4 }), settlement(janMay()), [], YEAR);
     expect(p.errors).toEqual([]);
     expect(p.changes.some(c => c.field.startsWith('consumption_after_'))).toBe(false);
-    expect(p.warnings.some(w => w.includes('PO (4 MWh)') && w.includes('12,0861') || w.includes('PO (4 MWh)'))).toBe(true);
+    expect(p.warnings.some(w => w.includes('PO (4 MWh)'))).toBe(true);
   });
 
   it('zużycie w formularzu różne od sumy faktur → błąd, bez zmian', () => {
@@ -108,7 +117,7 @@ describe('planYearSimulation', () => {
       { id: 'e1', field: 'consumption_before_zone1_mwh', period_from: '2025-03-01', period_to: '2025-03-31', value: 1 },
     ], YEAR);
     expect(p.errors).toEqual([]);
-    expect(p.changes).toContainEqual({ field: 'consumption_before_zone1_mwh', value: 13.0861 });
+    expect(p.changes).toContainEqual({ field: 'consumption_before_zone1_mwh', value: 13.0862 });
   });
 
   it('niepełne zużycie strefy z faktur → błąd', () => {
@@ -129,11 +138,11 @@ describe('planYearSimulation', () => {
     const noCost = planYearSimulation(row({ capacity_charge_before: 500 }), s, [], YEAR);
     expect(noCost.changes.some(c => c.field === 'capacity_charge_before')).toBe(false);
     expect(noCost.unresolved.some(u => u.includes('Opłata mocowa PRZED'))).toBe(true);
-    // ze zgodą: 500 zł / 151 dni × 214 dni = 708,61 zł; razem 1208,61 zł
+    // ze zgodą: 500 zł / 151 dni; miesięcznie 99,34 / 102,65 zł; razem 708,63 zł; łącznie 1208,63 zł
     const withCost = planYearSimulation(row({ capacity_charge_before: 500 }), s, [], YEAR, 'mocowa');
     expect(withCost.errors).toEqual([]);
-    expect(withCost.changes).toContainEqual({ field: 'capacity_charge_before', value: 1208.61 });
-    expect(withCost.preview!.koszty[0]).toMatchObject({ skladnik: 'Opłata mocowa PRZED', rzeczywiste_zl: 500, szacunek_zl: 708.61, razem_zl: 1208.61 });
+    expect(withCost.changes).toContainEqual({ field: 'capacity_charge_before', value: 1208.63 });
+    expect(withCost.preview!.koszty[0]).toMatchObject({ skladnik: 'Opłata mocowa PRZED', rzeczywiste_zl: 500, szacunek_zl: 708.63, razem_zl: 1208.63 });
     // wartość ręczna różna od sumy faktur → nie zmienia
     const manual = planYearSimulation(row({ capacity_charge_before: 777 }), s, [], YEAR, 'mocowa');
     expect(manual.changes.some(c => c.field === 'capacity_charge_before')).toBe(false);
@@ -162,5 +171,30 @@ describe('planYearSimulation', () => {
   it('zmiana taryfy w okresie źródłowym blokuje symulację', () => {
     const s = settlement(janMay(), { blocked: ['Taryfa zmienia się w okresie rozliczeń.'] });
     expect(planYearSimulation(row(), s, [], YEAR).errors).toContain('Taryfa zmienia się w okresie rozliczeń.');
+  });
+});
+
+describe('zastąpienie części szacunku późniejszą fakturą', () => {
+  it('faktura za czerwiec zastępuje tylko czerwcowy szacunek, bez podwójnego liczenia', () => {
+    const s = settlement(janMay());
+    const plan = planYearSimulation(row(), s, [], YEAR);
+    // po zastosowaniu symulacji: zużycie 12,0862 MWh, aktywne szacunki miesięczne czerwiec–grudzień
+    const estimates = plan.estimates.map((e, i) => ({ id: `e${i}`, ...e }));
+    const june = entry('6', '2025-06-01', '2025-06-30', 1200); // 1,2 MWh z faktury
+    const snapshot: SettlementSnapshot = {
+      token: 't',
+      row: { ...row(), consumption_before_zone1_mwh: 12.0862, period_to: '2025-12-31', value_sources: {} },
+      docs: [...janMay().map(e => ({ id: 'd' + e.record.id, file_name: `faktura-${e.record.id}.pdf`, status: 'approved', doc_type: 'kompleksowa', document_number: e.record.id, issuer: 'X' })),
+        { id: 'd6', file_name: 'faktura-6.pdf', status: 'approved', doc_type: 'kompleksowa', document_number: '6', issuer: 'X' }],
+      records: [...janMay().map(e => ({ id: e.record.id, document_id: 'd' + e.record.id, ppe_number: 'PL1', matched_analysis_id: 'a', tariff_code: 'C11', period_from: e.record.period_from, period_to: e.record.period_to, consumption: [{ zone_name: 'całodobowa', value: 1000, unit: 'kWh' }], review_state: null })),
+        { id: '6', document_id: 'd6', ppe_number: 'PL1', matched_analysis_id: 'a', tariff_code: 'C11', period_from: '2025-06-01', period_to: '2025-06-30', consumption: [{ zone_name: 'całodobowa', value: 1200, unit: 'kWh' }], review_state: null }],
+      items: [],
+      estimates,
+    };
+    const out = settlementPlan(snapshot);
+    // zastąpiony wyłącznie szacunek czerwcowy (e0)
+    expect(out.replaced).toEqual(['e0']);
+    // faktury 6,2 MWh + zachowane szacunki lipiec–grudzień (6,0928) = 12,2928 — czerwiec policzony raz
+    expect(out.rows[0].value).toBe(12.2928);
   });
 });
