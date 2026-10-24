@@ -6,6 +6,8 @@
 - [x] „Zastosuj do PRZED” (porównanie, ochrona ręcznych, nadpisanie bez sumowania), „Przejdź do analizy”, wejście z formularza PPE.
 - [ ] Zastosowanie podsumowania do PRZED przez asystenta tym samym mechanizmem (wymaga przeniesienia zapisu do funkcji bazy).
 - [ ] Test w przeglądarce pełnej listy scenariuszy z punktu 6.
+- [ ] Wspólny atomowy zapis serwerowy: aktualność podglądu, tylko zatwierdzone źródła, konkretne konflikty ręczne, historia i cofnięcie; PO bez zmian.
+- [ ] Test zalogowanych widoków podsumowania, importu i formularza; rzeczywiste daty i oddzielne pokrycie sprzedaży/dystrybucji; sprzątnięcie wyłącznie nowych danych testowych.
 
 ## Asystent: zmiana pól i porównanie taryf
 - [x] Reguły: taryfa+moc razem, dostępność dla OSD, warunki zmiany grupy, strefy wg znaczenia, brak stawki ≠ 0, najtańszy/remis (testy).

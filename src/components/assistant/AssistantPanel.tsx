@@ -37,7 +37,7 @@ export interface AssistantPanelProps {
 type Msg = { id: string; role: 'user' | 'assistant'; content: string; ppe_label?: string | null; error?: boolean; proposal_id?: string | null };
 
 const OPEN_EVENT = 'ai-assistant:open';
-export function openAssistant(prompt?: string) { window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: { prompt } })); }
+export function openAssistant(prompt?: string, summary?: {ppeId:string;token:string}) { window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: { prompt, summary } })); }
 
 export function AssistantContextButton({ label, prompt }: { label: string; prompt: string }) {
   return <Button type="button" variant="outline" size="sm" onClick={() => openAssistant(prompt)}><Bot className="h-4 w-4 mr-2" />{label}</Button>;
@@ -50,13 +50,14 @@ export function AssistantPanel(p: AssistantPanelProps) {
   const [pending, setPending] = useState<Msg[]>([]);
   const [busy, setBusy] = useState(false);
   const [lastFailed, setLastFailed] = useState<string | null>(null);
+  const [summaryContext,setSummaryContext]=useState<{ppeId:string;token:string}|null>(null);
   const qc = useQueryClient();
   const messagesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { document.documentElement.classList.toggle('assistant-open', open); return () => document.documentElement.classList.remove('assistant-open'); }, [open]);
   useEffect(() => { if (p.currentPpeId) setScope(p.currentPpeId); }, [p.currentPpeId]);
   useEffect(() => {
-    const h = (e: Event) => { setOpen(true); const prompt = (e as CustomEvent).detail?.prompt; if (prompt) setInput(prompt); };
+    const h = (e: Event) => { setOpen(true); const detail = (e as CustomEvent).detail; if (detail?.prompt) setInput(detail.prompt); if(detail?.summary){setSummaryContext(detail.summary);setScope(detail.summary.ppeId);} };
     window.addEventListener(OPEN_EVENT, h); return () => window.removeEventListener(OPEN_EVENT, h);
   }, []);
 
@@ -116,7 +117,7 @@ export function AssistantPanel(p: AssistantPanelProps) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.session?.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
         body: JSON.stringify({ groupId: p.groupId, ppeId: isAll ? null : scope, scope: isAll ? 'all' : 'ppe', step: p.step, message,
           draft: ownPpe && dirty.length ? Object.fromEntries(dirty.map(k => [k, p.draft?.[k] ?? null])) : null, draftDirty: ownPpe && dirty.length > 0,
-          results, issues: ownPpe ? p.issues : [], facts }),
+          results, issues: ownPpe ? p.issues : [], facts, summaryToken:summaryContext?.ppeId===scope?summaryContext.token:undefined }),
       });
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({}));
@@ -128,7 +129,7 @@ export function AssistantPanel(p: AssistantPanelProps) {
  }
       if (acc.includes('[[BŁĄD]]')) throw new Error(acc.split('[[BŁĄD]]')[1].trim());
       // A chat command may have saved PO values: reload form, PPE card and summary from the database.
-      await Promise.all(['ai-messages', 'ai-proposal', 'analysis', 'ai-group-ppes', 'group-ppe', 'analyses', 'ai-history', 'analysis-estimates', 'invoice-facts']
+      await Promise.all(['ai-messages', 'ai-proposal', 'analysis', 'ai-group-ppes', 'group-ppe', 'analyses', 'ai-history', 'analysis-estimates', 'invoice-facts','invoice-summary-preview','invoice-summary-history','group-settlement']
         .map(k => qc.invalidateQueries({ queryKey: [k] })));
       setPending([]);
     } catch (e) {

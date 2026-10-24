@@ -18,7 +18,7 @@ const fmt = (v: unknown) => (v === null || v === undefined || v === '' ? 'brak'
   : typeof v === 'object' ? '—'
   : Number(v).toLocaleString('pl-PL', { minimumFractionDigits: 0, maximumFractionDigits: 4 }));
 
-export function ProposalCard({ proposalId, dirtyFor, onSaveForm }: { proposalId: string; dirtyFor?: string | null; onSaveForm?: () => Promise<boolean> }) {
+export function ProposalCard({ proposalId, dirtyFor, onSaveForm,invoiceSummary=false }: { proposalId: string; dirtyFor?: string | null; onSaveForm?: () => Promise<boolean>;invoiceSummary?:boolean }) {
   const qc = useQueryClient();
   const lock = useRef(false);
   const [busy, setBusy] = useState(false);
@@ -28,14 +28,14 @@ export function ProposalCard({ proposalId, dirtyFor, onSaveForm }: { proposalId:
   const q = useQuery({
     queryKey: ['ai-proposal', proposalId],
     queryFn: async () => {
-      const { data: p, error } = await db.from('ai_proposals').select('*').eq('id', proposalId).maybeSingle();
+      const { data: p, error } = await db.from(invoiceSummary?'invoice_summary_changes':'ai_proposals').select('*').eq('id', proposalId).maybeSingle();
       if (error || !p) throw new Error('Brak dostępu do propozycji');
       const [{ data: row }, { data: ch }] = await Promise.all([
         supabase.from('energy_analyses').select('*').eq('id', p.analysis_id).maybeSingle(),
-        p.applied_change_id ? db.from('ai_applied_changes').select('*').eq('id', p.applied_change_id).maybeSingle() : Promise.resolve({ data: null }),
+        invoiceSummary?Promise.resolve({data:p}):p.applied_change_id ? db.from('ai_applied_changes').select('*').eq('id', p.applied_change_id).maybeSingle() : Promise.resolve({ data: null }),
       ]);
       if (!row) throw new Error('Brak dostępu do PPE');
-      return { p, row: row as Record<string, unknown>, ch };
+      return { p:invoiceSummary?{...p,kind:'settlement',status:p.undone_at?'undone':'applied',changes:Object.entries(p.fields).map(([field,v]:[string,any])=>({field,value:v.after})),source:'dane_analizy',assumption:'Zatwierdzone podsumowanie faktur; PO bez zmian.'}:p, row: row as Record<string, unknown>, ch };
     },
   });
 
@@ -52,6 +52,7 @@ export function ProposalCard({ proposalId, dirtyFor, onSaveForm }: { proposalId:
       qc.invalidateQueries({ queryKey: ['analysis', p.analysis_id] }),
       qc.invalidateQueries({ queryKey: ['ai-group-ppes'] }), qc.invalidateQueries({ queryKey: ['group-ppe'] }),
       qc.invalidateQueries({ queryKey: ['analyses'] }), qc.invalidateQueries({ queryKey: ['analysis-estimates'] }), qc.invalidateQueries({ queryKey: ['invoice-facts'] }), qc.invalidateQueries({ queryKey: ['ai-history'] }),
+      qc.invalidateQueries({queryKey:['invoice-summary-history']}),qc.invalidateQueries({queryKey:['invoice-summary-preview']}),qc.invalidateQueries({queryKey:['group-settlement']}),
     ]);
   };
   const run = async (fn: () => Promise<void>) => {
@@ -79,7 +80,7 @@ export function ProposalCard({ proposalId, dirtyFor, onSaveForm }: { proposalId:
   const rebase = () => run(async () => { const { error } = await db.rpc('ai_refresh_proposal', { _id: proposalId }); if (error) throw new Error(error.message); await refresh(); });
   const reject = () => run(async () => { const { error } = await db.rpc('ai_reject_proposal', { _id: proposalId }); if (error) throw new Error(error.message); await refresh(); });
   const undo = () => run(async () => {
-    const { data, error } = await db.rpc('ai_undo_change', { _id: ch.id });
+    const { data, error } = await db.rpc(invoiceSummary?'invoice_summary_undo':'ai_undo_change', { _id: ch.id });
     if (error) throw new Error(error.message);
     await refresh();
     if (data?.status === 'conflict') setMsg({ text: `Nie cofnięto: pola zmieniono później (${(data.fields as string[]).map(label).join(', ')}). Nowsza praca pozostała bez zmian.`, error: true });
@@ -91,7 +92,7 @@ export function ProposalCard({ proposalId, dirtyFor, onSaveForm }: { proposalId:
     current: ch?.fields?.[c.field]?.before ?? p.before?.[c.field], proposed: c.value, replaces: null as string | null }));
 
   return <div className="mt-3 min-w-0 max-w-full rounded-md border bg-background p-3 text-xs space-y-2" data-testid="ai-proposal">
-    <div className="flex justify-between gap-2"><span className="font-semibold">{KIND_TITLE[p.kind ?? 'po'] ?? KIND_TITLE.po}</span><span className="text-muted-foreground">{status}</span></div>
+    <div className="flex justify-between gap-2"><span className="font-semibold">{invoiceSummary?'Zastosowanie podsumowania do PRZED':KIND_TITLE[p.kind ?? 'po'] ?? KIND_TITLE.po}</span><span className="text-muted-foreground">{status}</span></div>
     <p className="text-muted-foreground">PPE {String(row.ppe_number || row.name || '')}</p>
     <ul className="space-y-1">{fields.map(f => <li key={f.field}>{f.label}: <b>{fmt(f.current)} → {fmt(f.proposed)}</b> {f.unit}
       {f.replaces && <span className="block text-destructive">Zastąpi {f.replaces}.</span>}</li>)}</ul>

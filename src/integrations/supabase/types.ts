@@ -1066,6 +1066,63 @@ export type Database = {
         }
         Relationships: []
       }
+      invoice_summary_changes: {
+        Row: {
+          analysis_group_id: string
+          analysis_id: string
+          command: string
+          created_at: string
+          fields: Json
+          id: string
+          replaced_estimates: string[]
+          request_id: string
+          undone_at: string | null
+          undone_by: string | null
+          user_id: string
+        }
+        Insert: {
+          analysis_group_id: string
+          analysis_id: string
+          command: string
+          created_at?: string
+          fields: Json
+          id?: string
+          replaced_estimates?: string[]
+          request_id: string
+          undone_at?: string | null
+          undone_by?: string | null
+          user_id: string
+        }
+        Update: {
+          analysis_group_id?: string
+          analysis_id?: string
+          command?: string
+          created_at?: string
+          fields?: Json
+          id?: string
+          replaced_estimates?: string[]
+          request_id?: string
+          undone_at?: string | null
+          undone_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_summary_changes_analysis_group_id_fkey"
+            columns: ["analysis_group_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_summary_changes_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "energy_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       manager_assignments: {
         Row: {
           assigned_by_user_id: string | null
@@ -1363,6 +1420,26 @@ export type Database = {
         }
         Returns: boolean
       }
+      invoice_summary_allowed_fields: { Args: never; Returns: string[] }
+      invoice_summary_commit: {
+        Args: {
+          _actor: string
+          _analysis_id: string
+          _changes: Json
+          _command: string
+          _manual: string[]
+          _replace: string[]
+          _request_id: string
+          _sources: Json
+          _token: string
+        }
+        Returns: Json
+      }
+      invoice_summary_snapshot: {
+        Args: { _actor: string; _analysis_id: string }
+        Returns: Json
+      }
+      invoice_summary_undo: { Args: { _id: string }; Returns: Json }
       is_app_owner: { Args: never; Returns: boolean }
       is_manager_of: { Args: { _managed_user_id: string }; Returns: boolean }
     }
