@@ -113,6 +113,13 @@
       "when": 1792522268655,
       "tag": "0015_ai_tariff_field_operations",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1792831046874,
+      "tag": "0016_invoice_summary_atomic_application",
+      "breakpoints": true
     }
   ]
 }
