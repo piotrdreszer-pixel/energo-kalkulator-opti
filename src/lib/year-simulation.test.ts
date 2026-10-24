@@ -138,11 +138,11 @@ describe('planYearSimulation', () => {
     const noCost = planYearSimulation(row({ capacity_charge_before: 500 }), s, [], YEAR);
     expect(noCost.changes.some(c => c.field === 'capacity_charge_before')).toBe(false);
     expect(noCost.unresolved.some(u => u.includes('Opłata mocowa PRZED'))).toBe(true);
-    // ze zgodą: 500 zł / 151 dni; miesięcznie 99,34 / 102,65 zł; razem 708,63 zł; łącznie 1208,63 zł
+    // ze zgodą: 500 zł / 151 dni; miesięcznie 99,34 / 102,65 zł; razem 708,62 zł; łącznie 1208,62 zł
     const withCost = planYearSimulation(row({ capacity_charge_before: 500 }), s, [], YEAR, 'mocowa');
     expect(withCost.errors).toEqual([]);
-    expect(withCost.changes).toContainEqual({ field: 'capacity_charge_before', value: 1208.63 });
-    expect(withCost.preview!.koszty[0]).toMatchObject({ skladnik: 'Opłata mocowa PRZED', rzeczywiste_zl: 500, szacunek_zl: 708.63, razem_zl: 1208.63 });
+    expect(withCost.changes).toContainEqual({ field: 'capacity_charge_before', value: 1208.62 });
+    expect(withCost.preview!.koszty[0]).toMatchObject({ skladnik: 'Opłata mocowa PRZED', rzeczywiste_zl: 500, szacunek_zl: 708.62, razem_zl: 1208.62 });
     // wartość ręczna różna od sumy faktur → nie zmienia
     const manual = planYearSimulation(row({ capacity_charge_before: 777 }), s, [], YEAR, 'mocowa');
     expect(manual.changes.some(c => c.field === 'capacity_charge_before')).toBe(false);
