@@ -198,3 +198,45 @@ describe('zastąpienie części szacunku późniejszą fakturą', () => {
     expect(out.rows[0].value).toBe(12.2928);
   });
 });
+
+describe('moc umowna w symulacji', () => {
+  const hist = [
+    { kw: 1100, period_from: '2025-01-01', period_to: '2025-04-30' },
+    { kw: 1050, period_from: '2025-05-01', period_to: '2025-05-31' },
+  ];
+  it('historia zmian mocy nie blokuje szacunku zużycia; pytanie o moc dla brakujących miesięcy', () => {
+    const p = planYearSimulation(row({ contracted_power_before_kw: 1100 }), settlement(janMay(), { contractedPower: hist }), [], YEAR);
+    expect(p.errors).toEqual([]);
+    expect(p.changes).toContainEqual({ field: 'consumption_before_zone1_mwh', value: 12.0862 });
+    expect(p.changes.some(c => c.field === 'contracted_power_before_kw')).toBe(false);
+    expect(p.power?.pytanie).toContain('1050 kW');
+    expect(p.power?.pytanie).toContain('01.06.2025');
+    expect(p.power?.ostatnia_znana_kw).toBe(1050);
+    expect(p.power?.historia).toEqual([{ kw: 1100, od: '2025-01-01', do: '2025-04-30' }, { kw: 1050, od: '2025-05-01', do: '2025-05-31' }]);
+  });
+  it('zaakceptowana moc zapisywana jako jawny wariant uproszczony, bez uśredniania', () => {
+    const p = planYearSimulation(row({ contracted_power_before_kw: 1100 }), settlement(janMay(), { contractedPower: hist }), [], YEAR, null, 1050);
+    expect(p.errors).toEqual([]);
+    expect(p.changes).toContainEqual({ field: 'contracted_power_before_kw', value: 1050 });
+    expect(p.power?.pytanie).toBeNull();
+    expect(p.notes.join(' ')).toContain('wariant uproszczony');
+    expect(p.notes.join(' ')).toContain('1100 kW');
+  });
+  it('własna wartość mocy od użytkownika', () => {
+    const p = planYearSimulation(row({ contracted_power_before_kw: 1100 }), settlement(janMay(), { contractedPower: hist }), [], YEAR, null, 1000);
+    expect(p.changes).toContainEqual({ field: 'contracted_power_before_kw', value: 1000 });
+  });
+  it('jedna moc zgodna z formularzem — brak pytania i zmiany', () => {
+    const same = [{ kw: 1100, period_from: '2025-01-01', period_to: '2025-05-31' }];
+    const p = planYearSimulation(row({ contracted_power_before_kw: 1100 }), settlement(janMay(), { contractedPower: same }), [], YEAR);
+    expect(p.power).toBeNull();
+    expect(p.changes.some(c => c.field === 'contracted_power_before_kw')).toBe(false);
+  });
+  it('moc w formularzu różna od historii — pytanie bez blokady zużycia', () => {
+    const same = [{ kw: 1050, period_from: '2025-01-01', period_to: '2025-05-31' }];
+    const p = planYearSimulation(row({ contracted_power_before_kw: 1100 }), settlement(janMay(), { contractedPower: same }), [], YEAR);
+    expect(p.errors).toEqual([]);
+    expect(p.power?.pytanie).toContain('1050 kW');
+    expect(p.changes).toContainEqual({ field: 'consumption_before_zone1_mwh', value: 12.0862 });
+  });
+});
