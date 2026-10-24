@@ -51,6 +51,20 @@ export function missingWithin(target: Interval, covered: Interval[]): Interval[]
   return out;
 }
 
+/** Podział okresu na miesiące kalendarzowe — późniejsza faktura zastępuje tylko swoje miesiące, bez podwójnego liczenia. */
+export function splitMonths(i: Interval): Interval[] {
+  const out: Interval[] = [];
+  let cur = i.from;
+  while (cur <= i.to) {
+    const [y, m] = cur.split('-').map(Number);
+    const last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+    const to = last < i.to ? last : i.to;
+    out.push({ from: cur, to });
+    cur = fromDay(toDay(to) + 1);
+  }
+  return out;
+}
+
 const COSTS: Record<'mocowa' | 'bierna', { kind: 'capacity' | 'reactive'; field: string; label: string }> = {
   mocowa: { kind: 'capacity', field: 'capacity_charge_before', label: 'Opłata mocowa PRZED' },
   bierna: { kind: 'reactive', field: 'reactive_energy_cost_before', label: 'Energia bierna PRZED' },
