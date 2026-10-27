@@ -22,13 +22,14 @@ import {
   ArrowRight,
   Save,
   Loader2,
-  AlertCircle,
+  AlertTriangle,
   Printer,
   ChevronLeft,
   ChevronRight,
   Check,
   Plus,
 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import type { EnergyAnalysis, ClientProject, ResolvedRates } from '@/types/database';
 import { TARIFF_CODES, getZonesCount, getZoneLabels, validateContractedPower, calculatePeriodMonths, getDefaultDistribution } from '@/lib/tariff-utils';
 import { normalizeTariffCode } from '@/lib/invoice-import';
@@ -135,6 +136,9 @@ function AnalysisForm() {
   });
 
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  // Explicit user confirmation for contracted power outside the tariff's typical range.
+  // Without confirmation the value still blocks saving; confirming turns the error into a warning.
+  const [powerConfirmations, setPowerConfirmations] = useState<Record<string, boolean>>({});
   const [resolvedRatesBefore, setResolvedRatesBefore] = useState<ResolvedRates | null>(null);
   const [resolvedRatesAfter, setResolvedRatesAfter] = useState<ResolvedRates | null>(null);
   const [isManualModeBefore, setIsManualModeBefore] = useState(false);
@@ -377,12 +381,21 @@ function AnalysisForm() {
     },
   });
 
+  const resetPowerConfirmation = (powerField: string) => {
+    setPowerConfirmations(prev => {
+      if (!prev[powerField]) return prev;
+      const { [powerField]: _, ...rest } = prev;
+      return rest;
+    });
+  };
+
   const handleTariffChange = (field: 'tariff_code_before' | 'tariff_code_after', value: string) => {
     const zonesField = field === 'tariff_code_before' ? 'zones_count_before' : 'zones_count_after';
     const zones = getZonesCount(value);
     setFormData(prev => ({ ...prev, [field]: value, [zonesField]: zones }));
-    
+
     const powerField = field === 'tariff_code_before' ? 'contracted_power_before_kw' : 'contracted_power_after_kw';
+    resetPowerConfirmation(powerField);
     const power = Number(formData[powerField]) || 0;
     const validation = validateContractedPower(value, power);
     if (!validation.valid) {
@@ -397,7 +410,8 @@ function AnalysisForm() {
 
   const handlePowerChangeBefore = (value: number) => {
     setFormData(prev => ({ ...prev, contracted_power_before_kw: value }));
-    
+    resetPowerConfirmation('contracted_power_before_kw');
+
     const validation = validateContractedPower(formData.tariff_code_before || 'C11', value);
     setValidationErrors(prev => {
       const newErrors = { ...prev };
@@ -412,7 +426,8 @@ function AnalysisForm() {
 
   const handlePowerChangeAfter = (value: number) => {
     setFormData(prev => ({ ...prev, contracted_power_after_kw: value }));
-    
+    resetPowerConfirmation('contracted_power_after_kw');
+
     const validation = validateContractedPower(formData.tariff_code_after || 'C11', value);
     setValidationErrors(prev => {
       const newErrors = { ...prev };
@@ -428,9 +443,57 @@ function AnalysisForm() {
   const getPowerHint = (tariffCode: string): string => {
     const isLow = tariffCode.startsWith('C1') || tariffCode.startsWith('B1') || tariffCode.startsWith('G');
     const isHigh = tariffCode.startsWith('C2') || tariffCode.startsWith('B2');
-    if (isLow) return 'Dla taryf C1/B1/G moc umowna musi być ≤ 40 kW';
-    if (isHigh) return 'Dla taryf C2/B2 moc umowna musi być > 40 kW';
+    if (isLow) return 'Typowy zakres dla taryf C1/B1/G: moc umowna ≤ 40 kW';
+    if (isHigh) return 'Typowy zakres dla taryf C2/B2: moc umowna > 40 kW';
     return '';
+  };
+
+  // Power errors block saving only until the user explicitly confirms the out-of-range value.
+  const blockingValidationErrors = (): string[] =>
+    Object.entries(validationErrors)
+      .filter(([key]) => !powerConfirmations[key])
+      .map(([, message]) => message);
+
+  const renderPowerFeedback = (
+    field: 'contracted_power_before_kw' | 'contracted_power_after_kw',
+    tariffCode: string,
+    compact = false,
+  ) => {
+    const error = validationErrors[field];
+    const textSize = compact ? 'text-xs' : 'text-sm';
+    if (!error) {
+      return (
+        <p className="text-xs text-muted-foreground">
+          {getPowerHint(tariffCode || 'C11')}
+        </p>
+      );
+    }
+    if (powerConfirmations[field]) {
+      return (
+        <p className={`${textSize} text-warning flex items-center gap-1`}>
+          <AlertTriangle className="h-3 w-3" />
+          {error} — potwierdzono świadome wprowadzenie.
+        </p>
+      );
+    }
+    return (
+      <div className="space-y-1.5">
+        <p className={`${textSize} text-warning flex items-center gap-1`}>
+          <AlertTriangle className="h-3 w-3" />
+          {error}
+        </p>
+        <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
+          <Checkbox
+            checked={false}
+            onCheckedChange={(checked) =>
+              setPowerConfirmations(prev => ({ ...prev, [field]: checked === true }))
+            }
+            className="mt-0.5"
+          />
+          Potwierdzam świadome wprowadzenie mocy poza typowym zakresem dla tej taryfy
+        </label>
+      </div>
+    );
   };
 
   const handleInputChange = useCallback((field: keyof EnergyAnalysis, value: string | number | boolean) => {
@@ -598,7 +661,7 @@ function AnalysisForm() {
     if (addingNextRef.current || !access.multiPpe || access.readOnly) return;
     try { await requireFeature('multi_ppe', formData.analysis_group_id); }
     catch { toast({ variant: 'destructive', title: 'Brak dostępu do funkcji Analizy wielu PPE' }); return; }
-    const errors = Object.values(validationErrors);
+    const errors = blockingValidationErrors();
     if (errors.length > 0) {
       toast({ variant: 'destructive', title: 'Błąd walidacji', description: errors[0] || 'Popraw błędy w formularzu.' });
       return;
@@ -641,12 +704,12 @@ function AnalysisForm() {
   };
 
   const handleSave = () => {
-    const errors = Object.values(validationErrors);
+    const errors = blockingValidationErrors();
     if (errors.length > 0) {
-      toast({ 
-        variant: 'destructive', 
-        title: 'Błąd walidacji', 
-        description: errors[0] || 'Popraw błędy w formularzu.' 
+      toast({
+        variant: 'destructive',
+        title: 'Błąd walidacji',
+        description: errors[0] || 'Popraw błędy w formularzu.'
       });
       return;
     }
@@ -914,16 +977,7 @@ function AnalysisForm() {
                           handlePowerChangeBefore(parseFloat(value) || 0);
                         }}
                       />
-                      {validationErrors.contracted_power_before_kw ? (
-                        <p className="text-sm text-destructive flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3" />
-                          {validationErrors.contracted_power_before_kw}
-                        </p>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">
-                          {getPowerHint(formData.tariff_code_before || 'C11')}
-                        </p>
-                      )}
+                      {renderPowerFeedback('contracted_power_before_kw', formData.tariff_code_before || 'C11')}
                     </div>
                   </div>
                 </div>
@@ -959,16 +1013,7 @@ function AnalysisForm() {
                           handlePowerChangeAfter(parseFloat(value) || 0);
                         }}
                       />
-                      {validationErrors.contracted_power_after_kw ? (
-                        <p className="text-sm text-destructive flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3" />
-                          {validationErrors.contracted_power_after_kw}
-                        </p>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">
-                          {getPowerHint(formData.tariff_code_after || 'C11')}
-                        </p>
-                      )}
+                      {renderPowerFeedback('contracted_power_after_kw', formData.tariff_code_after || 'C11')}
                     </div>
                   </div>
                 </div>
@@ -1038,16 +1083,7 @@ function AnalysisForm() {
                           className="w-[120px]"
                           placeholder="kW"
                         />
-                        {validationErrors.contracted_power_before_kw ? (
-                          <p className="text-xs text-destructive flex items-center gap-1">
-                            <AlertCircle className="h-3 w-3" />
-                            {validationErrors.contracted_power_before_kw}
-                          </p>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">
-                            {getPowerHint(formData.tariff_code_before || 'C11')}
-                          </p>
-                        )}
+                        {renderPowerFeedback('contracted_power_before_kw', formData.tariff_code_before || 'C11', true)}
                       </div>
                     </div>
                   </div>
@@ -1149,16 +1185,7 @@ function AnalysisForm() {
                           className="w-[120px]"
                           placeholder="kW"
                         />
-                        {validationErrors.contracted_power_after_kw ? (
-                          <p className="text-xs text-destructive flex items-center gap-1">
-                            <AlertCircle className="h-3 w-3" />
-                            {validationErrors.contracted_power_after_kw}
-                          </p>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">
-                            {getPowerHint(formData.tariff_code_after || 'C11')}
-                          </p>
-                        )}
+                        {renderPowerFeedback('contracted_power_after_kw', formData.tariff_code_after || 'C11', true)}
                       </div>
                     </div>
                   </div>
@@ -1280,7 +1307,7 @@ function AnalysisForm() {
         ppes={aiGroup?.ppes ?? [{ id: analysisId!, name: formData.name || 'PPE', ppe_number: formData.ppe_number }]} currentPpeId={analysisId} allowAll={access.multiPpe} invoiceImport={access.canImport}
         step={WIZARD_STEPS.find(s => s.id === currentStep)?.label} draft={formData as Record<string, unknown>} saved={analysis as unknown as Record<string, unknown>}
         results={results as unknown as Record<string, unknown>} issues={assistantIssues(formData as Record<string, unknown>)}
-        onSaveForm={async () => { if (Object.keys(validationErrors).length) { handleSave(); return false; } try { await saveMutation.mutateAsync(); return true; } catch { return false; } }} />}
+        onSaveForm={async () => { if (blockingValidationErrors().length) { handleSave(); return false; } try { await saveMutation.mutateAsync(); return true; } catch { return false; } }} />}
     </AppLayout>
   );
 }
