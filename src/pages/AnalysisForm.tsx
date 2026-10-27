@@ -662,7 +662,7 @@ function AnalysisForm() {
     if (addingNextRef.current || !access.multiPpe || access.readOnly) return;
     try { await requireFeature('multi_ppe', formData.analysis_group_id); }
     catch { toast({ variant: 'destructive', title: 'Brak dostępu do funkcji Analizy wielu PPE' }); return; }
-    const errors = Object.values(validationErrors);
+    const errors = blockingValidationErrors();
     if (errors.length > 0) {
       toast({ variant: 'destructive', title: 'Błąd walidacji', description: errors[0] || 'Popraw błędy w formularzu.' });
       return;
@@ -705,12 +705,12 @@ function AnalysisForm() {
   };
 
   const handleSave = () => {
-    const errors = Object.values(validationErrors);
+    const errors = blockingValidationErrors();
     if (errors.length > 0) {
-      toast({ 
-        variant: 'destructive', 
-        title: 'Błąd walidacji', 
-        description: errors[0] || 'Popraw błędy w formularzu.' 
+      toast({
+        variant: 'destructive',
+        title: 'Błąd walidacji',
+        description: errors[0] || 'Popraw błędy w formularzu.'
       });
       return;
     }
