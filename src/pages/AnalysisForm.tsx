@@ -1308,7 +1308,7 @@ function AnalysisForm() {
         ppes={aiGroup?.ppes ?? [{ id: analysisId!, name: formData.name || 'PPE', ppe_number: formData.ppe_number }]} currentPpeId={analysisId} allowAll={access.multiPpe} invoiceImport={access.canImport}
         step={WIZARD_STEPS.find(s => s.id === currentStep)?.label} draft={formData as Record<string, unknown>} saved={analysis as unknown as Record<string, unknown>}
         results={results as unknown as Record<string, unknown>} issues={assistantIssues(formData as Record<string, unknown>)}
-        onSaveForm={async () => { if (Object.keys(validationErrors).length) { handleSave(); return false; } try { await saveMutation.mutateAsync(); return true; } catch { return false; } }} />}
+        onSaveForm={async () => { if (blockingValidationErrors().length) { handleSave(); return false; } try { await saveMutation.mutateAsync(); return true; } catch { return false; } }} />}
     </AppLayout>
   );
 }
