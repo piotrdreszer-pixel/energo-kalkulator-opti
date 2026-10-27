@@ -382,12 +382,21 @@ function AnalysisForm() {
     },
   });
 
+  const resetPowerConfirmation = (powerField: string) => {
+    setPowerConfirmations(prev => {
+      if (!prev[powerField]) return prev;
+      const { [powerField]: _, ...rest } = prev;
+      return rest;
+    });
+  };
+
   const handleTariffChange = (field: 'tariff_code_before' | 'tariff_code_after', value: string) => {
     const zonesField = field === 'tariff_code_before' ? 'zones_count_before' : 'zones_count_after';
     const zones = getZonesCount(value);
     setFormData(prev => ({ ...prev, [field]: value, [zonesField]: zones }));
-    
+
     const powerField = field === 'tariff_code_before' ? 'contracted_power_before_kw' : 'contracted_power_after_kw';
+    resetPowerConfirmation(powerField);
     const power = Number(formData[powerField]) || 0;
     const validation = validateContractedPower(value, power);
     if (!validation.valid) {
@@ -402,7 +411,8 @@ function AnalysisForm() {
 
   const handlePowerChangeBefore = (value: number) => {
     setFormData(prev => ({ ...prev, contracted_power_before_kw: value }));
-    
+    resetPowerConfirmation('contracted_power_before_kw');
+
     const validation = validateContractedPower(formData.tariff_code_before || 'C11', value);
     setValidationErrors(prev => {
       const newErrors = { ...prev };
@@ -417,7 +427,8 @@ function AnalysisForm() {
 
   const handlePowerChangeAfter = (value: number) => {
     setFormData(prev => ({ ...prev, contracted_power_after_kw: value }));
-    
+    resetPowerConfirmation('contracted_power_after_kw');
+
     const validation = validateContractedPower(formData.tariff_code_after || 'C11', value);
     setValidationErrors(prev => {
       const newErrors = { ...prev };
@@ -433,9 +444,57 @@ function AnalysisForm() {
   const getPowerHint = (tariffCode: string): string => {
     const isLow = tariffCode.startsWith('C1') || tariffCode.startsWith('B1') || tariffCode.startsWith('G');
     const isHigh = tariffCode.startsWith('C2') || tariffCode.startsWith('B2');
-    if (isLow) return 'Dla taryf C1/B1/G moc umowna musi być ≤ 40 kW';
-    if (isHigh) return 'Dla taryf C2/B2 moc umowna musi być > 40 kW';
+    if (isLow) return 'Typowy zakres dla taryf C1/B1/G: moc umowna ≤ 40 kW';
+    if (isHigh) return 'Typowy zakres dla taryf C2/B2: moc umowna > 40 kW';
     return '';
+  };
+
+  // Power errors block saving only until the user explicitly confirms the out-of-range value.
+  const blockingValidationErrors = (): string[] =>
+    Object.entries(validationErrors)
+      .filter(([key]) => !powerConfirmations[key])
+      .map(([, message]) => message);
+
+  const renderPowerFeedback = (
+    field: 'contracted_power_before_kw' | 'contracted_power_after_kw',
+    tariffCode: string,
+    compact = false,
+  ) => {
+    const error = validationErrors[field];
+    const textSize = compact ? 'text-xs' : 'text-sm';
+    if (!error) {
+      return (
+        <p className="text-xs text-muted-foreground">
+          {getPowerHint(tariffCode || 'C11')}
+        </p>
+      );
+    }
+    if (powerConfirmations[field]) {
+      return (
+        <p className={`${textSize} text-warning flex items-center gap-1`}>
+          <AlertTriangle className="h-3 w-3" />
+          {error} — potwierdzono świadome wprowadzenie.
+        </p>
+      );
+    }
+    return (
+      <div className="space-y-1.5">
+        <p className={`${textSize} text-warning flex items-center gap-1`}>
+          <AlertTriangle className="h-3 w-3" />
+          {error}
+        </p>
+        <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
+          <Checkbox
+            checked={false}
+            onCheckedChange={(checked) =>
+              setPowerConfirmations(prev => ({ ...prev, [field]: checked === true }))
+            }
+            className="mt-0.5"
+          />
+          Potwierdzam świadome wprowadzenie mocy poza typowym zakresem dla tej taryfy
+        </label>
+      </div>
+    );
   };
 
   const handleInputChange = useCallback((field: keyof EnergyAnalysis, value: string | number | boolean) => {
