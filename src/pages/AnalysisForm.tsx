@@ -978,16 +978,7 @@ function AnalysisForm() {
                           handlePowerChangeBefore(parseFloat(value) || 0);
                         }}
                       />
-                      {validationErrors.contracted_power_before_kw ? (
-                        <p className="text-sm text-destructive flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3" />
-                          {validationErrors.contracted_power_before_kw}
-                        </p>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">
-                          {getPowerHint(formData.tariff_code_before || 'C11')}
-                        </p>
-                      )}
+                      {renderPowerFeedback('contracted_power_before_kw', formData.tariff_code_before || 'C11')}
                     </div>
                   </div>
                 </div>
@@ -1023,16 +1014,7 @@ function AnalysisForm() {
                           handlePowerChangeAfter(parseFloat(value) || 0);
                         }}
                       />
-                      {validationErrors.contracted_power_after_kw ? (
-                        <p className="text-sm text-destructive flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3" />
-                          {validationErrors.contracted_power_after_kw}
-                        </p>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">
-                          {getPowerHint(formData.tariff_code_after || 'C11')}
-                        </p>
-                      )}
+                      {renderPowerFeedback('contracted_power_after_kw', formData.tariff_code_after || 'C11')}
                     </div>
                   </div>
                 </div>
