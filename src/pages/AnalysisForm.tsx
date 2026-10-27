@@ -23,12 +23,14 @@ import {
   Save,
   Loader2,
   AlertCircle,
+  AlertTriangle,
   Printer,
   ChevronLeft,
   ChevronRight,
   Check,
   Plus,
 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import type { EnergyAnalysis, ClientProject, ResolvedRates } from '@/types/database';
 import { TARIFF_CODES, getZonesCount, getZoneLabels, validateContractedPower, calculatePeriodMonths, getDefaultDistribution } from '@/lib/tariff-utils';
 import { normalizeTariffCode } from '@/lib/invoice-import';
@@ -135,6 +137,9 @@ function AnalysisForm() {
   });
 
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  // Explicit user confirmation for contracted power outside the tariff's typical range.
+  // Without confirmation the value still blocks saving; confirming turns the error into a warning.
+  const [powerConfirmations, setPowerConfirmations] = useState<Record<string, boolean>>({});
   const [resolvedRatesBefore, setResolvedRatesBefore] = useState<ResolvedRates | null>(null);
   const [resolvedRatesAfter, setResolvedRatesAfter] = useState<ResolvedRates | null>(null);
   const [isManualModeBefore, setIsManualModeBefore] = useState(false);
