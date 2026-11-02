@@ -1,5 +1,4 @@
 import type { EnergyAnalysis } from '@/types/database';
-import { incompletePo, INCOMPLETE_PO_MESSAGE } from './invoice-gaps';
 import { calculateEnergyCosts, type CalculationResult } from './calculation-utils';
 
 export interface PpeEntry {
@@ -28,25 +27,9 @@ export interface ProjectTotals {
 
 export const normalizePpe = (v: string | null | undefined) => (v || '').replace(/\s+/g, '').toUpperCase();
 
-const isBlank = (v: unknown) => v === null || v === undefined || v === '';
-
-/** Required fields check — missing values are NOT treated as zero. */
-export function findMissingFields(a: Partial<EnergyAnalysis>): string[] {
-  const m: string[] = [];
-  if (isBlank(a.period_from) || isBlank(a.period_to)) m.push('okres analizy');
-  if (isBlank(a.tariff_code_before)) m.push('taryfa PRZED');
-  if (isBlank(a.tariff_code_after)) m.push('taryfa PO');
-  const zb = a.zones_count_before || 1;
-  const za = a.zones_count_after || 1;
-  for (let z = 1; z <= zb; z++) {
-    if (isBlank((a as any)[`consumption_before_zone${z}_mwh`])) m.push(`zużycie PRZED S${z}`);
-    if (isBlank((a as any)[`active_energy_price_before_zone${z}`])) m.push(`cena energii PRZED S${z}`);
-  }
-  for (let z = 1; z <= za; z++) {
-    if (isBlank((a as any)[`consumption_after_zone${z}_mwh`])) m.push(`zużycie PO S${z}`);
-    if (isBlank((a as any)[`active_energy_price_after_zone${z}`])) m.push(`cena energii PO S${z}`);
-  }
-  return [...new Set([...m, ...incompletePo(a as Record<string, unknown>)])];
+/** Missing inputs never disqualify a PPE from calculation or reporting. */
+export function findMissingFields(_a: Partial<EnergyAnalysis>): string[] {
+  return [];
 }
 
 const exclusionKey = (a: Partial<EnergyAnalysis>) =>
@@ -75,8 +58,8 @@ export function calculateProjectTotals(analyses: (Partial<EnergyAnalysis> & { id
 
   const totalBefore = entries.reduce((s, e) => s + e.result.totalCostBefore, 0);
   const totalAfter = entries.reduce((s, e) => s + e.result.totalCostAfter, 0);
-  const savingsValue = invalid.length ? NaN : totalBefore - totalAfter;
-  const savingsPercent = invalid.length ? null : totalBefore !== 0 ? (savingsValue / totalBefore) * 100 : null;
+  const savingsValue = totalBefore - totalAfter;
+  const savingsPercent = totalBefore !== 0 ? (savingsValue / totalBefore) * 100 : null;
 
   return {
     entries,
@@ -107,7 +90,6 @@ export function summarizeGroupCard(items: (Partial<EnergyAnalysis> & { id: strin
   const set = items.length === 1 ? items : chosen;
   if (set.length === 0) return { kind: 'message', message: 'Wybierz PPE do zestawienia' };
   const t = calculateProjectTotals(set);
-  if (t.invalid.length > 0) return { kind: 'message', message: INCOMPLETE_PO_MESSAGE };
   if (!t.samePeriod) return { kind: 'message', message: 'Różne okresy — brak wspólnego wyniku' };
   if (t.duplicatePpe.length > 0) return { kind: 'message', message: 'Ten sam numer PPE wybrany kilka razy' };
   const label = items.length === 1 ? 'Wynik 1 PPE' : `Wynik ${set.length} z ${items.length} PPE wybranych do raportu`;

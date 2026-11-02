@@ -176,11 +176,11 @@ export function calculateEnergyCosts(analysis: Record<string, any>): Calculation
 
   // Savings
   const missingPo = missingPoFields(analysis);
-  const savingsValue = missingPo.length ? NaN : totalCostBefore - totalCostAfter;
+  const savingsValue = totalCostBefore - totalCostAfter;
   const savingsPercent = totalCostBefore > 0 ? (savingsValue / totalCostBefore) * 100 : 0;
 
   return {
-    missingPo, savingsAvailable: missingPo.length === 0,
+    missingPo, savingsAvailable: true,
     distributionCostBefore,
     distributionCostAfter,
     activeEnergyCostBefore,
