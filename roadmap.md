@@ -1,8 +1,8 @@
 # Roadmap
 
 ## Oszczędności z dostępnych danych
-- [ ] Usunięcie blokady niepełnych pól w kalkulatorze, zestawieniu, PDF i asystencie; brakujące liczby bez wkładu do kosztów, bez zmiany zapisanych danych.
-- [ ] Testy automatyczne i sprawdzenie zalogowanego formularza na osobnym projekcie testowym.
+- [x] Usunięcie wspólnej blokady niepełnych pól w kalkulatorze, zestawieniu, PDF i asystencie; brakujące liczby bez wkładu do kosztów, bez zmiany zapisanych danych. Wdrożono funkcje asystenta i podsumowania faktur.
+- [x] 226 testów automatycznych; przeglądarka po zalogowaniu: pusta cena i opłata mocowa PO, PRZED 5100 zł / PO 0 zł / oszczędność 5100 zł, zapis, odświeżenie, karta PPE i zestawienie bez komunikatu o brakach; projekt testowy usunięty. Rozmowy AI i pobrania PDF nie testowano w przeglądarce.
 
 ## Podsumowanie danych z faktur
 - [x] Auto-otwarcie po odczycie paczki, lista PPE / szczegóły, statusy dokumentów, nieodczytane jawnie.
