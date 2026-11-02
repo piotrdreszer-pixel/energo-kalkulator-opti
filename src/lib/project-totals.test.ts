@@ -43,10 +43,12 @@ describe('calculateProjectTotals', () => {
     expect(t.canAggregate).toBe(false);
   });
 
-  it('treats missing values as incomplete, not zero', () => {
+  it('includes PPE with missing consumption in savings', () => {
     const t = calculateProjectTotals([base('a', { consumption_after_zone1_mwh: null })]);
-    expect(t.invalid).toHaveLength(1);
-    expect(t.canAggregate).toBe(false);
+    expect(t.invalid).toHaveLength(0);
+    expect(t.canAggregate).toBe(true);
+    expect(t.totalAfter).toBe(0);
+    expect(t.savingsValue).toBe(5000);
   });
 
   it('returns null percent when total before is zero', () => {

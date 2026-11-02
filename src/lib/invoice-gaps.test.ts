@@ -89,8 +89,8 @@ describe('szacunek kosztów i zastąpienie fakturą', () => {
 });
 
 describe('niepełny wariant PO', () => {
-  it('koszt w PRZED i pusty w PO jest oznaczany', () => {
-    expect(incompletePo({ period_from: '2025-01-01', period_to: '2025-12-31', handling_fee_before: 100, handling_fee_after: null })).toContain('opłata handlowa');
+  it('pusty koszt PO nie blokuje oszczędności', () => {
+    expect(incompletePo({ period_from: '2025-01-01', period_to: '2025-12-31', handling_fee_before: 100, handling_fee_after: null })).toEqual([]);
     expect(incompletePo({ period_from: '2025-01-01', period_to: '2025-12-31', handling_fee_before: 100, handling_fee_after: 50 })).toEqual([]);
   });
 });

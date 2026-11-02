@@ -67,12 +67,13 @@ describe('assistant proposals – gaps', () => {
 });
 
 describe('podgląd przy niepełnym PO', () => {
-  it('procent oszczędności jest pusty (null), nigdy NaN', () => {
+  it('wylicza oszczędność mimo pustego kosztu PO', () => {
     const p = buildProposalPreview(
       { period_from: '2025-01-01', period_to: '2025-05-31', consumption_before_zone1_mwh: 5, active_energy_price_before_zone1: 500, capacity_charge_before: 500, consumption_after_zone1_mwh: 4, active_energy_price_after_zone1: 450 },
       [{ field: 'consumption_before_zone1_mwh', value: 12.0862 }],
     );
-    expect(p.savingsAvailable).toBe(false);
-    expect(p.savingsPercentAfterChange).toBeNull();
+    expect(p.savingsAvailable).toBe(true);
+    expect(p.savingsAfterChange).toBeCloseTo(4743.1, 2);
+    expect(p.savingsPercentAfterChange).toBeCloseTo(4743.1 / 6543.1 * 100, 4);
   });
 });
