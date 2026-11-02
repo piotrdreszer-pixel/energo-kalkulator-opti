@@ -1,5 +1,9 @@
 # Roadmap
 
+## Oszczędności z dostępnych danych
+- [ ] Usunięcie blokady niepełnych pól w kalkulatorze, zestawieniu, PDF i asystencie; brakujące liczby bez wkładu do kosztów, bez zmiany zapisanych danych.
+- [ ] Testy automatyczne i sprawdzenie zalogowanego formularza na osobnym projekcie testowym.
+
 ## Podsumowanie danych z faktur
 - [x] Auto-otwarcie po odczycie paczki, lista PPE / szczegóły, statusy dokumentów, nieodczytane jawnie.
 - [x] Komunikat o lukach (miesiące), przycisk asystenta, „Okres uzupełniony szacunkiem”, z faktur / szacunek / łącznie.
@@ -27,7 +31,7 @@
 ## Stabilizacja ostatniego wdrożenia
 - [x] Spójny wynik po zapisie: odczyt, przeliczenie, odpowiedź i karta.
 - [x] Szacunki zużycia wyłącznie PRZED; osobna zgoda na każdy koszt.
-- [x] Niepełne PO bez kwoty/procentu oszczędności we wszystkich widokach; świadome zero.
+- [x] Dawna blokada niepełnego PO — zastąpiona liczeniem z dostępnych danych na polecenie użytkownika.
 - [x] Pełny test przeglądarkowy na osobnym projekcie, cofanie, ponowne otwarcie, zastępowanie i PDF.
 
 ## Asystent AI
@@ -37,7 +41,7 @@
 - [x] Etap C: „Zastosuj do PO”, historia i „Cofnij zmianę”.
 - [x] Polecenia w czacie: polecenie z wartością zapisuje od razu, akceptacja w czacie, pytania/symulacje bez zapisu (serwer sprawdza).
 - [x] Test poleceń w przeglądarce — czeka na włączenie „Asystent AI” na koncie testowym.
-- [x] „Uzupełnij wariant PO” zamiast pozornych 100% oszczędności.
+- [x] Dawny komunikat „Uzupełnij wariant PO” — zastąpiony liczeniem z dostępnych danych.
 - [x] Okres analizy z zatwierdzonych faktur (zakres, pokrycie, luki) z historią i cofaniem.
 - [x] Szacunki brakujących miesięcy (osobna tabela, metoda dobowa per strefa, akceptacja).
 - [x] Oznaczenia szacunków w formularzu i PDF; zastąpienie szacunku fakturą.
