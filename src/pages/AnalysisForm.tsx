@@ -766,6 +766,13 @@ function AnalysisForm() {
                 {' › '}
                 <Link to={groupPath} className="hover:underline">Lista PPE</Link>
               </p>
+              {(formData.period_from || formData.period_to) && (
+                <p className="text-sm text-foreground mt-1" aria-label="Zakres dat kalkulacji">
+                  Okres kalkulacji: {formData.period_from ? <time dateTime={formData.period_from}>{formData.period_from.split('-').reverse().join('.')}</time> : '—'}
+                  {' – '}
+                  {formData.period_to ? <time dateTime={formData.period_to}>{formData.period_to.split('-').reverse().join('.')}</time> : '—'}
+                </p>
+              )}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -904,16 +911,18 @@ function AnalysisForm() {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>Okres od</Label>
+                    <Label htmlFor="period_from">Okres od</Label>
                     <Input
+                      id="period_from"
                       type="date"
                       value={formData.period_from || ''}
                       onChange={(e) => handleInputChange('period_from', e.target.value)}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Okres do</Label>
+                    <Label htmlFor="period_to">Okres do</Label>
                     <Input
+                      id="period_to"
                       type="date"
                       value={formData.period_to || ''}
                       onChange={(e) => handleInputChange('period_to', e.target.value)}
