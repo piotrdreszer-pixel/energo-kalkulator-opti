@@ -13,7 +13,13 @@ interface AuthContextType {
   signOut: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Keep the same context when this mixed component/hook module is hot-reloaded.
+// Mounted providers and refreshed consumers must never use different instances.
+const AuthContext = (import.meta.hot?.data.authContext as React.Context<AuthContextType | undefined> | undefined)
+  ?? createContext<AuthContextType | undefined>(undefined);
+if (import.meta.hot) {
+  import.meta.hot.data.authContext = AuthContext;
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
